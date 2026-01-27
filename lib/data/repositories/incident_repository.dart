@@ -103,6 +103,10 @@ class IncidentRepository {
     _incidents.insert(0, incident);
   }
 
+  void delete(String id) {
+    _incidents.removeWhere((i) => i.id == id);
+  }
+
   void confirm(String id) {
     final index = _incidents.indexWhere((i) => i.id == id);
     if (index != -1) {

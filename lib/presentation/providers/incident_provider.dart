@@ -83,4 +83,9 @@ class IncidentProvider extends ChangeNotifier {
     _repository.confirm(id);
     notifyListeners();
   }
+
+  void deleteIncident(String id) {
+    _repository.delete(id);
+    notifyListeners();
+  }
 }

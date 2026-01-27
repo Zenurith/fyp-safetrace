@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../utils/app_theme.dart';
@@ -7,12 +8,73 @@ import '../providers/user_provider.dart';
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
+  void _showEditProfileDialog(BuildContext context) {
+    final provider = context.read<UserProvider>();
+    final user = provider.currentUser;
+    if (user == null) return;
+
+    final nameController = TextEditingController(text: user.name);
+    final handleController = TextEditingController(text: user.handle);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit Profile'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Name',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: handleController,
+              decoration: const InputDecoration(
+                labelText: 'Handle',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final updated = user.copyWith(
+                name: nameController.text.trim(),
+                handle: handleController.text.trim(),
+              );
+              provider.updateUser(updated);
+              Navigator.pop(ctx);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.profilePurple,
+            ),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<UserProvider>(
       builder: (context, provider, _) {
         final user = provider.currentUser;
         if (user == null) {
+          if (provider.isLoading) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
           return const Center(child: Text('No user data'));
         }
 
@@ -145,7 +207,7 @@ class ProfileScreen extends StatelessWidget {
                   child: SizedBox(
                     width: double.infinity,
                     child: OutlinedButton(
-                      onPressed: () {},
+                      onPressed: () => _showEditProfileDialog(context),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppTheme.accentBlue,
                         side: const BorderSide(color: AppTheme.accentBlue),
@@ -223,6 +285,27 @@ class ProfileScreen extends StatelessWidget {
                           ),
                         ),
                       ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Sign Out button
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        context.read<UserProvider>().clearUser();
+                        await FirebaseAuth.instance.signOut();
+                      },
+                      icon: const Icon(Icons.logout),
+                      label: const Text('Sign Out'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.primaryRed,
+                        side: const BorderSide(color: AppTheme.primaryRed),
+                      ),
                     ),
                   ),
                 ),
