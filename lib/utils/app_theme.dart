@@ -63,21 +63,13 @@ class AppTheme {
   }
 
   static Color categoryColor(String category) {
-    switch (category.toLowerCase()) {
-      case 'crime':
-        return primaryRed;
-      case 'traffic':
-        return warningOrange;
-      case 'emergency':
-        return primaryRed;
-      case 'infrastructure':
-        return accentBlue;
-      case 'environmental':
-        return successGreen;
-      case 'suspicious':
-        return Colors.purple;
-      default:
-        return Colors.grey;
-    }
+    final cat = category.toLowerCase();
+    if (cat.contains('crime')) return primaryRed;
+    if (cat.contains('traffic') || cat.contains('hazard')) return warningOrange;
+    if (cat.contains('emergency')) return primaryRed;
+    if (cat.contains('infrastructure')) return accentBlue;
+    if (cat.contains('environmental')) return successGreen;
+    if (cat.contains('suspicious')) return Colors.purple;
+    return Colors.grey;
   }
 }

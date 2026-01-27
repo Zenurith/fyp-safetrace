@@ -61,6 +61,7 @@ class IncidentProvider extends ChangeNotifier {
     required double longitude,
     required String address,
     bool isAnonymous = false,
+    List<String> mediaUrls = const [],
   }) {
     final incident = IncidentModel(
       id: _uuid.v4(),
@@ -74,6 +75,7 @@ class IncidentProvider extends ChangeNotifier {
       reportedAt: DateTime.now(),
       reporterId: 'currentUser',
       isAnonymous: isAnonymous,
+      mediaUrls: mediaUrls,
     );
     _repository.add(incident);
     notifyListeners();

@@ -6,6 +6,9 @@
         android:label="SafeTrace"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <uses-library
+            android:name="org.apache.http.legacy"
+            android:required="false"/>
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyAs0PNHYH4X3mwsJQZqdZ9q778eISZ4ifw"/>

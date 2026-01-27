@@ -4,7 +4,15 @@
       "Bash(tree:*)",
       "Bash(ls:*)",
       "Bash(flutter pub get:*)",
-      "Bash(flutter analyze:*)"
+      "Bash(flutter analyze:*)",
+      "Bash(flutter upgrade:*)",
+      "Bash(cmd.exe /c \"flutter upgrade\")",
+      "Bash(powershell.exe -Command \"flutter upgrade\")",
+      "Bash(powershell.exe -Command \"& ''C:\\\\flutter\\\\bin\\\\flutter'' upgrade\")",
+      "Bash(powershell.exe -Command \"& ''C:\\\\flutter\\\\bin\\\\flutter'' --version\")",
+      "Bash(adb shell pm:*)",
+      "Bash(adb logcat:*)",
+      "Bash(where:*)"
     ]
   }
 }
