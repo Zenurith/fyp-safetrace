@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../data/models/incident_model.dart';
 import '../../utils/app_theme.dart';
@@ -104,7 +105,7 @@ class IncidentBottomSheet extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          // Media placeholder
+          // Media
           if (incident.mediaUrls.isNotEmpty) ...[
             const Text(
               'Media',
@@ -114,12 +115,21 @@ class IncidentBottomSheet extends StatelessWidget {
                   color: AppTheme.primaryDark),
             ),
             const SizedBox(height: 8),
-            Row(
-              children: [
-                _MediaPlaceholder(icon: Icons.image),
-                const SizedBox(width: 8),
-                _MediaPlaceholder(icon: Icons.videocam),
-              ],
+            SizedBox(
+              height: 100,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: incident.mediaUrls.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  final url = incident.mediaUrls[index];
+                  final isVideo = url.endsWith('.mp4') || url.endsWith('.mov');
+                  return GestureDetector(
+                    onTap: () => _showMediaViewer(context, url, isVideo),
+                    child: _MediaThumbnail(url: url, isVideo: isVideo),
+                  );
+                },
+              ),
             ),
             const SizedBox(height: 16),
           ],
@@ -187,22 +197,127 @@ class IncidentBottomSheet extends StatelessWidget {
   }
 }
 
-class _MediaPlaceholder extends StatelessWidget {
-  final IconData icon;
+void _showMediaViewer(BuildContext context, String url, bool isVideo) {
+  final isNetworkUrl = url.startsWith('http');
 
-  const _MediaPlaceholder({required this.icon});
+  if (isVideo) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Video playback not yet implemented')),
+    );
+    return;
+  }
+
+  showDialog(
+    context: context,
+    builder: (context) => Dialog(
+      backgroundColor: Colors.transparent,
+      child: Stack(
+        children: [
+          Center(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: isNetworkUrl
+                  ? Image.network(
+                      url,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => _buildErrorWidget(),
+                    )
+                  : Image.file(
+                      File(url),
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => _buildErrorWidget(),
+                    ),
+            ),
+          ),
+          Positioned(
+            top: 40,
+            right: 0,
+            child: IconButton(
+              icon: const Icon(Icons.close, color: Colors.white, size: 30),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildErrorWidget() {
+  return Container(
+    width: 200,
+    height: 200,
+    color: Colors.grey[300],
+    child: const Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.broken_image, size: 48, color: Colors.grey),
+          SizedBox(height: 8),
+          Text('Image not available', style: TextStyle(color: Colors.grey)),
+        ],
+      ),
+    ),
+  );
+}
+
+class _MediaThumbnail extends StatelessWidget {
+  final String url;
+  final bool isVideo;
+
+  const _MediaThumbnail({required this.url, required this.isVideo});
 
   @override
   Widget build(BuildContext context) {
+    final isNetworkUrl = url.startsWith('http');
+
     return Container(
-      width: 72,
-      height: 72,
+      width: 100,
+      height: 100,
       decoration: BoxDecoration(
         color: Colors.grey[200],
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.grey[300]!),
       ),
-      child: Icon(icon, color: Colors.grey[500], size: 28),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (isVideo)
+            Container(
+              color: Colors.grey[300],
+              child: const Icon(Icons.videocam, color: Colors.grey, size: 40),
+            )
+          else if (isNetworkUrl)
+            Image.network(
+              url,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const Icon(
+                Icons.broken_image,
+                color: Colors.grey,
+                size: 40,
+              ),
+            )
+          else
+            Image.file(
+              File(url),
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const Icon(
+                Icons.broken_image,
+                color: Colors.grey,
+                size: 40,
+              ),
+            ),
+          if (isVideo)
+            const Center(
+              child: Icon(
+                Icons.play_circle_fill,
+                color: Colors.white70,
+                size: 36,
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

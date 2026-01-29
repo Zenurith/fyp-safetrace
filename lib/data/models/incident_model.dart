@@ -106,4 +106,39 @@ class IncidentModel {
       confirmations: confirmations ?? this.confirmations,
     );
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'title': title,
+      'category': category.index,
+      'severity': severity.index,
+      'description': description,
+      'latitude': latitude,
+      'longitude': longitude,
+      'address': address,
+      'reportedAt': reportedAt.millisecondsSinceEpoch,
+      'reporterId': reporterId,
+      'isAnonymous': isAnonymous,
+      'mediaUrls': mediaUrls,
+      'confirmations': confirmations,
+    };
+  }
+
+  factory IncidentModel.fromMap(String id, Map<String, dynamic> map) {
+    return IncidentModel(
+      id: id,
+      title: map['title'] ?? '',
+      category: IncidentCategory.values[map['category'] ?? 0],
+      severity: SeverityLevel.values[map['severity'] ?? 0],
+      description: map['description'] ?? '',
+      latitude: (map['latitude'] ?? 0).toDouble(),
+      longitude: (map['longitude'] ?? 0).toDouble(),
+      address: map['address'] ?? '',
+      reportedAt: DateTime.fromMillisecondsSinceEpoch(map['reportedAt'] ?? 0),
+      reporterId: map['reporterId'] ?? '',
+      isAnonymous: map['isAnonymous'] ?? false,
+      mediaUrls: List<String>.from(map['mediaUrls'] ?? []),
+      confirmations: map['confirmations'] ?? 0,
+    );
+  }
 }

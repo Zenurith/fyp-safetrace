@@ -163,12 +163,11 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     setState(() => _submitting = true);
 
     try {
-      // In production, upload media files to storage and get URLs
-      // For now, we'll use local file paths as placeholders
+      // Store local file paths (media only visible on this device)
       final mediaUrls = _mediaFiles.map((f) => f.path).toList();
 
       final provider = context.read<IncidentProvider>();
-      provider.reportIncident(
+      await provider.reportIncident(
         title: _getCategoryLabel(_selectedCategory),
         category: _selectedCategory,
         severity: _selectedSeverity,
@@ -188,6 +187,19 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
           SnackBar(
             content: const Text('Incident reported successfully'),
             backgroundColor: AppTheme.successGreen,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to report incident: $e'),
+            backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),

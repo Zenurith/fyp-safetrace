@@ -12,7 +12,8 @@
       "Bash(powershell.exe -Command \"& ''C:\\\\flutter\\\\bin\\\\flutter'' --version\")",
       "Bash(adb shell pm:*)",
       "Bash(adb logcat:*)",
-      "Bash(where:*)"
+      "Bash(where:*)",
+      "Bash(git fetch:*)"
     ]
   }
 }

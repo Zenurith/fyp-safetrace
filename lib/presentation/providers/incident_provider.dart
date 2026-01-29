@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../../data/models/incident_model.dart';
@@ -7,22 +8,47 @@ class IncidentProvider extends ChangeNotifier {
   final IncidentRepository _repository = IncidentRepository();
   final _uuid = const Uuid();
 
+  List<IncidentModel> _incidents = [];
   final Set<String> _activeFilters = {};
   IncidentModel? _selectedIncident;
+  bool _isLoading = false;
+  String? _error;
+  StreamSubscription<List<IncidentModel>>? _subscription;
+
+  IncidentProvider() {
+    _subscribeToIncidents();
+  }
+
+  void _subscribeToIncidents() {
+    _subscription = _repository.getIncidentsStream().listen(
+      (incidents) {
+        _incidents = incidents;
+        _isLoading = false;
+        _error = null;
+        notifyListeners();
+      },
+      onError: (e) {
+        _error = e.toString();
+        _isLoading = false;
+        notifyListeners();
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
+  }
 
   List<IncidentModel> get incidents {
-    var list = _repository.getAll();
+    var list = _incidents;
     if (_activeFilters.isEmpty) return list;
 
     return list.where((i) {
       if (_activeFilters.contains('Last 24 hours')) {
         final cutoff = DateTime.now().subtract(const Duration(hours: 24));
         if (i.reportedAt.isBefore(cutoff)) return false;
-      }
-      if (_activeFilters.contains('Crime') &&
-          !_activeFilters.contains(i.categoryLabel) &&
-          i.category != IncidentCategory.crime) {
-        // If Crime filter is active, only show crime when other categories aren't matching
       }
       final categoryFilters = _activeFilters
           .where((f) => f != 'Last 24 hours')
@@ -37,6 +63,8 @@ class IncidentProvider extends ChangeNotifier {
 
   Set<String> get activeFilters => _activeFilters;
   IncidentModel? get selectedIncident => _selectedIncident;
+  bool get isLoading => _isLoading;
+  String? get error => _error;
 
   void toggleFilter(String filter) {
     if (_activeFilters.contains(filter)) {
@@ -52,7 +80,7 @@ class IncidentProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void reportIncident({
+  Future<void> reportIncident({
     required String title,
     required IncidentCategory category,
     required SeverityLevel severity,
@@ -62,7 +90,7 @@ class IncidentProvider extends ChangeNotifier {
     required String address,
     bool isAnonymous = false,
     List<String> mediaUrls = const [],
-  }) {
+  }) async {
     final incident = IncidentModel(
       id: _uuid.v4(),
       title: title,
@@ -77,12 +105,16 @@ class IncidentProvider extends ChangeNotifier {
       isAnonymous: isAnonymous,
       mediaUrls: mediaUrls,
     );
-    _repository.add(incident);
-    notifyListeners();
+    await _repository.add(incident);
   }
 
-  void confirmIncident(String id) {
-    _repository.confirm(id);
+  Future<void> confirmIncident(String id) async {
+    await _repository.confirm(id);
+  }
+
+  Future<void> refresh() async {
+    _isLoading = true;
     notifyListeners();
+    // Stream will automatically update
   }
 }
