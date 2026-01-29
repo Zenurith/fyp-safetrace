@@ -1,9 +1,12 @@
 import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../data/models/user_model.dart';
 import '../../data/repositories/user_repository.dart';
+import '../../data/services/media_upload_service.dart';
 
 class UserProvider extends ChangeNotifier {
   final UserRepository _repository = UserRepository();
+  final MediaUploadService _mediaService = MediaUploadService();
 
   UserModel? _currentUser;
   bool _isLoading = false;
@@ -89,5 +92,69 @@ class UserProvider extends ChangeNotifier {
     _currentUser = null;
     _error = null;
     notifyListeners();
+  }
+
+  Future<XFile?> pickProfilePhoto({ImageSource source = ImageSource.gallery}) async {
+    return await _mediaService.pickProfilePhoto(source: source);
+  }
+
+  Future<bool> uploadProfilePhoto(XFile file) async {
+    print('uploadProfilePhoto called');
+    print('currentUser: $_currentUser');
+    print('currentUser id: ${_currentUser?.id}');
+
+    if (_currentUser == null) {
+      print('currentUser is null, returning false');
+      return false;
+    }
+
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      print('Calling mediaService.uploadProfilePhoto with userId: ${_currentUser!.id}');
+      final url = await _mediaService.uploadProfilePhoto(_currentUser!.id, file);
+      print('Upload result URL: $url');
+
+      if (url != null) {
+        print('Updating repository with photo URL');
+        await _repository.updateProfilePhoto(_currentUser!.id, url);
+        _currentUser = _currentUser!.copyWith(profilePhotoUrl: url);
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      }
+      print('URL was null, upload failed');
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      print('Exception in uploadProfilePhoto: $e');
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> removeProfilePhoto() async {
+    if (_currentUser == null) return false;
+
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      await _mediaService.deleteProfilePhoto(_currentUser!.id);
+      await _repository.updateProfilePhoto(_currentUser!.id, null);
+      _currentUser = _currentUser!.copyWith(clearProfilePhoto: true);
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
   }
 }

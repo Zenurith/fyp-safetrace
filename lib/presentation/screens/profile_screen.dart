@@ -1,12 +1,107 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../utils/app_theme.dart';
 import '../providers/user_provider.dart';
+import '../widgets/user_avatar.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
+
+  void _showPhotoOptions(BuildContext context) {
+    final provider = context.read<UserProvider>();
+    final user = provider.currentUser;
+    final hasPhoto = user?.profilePhotoUrl != null && user!.profilePhotoUrl!.isNotEmpty;
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Profile Photo',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: AppTheme.accentBlue),
+              title: const Text('Take Photo'),
+              onTap: () async {
+                Navigator.pop(ctx);
+                await _pickAndUploadPhoto(context, ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: AppTheme.accentBlue),
+              title: const Text('Choose from Gallery'),
+              onTap: () async {
+                Navigator.pop(ctx);
+                await _pickAndUploadPhoto(context, ImageSource.gallery);
+              },
+            ),
+            if (hasPhoto)
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: AppTheme.primaryRed),
+                title: const Text('Remove Photo', style: TextStyle(color: AppTheme.primaryRed)),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await _removePhoto(context);
+                },
+              ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickAndUploadPhoto(BuildContext context, ImageSource source) async {
+    final provider = context.read<UserProvider>();
+    final file = await provider.pickProfilePhoto(source: source);
+    if (file != null) {
+      final success = await provider.uploadProfilePhoto(file);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(success ? 'Profile photo updated' : 'Failed to update photo'),
+            backgroundColor: success ? AppTheme.successGreen : AppTheme.primaryRed,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _removePhoto(BuildContext context) async {
+    final provider = context.read<UserProvider>();
+    final success = await provider.removeProfilePhoto();
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(success ? 'Profile photo removed' : 'Failed to remove photo'),
+          backgroundColor: success ? AppTheme.successGreen : AppTheme.primaryRed,
+        ),
+      );
+    }
+  }
 
   void _showEditProfileDialog(BuildContext context) {
     final provider = context.read<UserProvider>();
@@ -100,24 +195,37 @@ class ProfileScreen extends StatelessWidget {
                       top: 8, bottom: 32, left: 20, right: 20),
                   child: Column(
                     children: [
-                      // Avatar
-                      Container(
-                        width: 88,
-                        height: 88,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.teal,
-                          border: Border.all(color: Colors.amber, width: 3),
-                        ),
-                        child: Center(
-                          child: Text(
-                            user.initials,
-                            style: const TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                      // Avatar with edit overlay
+                      GestureDetector(
+                        onTap: () => _showPhotoOptions(context),
+                        child: Stack(
+                          children: [
+                            UserAvatar(
+                              photoUrl: user.profilePhotoUrl,
+                              initials: user.initials,
+                              radius: 44,
+                              backgroundColor: Colors.teal,
+                              borderWidth: 3,
+                              borderColor: Colors.amber,
                             ),
-                          ),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.accentBlue,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white, width: 2),
+                                ),
+                                child: const Icon(
+                                  Icons.camera_alt,
+                                  size: 16,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 12),

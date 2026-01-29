@@ -39,4 +39,8 @@ class UserRepository {
   Future<void> updateUserRole(String uid, String role) async {
     await _usersCollection.doc(uid).update({'role': role});
   }
+
+  Future<void> updateProfilePhoto(String uid, String? photoUrl) async {
+    await _usersCollection.doc(uid).update({'profilePhotoUrl': photoUrl});
+  }
 }

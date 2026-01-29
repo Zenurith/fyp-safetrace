@@ -10,6 +10,7 @@ class UserModel {
   final String levelTitle;
   final bool isTrusted;
   final String role;
+  final String? profilePhotoUrl;
 
   UserModel({
     required this.id,
@@ -23,6 +24,7 @@ class UserModel {
     this.levelTitle = 'Newcomer',
     this.isTrusted = false,
     this.role = 'user',
+    this.profilePhotoUrl,
   });
 
   bool get isAdmin => role == 'admin';
@@ -42,6 +44,7 @@ class UserModel {
       levelTitle: map['levelTitle'] ?? 'Newcomer',
       isTrusted: map['isTrusted'] ?? false,
       role: map['role'] ?? 'user',
+      profilePhotoUrl: map['profilePhotoUrl'],
     );
   }
 
@@ -57,6 +60,7 @@ class UserModel {
       'levelTitle': levelTitle,
       'isTrusted': isTrusted,
       'role': role,
+      'profilePhotoUrl': profilePhotoUrl,
     };
   }
 
@@ -72,6 +76,8 @@ class UserModel {
     String? levelTitle,
     bool? isTrusted,
     String? role,
+    String? profilePhotoUrl,
+    bool clearProfilePhoto = false,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -85,6 +91,7 @@ class UserModel {
       levelTitle: levelTitle ?? this.levelTitle,
       isTrusted: isTrusted ?? this.isTrusted,
       role: role ?? this.role,
+      profilePhotoUrl: clearProfilePhoto ? null : (profilePhotoUrl ?? this.profilePhotoUrl),
     );
   }
 

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_provider.dart';
+import '../providers/incident_provider.dart';
 import 'map_screen.dart';
+import 'my_reports_screen.dart';
 import 'alert_settings_screen.dart';
 import 'admin_screen.dart';
 import 'profile_screen.dart';
@@ -17,12 +19,22 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
   @override
+  void initState() {
+    super.initState();
+    // Start listening to incidents when home screen loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<IncidentProvider>().startListening();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final user = context.watch<UserProvider>().currentUser;
     final isAdmin = user?.isAdmin ?? false;
 
     final screens = [
       const MapScreen(),
+      const MyReportsScreen(),
       const AlertSettingsScreen(),
       if (isAdmin) const AdminScreen(),
       const ProfileScreen(),
@@ -37,6 +49,10 @@ class _HomeScreenState extends State<HomeScreen> {
       const BottomNavigationBarItem(
         icon: Icon(Icons.map),
         label: 'Map',
+      ),
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.history),
+        label: 'My Reports',
       ),
       BottomNavigationBarItem(
         icon: Stack(
@@ -84,7 +100,7 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: (i) => setState(() => _currentIndex = i),
         selectedItemColor: const Color(0xFFE53E3E),
         unselectedItemColor: Colors.grey,
-        type: isAdmin ? BottomNavigationBarType.fixed : BottomNavigationBarType.shifting,
+        type: BottomNavigationBarType.fixed,
         items: navItems,
       ),
     );
