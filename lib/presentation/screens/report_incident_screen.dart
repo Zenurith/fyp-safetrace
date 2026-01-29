@@ -1,6 +1,8 @@
 // ignore_for_file: deprecated_member_use
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -19,6 +21,8 @@ class ReportIncidentScreen extends StatefulWidget {
 
 class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
   final _descriptionController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _addressFocusNode = FocusNode();
   final _locationService = LocationService();
   final _imagePicker = ImagePicker();
 
@@ -28,15 +32,121 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
   bool _isAnonymous = true;
   double _latitude = AppConstants.defaultLat;
   double _longitude = AppConstants.defaultLng;
-  String _address = 'Detecting location...';
   bool _loadingLocation = true;
   bool _submitting = false;
   final List<XFile> _mediaFiles = [];
 
+  // Address autocomplete state
+  List<PlaceSuggestion> _suggestions = [];
+  Timer? _debounceTimer;
+  bool _showSuggestions = false;
+  bool _isSearchingAddress = false;
+
   @override
   void initState() {
     super.initState();
+    _addressController.text = 'Detecting location...';
+    _addressController.addListener(_onAddressChanged);
+    _addressFocusNode.addListener(_onAddressFocusChanged);
     _detectLocation();
+  }
+
+  void _onAddressChanged() {
+    if (!_addressFocusNode.hasFocus) return;
+
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 400), () {
+      _fetchSuggestions(_addressController.text);
+    });
+  }
+
+  void _onAddressFocusChanged() {
+    if (!_addressFocusNode.hasFocus) {
+      // Delay hiding suggestions to allow tap on suggestion
+      Future.delayed(const Duration(milliseconds: 200), () {
+        if (mounted && !_addressFocusNode.hasFocus) {
+          setState(() => _showSuggestions = false);
+        }
+      });
+    }
+  }
+
+  Future<void> _fetchSuggestions(String query) async {
+    if (query.length < 3) {
+      setState(() {
+        _suggestions = [];
+        _showSuggestions = false;
+      });
+      return;
+    }
+
+    final suggestions = await _locationService.getAddressSuggestions(query);
+    if (mounted) {
+      setState(() {
+        _suggestions = suggestions;
+        _showSuggestions = suggestions.isNotEmpty;
+      });
+    }
+  }
+
+  Future<void> _selectSuggestion(PlaceSuggestion suggestion) async {
+    setState(() {
+      _showSuggestions = false;
+      _isSearchingAddress = true;
+    });
+    _addressController.text = suggestion.description;
+    _addressFocusNode.unfocus();
+
+    final coords = await _locationService.getCoordinatesFromPlaceId(suggestion.placeId);
+    if (coords != null && mounted) {
+      setState(() {
+        _latitude = coords.latitude;
+        _longitude = coords.longitude;
+        _isSearchingAddress = false;
+      });
+      _mapController?.animateCamera(
+        CameraUpdate.newLatLng(LatLng(_latitude, _longitude)),
+      );
+    } else {
+      setState(() => _isSearchingAddress = false);
+    }
+  }
+
+  Future<void> _searchEnteredAddress() async {
+    final address = _addressController.text.trim();
+    if (address.isEmpty) return;
+
+    setState(() {
+      _showSuggestions = false;
+      _isSearchingAddress = true;
+    });
+    _addressFocusNode.unfocus();
+
+    final coords = await _locationService.getCoordinatesFromAddress(address);
+    if (coords != null && mounted) {
+      setState(() {
+        _latitude = coords.latitude;
+        _longitude = coords.longitude;
+        _isSearchingAddress = false;
+      });
+      _mapController?.animateCamera(
+        CameraUpdate.newLatLng(LatLng(_latitude, _longitude)),
+      );
+    } else {
+      if (mounted) {
+        setState(() => _isSearchingAddress = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Could not find location for this address'),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _detectLocation() async {
@@ -49,15 +159,15 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
         setState(() {
           _latitude = pos.latitude;
           _longitude = pos.longitude;
-          _address = addr;
         });
+        _addressController.text = addr;
         _mapController?.animateCamera(
           CameraUpdate.newLatLng(LatLng(_latitude, _longitude)),
         );
       }
     } catch (_) {
       if (mounted) {
-        setState(() => _address = 'Unable to detect location');
+        _addressController.text = 'Unable to detect location';
       }
     }
     if (mounted) setState(() => _loadingLocation = false);
@@ -81,8 +191,8 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
       final addr = await _locationService.getAddressFromCoordinates(
           result.latitude, result.longitude);
       if (mounted) {
+        _addressController.text = addr;
         setState(() {
-          _address = addr;
           _loadingLocation = false;
         });
       }
@@ -153,7 +263,12 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
+    _addressController.removeListener(_onAddressChanged);
+    _addressFocusNode.removeListener(_onAddressFocusChanged);
     _descriptionController.dispose();
+    _addressController.dispose();
+    _addressFocusNode.dispose();
     _mapController?.dispose();
     super.dispose();
   }
@@ -176,7 +291,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
             : _descriptionController.text.trim(),
         latitude: _latitude,
         longitude: _longitude,
-        address: _address,
+        address: _addressController.text.trim(),
         isAnonymous: _isAnonymous,
         mediaUrls: mediaUrls,
       );
@@ -283,50 +398,130 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 12),
-            // Address display
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppTheme.cardBorder),
+            const SizedBox(height: 20),
+            const Text(
+              'Address',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.primaryDark,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Automatically detected:',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[500],
+            ),
+            const SizedBox(height: 12),
+            // Address input field with autocomplete
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: _addressController,
+                  focusNode: _addressFocusNode,
+                  enabled: !_loadingLocation && !_isSearchingAddress,
+                  maxLines: 1,
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (_) => _searchEnteredAddress(),
+                  decoration: InputDecoration(
+                    hintText: 'Enter or search for an address...',
+                    hintStyle: TextStyle(color: Colors.grey[400]),
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: AppTheme.cardBorder),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: AppTheme.cardBorder),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide:
+                          const BorderSide(color: AppTheme.primaryRed, width: 2),
+                    ),
+                    suffixIcon: (_loadingLocation || _isSearchingAddress)
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppTheme.primaryRed,
+                              ),
+                            ),
+                          )
+                        : IconButton(
+                            icon: const Icon(Icons.search, color: Colors.grey),
+                            onPressed: _searchEnteredAddress,
+                          ),
+                  ),
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                // Suggestions dropdown
+                if (_showSuggestions && _suggestions.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(top: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppTheme.cardBorder),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    constraints: const BoxConstraints(maxHeight: 200),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      padding: EdgeInsets.zero,
+                      itemCount: _suggestions.length,
+                      itemBuilder: (context, index) {
+                        final suggestion = _suggestions[index];
+                        return InkWell(
+                          onTap: () => _selectSuggestion(suggestion),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 12,
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.location_on_outlined,
+                                  color: Colors.grey[600],
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    suggestion.description,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          _loadingLocation ? 'Detecting location...' : _address,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                      if (_loadingLocation)
-                        const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppTheme.primaryRed,
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Type an address and press Enter to search, or use the button below',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[500],
               ),
             ),
             const SizedBox(height: 12),
@@ -334,7 +529,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
             OutlinedButton.icon(
               onPressed: _adjustLocation,
               icon: const Icon(Icons.location_on, size: 18),
-              label: const Text('Adjust Location'),
+              label: const Text('Adjust Location on Map'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppTheme.primaryDark,
                 padding:
