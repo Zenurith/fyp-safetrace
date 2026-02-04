@@ -36,6 +36,8 @@ class IncidentModel {
   final IncidentStatus status;
   final DateTime? statusUpdatedAt;
   final String? statusNote;
+  final int upvotes;
+  final int downvotes;
 
   IncidentModel({
     required this.id,
@@ -54,7 +56,11 @@ class IncidentModel {
     this.status = IncidentStatus.pending,
     this.statusUpdatedAt,
     this.statusNote,
+    this.upvotes = 0,
+    this.downvotes = 0,
   });
+
+  int get voteScore => upvotes - downvotes;
 
   String get categoryLabel {
     switch (category) {
@@ -127,6 +133,8 @@ class IncidentModel {
       'statusUpdatedAt':
           statusUpdatedAt != null ? Timestamp.fromDate(statusUpdatedAt!) : null,
       'statusNote': statusNote,
+      'upvotes': upvotes,
+      'downvotes': downvotes,
     };
   }
 
@@ -152,6 +160,8 @@ class IncidentModel {
           ? (map['statusUpdatedAt'] as Timestamp).toDate()
           : null,
       statusNote: map['statusNote'],
+      upvotes: map['upvotes'] ?? 0,
+      downvotes: map['downvotes'] ?? 0,
     );
   }
 
@@ -172,6 +182,8 @@ class IncidentModel {
     IncidentStatus? status,
     DateTime? statusUpdatedAt,
     String? statusNote,
+    int? upvotes,
+    int? downvotes,
   }) {
     return IncidentModel(
       id: id ?? this.id,
@@ -190,6 +202,8 @@ class IncidentModel {
       status: status ?? this.status,
       statusUpdatedAt: statusUpdatedAt ?? this.statusUpdatedAt,
       statusNote: statusNote ?? this.statusNote,
+      upvotes: upvotes ?? this.upvotes,
+      downvotes: downvotes ?? this.downvotes,
     );
   }
 }

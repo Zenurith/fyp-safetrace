@@ -3,14 +3,29 @@ import 'package:provider/provider.dart';
 import '../../data/models/incident_model.dart';
 import '../../utils/app_theme.dart';
 import '../providers/incident_provider.dart';
+import '../providers/user_provider.dart';
+import 'vote_buttons.dart';
 
 class IncidentBottomSheet extends StatelessWidget {
-  final IncidentModel incident;
+  final String incidentId;
 
-  const IncidentBottomSheet({super.key, required this.incident});
+  const IncidentBottomSheet({super.key, required this.incidentId});
 
   @override
   Widget build(BuildContext context) {
+    // Watch the incident from the provider to get real-time updates
+    final incidents = context.watch<IncidentProvider>().incidents;
+    final incident = incidents.where((i) => i.id == incidentId).firstOrNull;
+
+    if (incident == null) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        child: const Center(
+          child: Text('Incident not found'),
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -33,23 +48,26 @@ class IncidentBottomSheet extends StatelessWidget {
           // Header row
           Row(
             children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppTheme.categoryColor(incident.categoryLabel)
-                      .withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: AppTheme.categoryColor(incident.categoryLabel),
+              Expanded(
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.categoryColor(incident.categoryLabel)
+                        .withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppTheme.categoryColor(incident.categoryLabel),
+                    ),
                   ),
-                ),
-                child: Text(
-                  '${incident.categoryLabel} - ${incident.title}',
-                  style: TextStyle(
-                    color: AppTheme.categoryColor(incident.categoryLabel),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
+                  child: Text(
+                    '${incident.categoryLabel} - ${incident.title}',
+                    style: TextStyle(
+                      color: AppTheme.categoryColor(incident.categoryLabel),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ),
@@ -62,7 +80,6 @@ class IncidentBottomSheet extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
               ),
-              const Spacer(),
               IconButton(
                 icon: const Icon(Icons.close),
                 onPressed: () => Navigator.pop(context),
@@ -203,31 +220,8 @@ class IncidentBottomSheet extends StatelessWidget {
             const SizedBox(height: 16),
           ],
 
-          // Confirmations
-          if (incident.confirmations > 0)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppTheme.successGreen.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.check_circle,
-                      color: AppTheme.successGreen, size: 18),
-                  const SizedBox(width: 6),
-                  Text(
-                    '${incident.confirmations} community members confirmed this',
-                    style: const TextStyle(
-                      color: AppTheme.successGreen,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          // Voting section
+          _VotingSection(incident: incident),
           const SizedBox(height: 16),
 
           // Action buttons
@@ -235,27 +229,9 @@ class IncidentBottomSheet extends StatelessWidget {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {
-                    context.read<IncidentProvider>().confirmIncident(incident.id);
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Incident confirmed')),
-                    );
-                  },
-                  icon: const Icon(Icons.thumb_up_outlined, size: 18),
-                  label: const Text('Confirm'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.successGreen,
-                    side: const BorderSide(color: AppTheme.successGreen),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton.icon(
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.map_outlined, size: 18),
-                  label: const Text('View'),
+                  label: const Text('View on Map'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppTheme.primaryRed,
                     side: const BorderSide(color: AppTheme.primaryRed),
@@ -319,6 +295,80 @@ class IncidentBottomSheet extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _VotingSection extends StatelessWidget {
+  final IncidentModel incident;
+
+  const _VotingSection({required this.incident});
+
+  @override
+  Widget build(BuildContext context) {
+    final currentUser = context.watch<UserProvider>().currentUser;
+    final isOwnReport = currentUser?.id == incident.reporterId;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.backgroundGrey,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                'Community Feedback',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.primaryDark,
+                ),
+              ),
+              const Spacer(),
+              if (isOwnReport)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'Your report',
+                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              VoteButtons(incident: incident),
+              const Spacer(),
+              if (incident.confirmations > 0)
+                Row(
+                  children: [
+                    const Icon(Icons.verified, color: AppTheme.successGreen, size: 16),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${incident.confirmations} confirmed',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.successGreen,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }

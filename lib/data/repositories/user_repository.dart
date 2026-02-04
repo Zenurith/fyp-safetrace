@@ -43,4 +43,16 @@ class UserRepository {
   Future<void> updateProfilePhoto(String uid, String? photoUrl) async {
     await _usersCollection.doc(uid).update({'profilePhotoUrl': photoUrl});
   }
+
+  Future<void> updatePoints(String uid, int delta) async {
+    await _usersCollection.doc(uid).update({
+      'points': FieldValue.increment(delta),
+    });
+  }
+
+  Future<void> incrementVoteCount(String uid) async {
+    await _usersCollection.doc(uid).update({
+      'votes': FieldValue.increment(1),
+    });
+  }
 }

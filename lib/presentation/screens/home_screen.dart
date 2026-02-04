@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_provider.dart';
 import '../providers/incident_provider.dart';
+import '../providers/vote_provider.dart';
 import 'map_screen.dart';
 import 'my_reports_screen.dart';
 import 'alert_settings_screen.dart';
@@ -17,6 +18,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
+  bool _votesLoaded = false;
 
   @override
   void initState() {
@@ -24,13 +26,30 @@ class _HomeScreenState extends State<HomeScreen> {
     // Start listening to incidents when home screen loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<IncidentProvider>().startListening();
+      _loadUserVotesIfNeeded();
     });
+  }
+
+  void _loadUserVotesIfNeeded() {
+    if (_votesLoaded) return;
+    final user = context.read<UserProvider>().currentUser;
+    if (user != null) {
+      context.read<VoteProvider>().loadUserVotes(user.id);
+      _votesLoaded = true;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final user = context.watch<UserProvider>().currentUser;
     final isAdmin = user?.isAdmin ?? false;
+
+    // Load user votes once user is available
+    if (user != null && !_votesLoaded) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadUserVotesIfNeeded();
+      });
+    }
 
     final screens = [
       const MapScreen(),

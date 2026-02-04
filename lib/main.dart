@@ -6,6 +6,7 @@ import 'firebase_options.dart';
 import 'presentation/providers/incident_provider.dart';
 import 'presentation/providers/user_provider.dart';
 import 'presentation/providers/alert_settings_provider.dart';
+import 'presentation/providers/vote_provider.dart';
 import 'presentation/screens/home_screen.dart';
 import 'presentation/screens/auth_screen.dart';
 import 'utils/app_theme.dart';
@@ -28,6 +29,7 @@ class SafeTraceApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => IncidentProvider()),
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => AlertSettingsProvider()),
+        ChangeNotifierProvider(create: (_) => VoteProvider()),
       ],
       child: MaterialApp(
         title: 'SafeTrace',

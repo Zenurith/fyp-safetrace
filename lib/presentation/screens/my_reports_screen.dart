@@ -189,14 +189,23 @@ class _ReportCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 16),
-                  Icon(Icons.thumb_up_outlined,
-                      size: 14, color: Colors.grey[500]),
-                  const SizedBox(width: 4),
+                  Icon(Icons.arrow_upward, size: 14, color: AppTheme.successGreen),
+                  const SizedBox(width: 2),
                   Text(
-                    '${report.confirmations} confirmations',
+                    '${report.upvotes}',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey[500],
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(Icons.arrow_downward, size: 14, color: AppTheme.primaryRed),
+                  const SizedBox(width: 2),
+                  Text(
+                    '${report.downvotes}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
                     ),
                   ),
                   if (report.mediaUrls.isNotEmpty) ...[
@@ -380,8 +389,23 @@ class _ReportDetailsSheet extends StatelessWidget {
               ),
               _DetailRow(
                 icon: Icons.thumb_up,
-                label: 'Confirmations',
-                value: '${report.confirmations}',
+                label: 'Upvotes',
+                value: '${report.upvotes}',
+              ),
+              _DetailRow(
+                icon: Icons.thumb_down,
+                label: 'Downvotes',
+                value: '${report.downvotes}',
+              ),
+              _DetailRow(
+                icon: Icons.score,
+                label: 'Vote Score',
+                value: '${report.voteScore}',
+                valueColor: report.voteScore > 0
+                    ? AppTheme.successGreen
+                    : report.voteScore < 0
+                        ? AppTheme.primaryRed
+                        : null,
               ),
               if (report.statusUpdatedAt != null)
                 _DetailRow(
