@@ -1,8 +1,15 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../data/models/incident_model.dart';
+import '../../data/services/incident_notification_service.dart';
+import '../../data/services/location_service.dart';
 import '../providers/user_provider.dart';
 import '../providers/incident_provider.dart';
 import '../providers/vote_provider.dart';
+import '../providers/alert_settings_provider.dart';
+import '../widgets/incident_bottom_sheet.dart';
+import '../widgets/incident_notification_overlay.dart';
 import 'map_screen.dart';
 import 'my_reports_screen.dart';
 import 'alert_settings_screen.dart';
@@ -21,6 +28,16 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   bool _votesLoaded = false;
 
+  final _notificationService = IncidentNotificationService();
+  final _locationService = LocationService();
+  StreamSubscription? _notificationSubscription;
+
+  // Current notification to display
+  IncidentNotification? _currentNotification;
+
+  // Track previous incident count to detect new ones
+  int _previousIncidentCount = 0;
+
   @override
   void initState() {
     super.initState();
@@ -28,7 +45,55 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<IncidentProvider>().startListening();
       _loadUserVotesIfNeeded();
+      _initNotifications();
     });
+  }
+
+  void _initNotifications() {
+    // Listen for notification events
+    _notificationSubscription =
+        _notificationService.notificationStream.listen((notification) {
+      if (mounted) {
+        setState(() {
+          _currentNotification = notification;
+        });
+      }
+    });
+
+    // Get location immediately
+    _updateUserLocation();
+  }
+
+  Future<void> _updateUserLocation() async {
+    try {
+      final position = await _locationService.getCurrentPosition();
+      if (position != null) {
+        _notificationService.updateUserLocation(
+          position.latitude,
+          position.longitude,
+        );
+        // Check incidents immediately after getting location
+        if (mounted) {
+          _checkForNewIncidents();
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to update location: $e');
+    }
+  }
+
+  void _checkForNewIncidents() {
+    if (!mounted) return;
+
+    final incidents = context.read<IncidentProvider>().incidents;
+    final settings = context.read<AlertSettingsProvider>().settings;
+    final userId = context.read<UserProvider>().currentUser?.id;
+
+    _notificationService.checkNewIncidents(
+      incidents: incidents,
+      settings: settings,
+      currentUserId: userId,
+    );
   }
 
   void _loadUserVotesIfNeeded() {
@@ -40,10 +105,39 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _showIncidentDetails(IncidentModel incident) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => IncidentBottomSheet(incidentId: incident.id),
+    );
+  }
+
+  @override
+  void dispose() {
+    _notificationSubscription?.cancel();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = context.watch<UserProvider>().currentUser;
     final isAdmin = user?.isAdmin ?? false;
+
+    // Watch for incident changes and check for new incidents immediately
+    final incidents = context.watch<IncidentProvider>().incidents;
+
+    // Detect new incidents and check immediately
+    if (incidents.length > _previousIncidentCount && _previousIncidentCount > 0) {
+      // New incident added - check immediately
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkForNewIncidents();
+      });
+    }
+    _previousIncidentCount = incidents.length;
 
     // Load user votes once user is available
     if (user != null && !_votesLoaded) {
@@ -79,32 +173,8 @@ class _HomeScreenState extends State<HomeScreen> {
         icon: Icon(Icons.history),
         label: 'My Reports',
       ),
-      BottomNavigationBarItem(
-        icon: Stack(
-          children: [
-            const Icon(Icons.warning_amber_rounded),
-            Positioned(
-              right: 0,
-              top: 0,
-              child: Container(
-                padding: const EdgeInsets.all(2),
-                decoration: const BoxDecoration(
-                  color: Colors.red,
-                  shape: BoxShape.circle,
-                ),
-                constraints: const BoxConstraints(
-                  minWidth: 14,
-                  minHeight: 14,
-                ),
-                child: const Text(
-                  '3',
-                  style: TextStyle(color: Colors.white, fontSize: 9),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ),
-          ],
-        ),
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.warning_amber_rounded),
         label: 'Alerts',
       ),
       if (isAdmin)
@@ -119,14 +189,43 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
 
     return Scaffold(
-      body: screens[_currentIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (i) => setState(() => _currentIndex = i),
-        selectedItemColor: const Color(0xFFE53E3E),
-        unselectedItemColor: Colors.grey,
-        type: BottomNavigationBarType.fixed,
-        items: navItems,
+      body: Stack(
+        children: [
+          // Main content
+          Scaffold(
+            body: screens[_currentIndex],
+            bottomNavigationBar: BottomNavigationBar(
+              currentIndex: _currentIndex,
+              onTap: (i) => setState(() => _currentIndex = i),
+              selectedItemColor: const Color(0xFFE53E3E),
+              unselectedItemColor: Colors.grey,
+              type: BottomNavigationBarType.fixed,
+              items: navItems,
+            ),
+          ),
+          // Notification overlay
+          if (_currentNotification != null)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Material(
+                color: Colors.transparent,
+                child: IncidentNotificationOverlay(
+                  incident: _currentNotification!.incident,
+                  distance: _currentNotification!.distance,
+                  onTap: () {
+                    final incident = _currentNotification!.incident;
+                    setState(() => _currentNotification = null);
+                    _showIncidentDetails(incident);
+                  },
+                  onDismiss: () {
+                    setState(() => _currentNotification = null);
+                  },
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

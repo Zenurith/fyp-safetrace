@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../data/models/incident_model.dart';
@@ -148,7 +149,11 @@ class IncidentBottomSheet extends StatelessWidget {
                 itemCount: incident.mediaUrls.length,
                 itemBuilder: (context, index) {
                   final url = incident.mediaUrls[index];
-                  final isVideo = url.contains('/videos/');
+                  final isVideo = url.contains('/videos/') ||
+                      url.toLowerCase().endsWith('.mp4') ||
+                      url.toLowerCase().endsWith('.mov');
+                  final isLocalFile = url.startsWith('/') || url.startsWith('file://');
+
                   return GestureDetector(
                     onTap: () => _showMediaViewer(context, url, isVideo),
                     child: Container(
@@ -157,18 +162,41 @@ class IncidentBottomSheet extends StatelessWidget {
                       margin: const EdgeInsets.only(right: 8),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(8),
-                        color: isVideo ? Colors.grey[800] : null,
-                        image: isVideo
-                            ? null
-                            : DecorationImage(
-                                image: NetworkImage(url),
-                                fit: BoxFit.cover,
-                              ),
+                        color: isVideo ? Colors.grey[800] : Colors.grey[200],
                       ),
+                      clipBehavior: Clip.hardEdge,
                       child: isVideo
                           ? const Icon(Icons.play_circle_outline,
                               color: Colors.white, size: 32)
-                          : null,
+                          : isLocalFile
+                              ? Image.file(
+                                  File(url.replaceFirst('file://', '')),
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return const Icon(Icons.broken_image,
+                                        color: Colors.grey);
+                                  },
+                                )
+                              : Image.network(
+                                  url,
+                                  fit: BoxFit.cover,
+                                  loadingBuilder: (context, child, progress) {
+                                    if (progress == null) return child;
+                                    return const Center(
+                                      child: SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return const Icon(Icons.broken_image,
+                                        color: Colors.grey);
+                                  },
+                                ),
                     ),
                   );
                 },
@@ -255,10 +283,14 @@ class IncidentBottomSheet extends StatelessWidget {
   }
 
   void _showMediaViewer(BuildContext context, String url, bool isVideo) {
+    // Check if URL is a local file path or network URL
+    final isLocalFile = url.startsWith('/') || url.startsWith('file://');
+
     showDialog(
       context: context,
       builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.black87,
+        insetPadding: const EdgeInsets.all(16),
         child: Stack(
           children: [
             Center(
@@ -282,19 +314,77 @@ class IncidentBottomSheet extends StatelessWidget {
                       ),
                     )
                   : InteractiveViewer(
-                      child: Image.network(url),
+                      minScale: 0.5,
+                      maxScale: 4.0,
+                      child: isLocalFile
+                          ? Image.file(
+                              File(url.replaceFirst('file://', '')),
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) {
+                                return _buildErrorWidget('Failed to load local image');
+                              },
+                            )
+                          : Image.network(
+                              url,
+                              fit: BoxFit.contain,
+                              loadingBuilder: (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return Center(
+                                  child: CircularProgressIndicator(
+                                    value: loadingProgress.expectedTotalBytes != null
+                                        ? loadingProgress.cumulativeBytesLoaded /
+                                            loadingProgress.expectedTotalBytes!
+                                        : null,
+                                    color: Colors.white,
+                                  ),
+                                );
+                              },
+                              errorBuilder: (context, error, stackTrace) {
+                                debugPrint('Image load error: $error');
+                                debugPrint('URL: $url');
+                                return _buildErrorWidget('Failed to load image');
+                              },
+                            ),
                     ),
             ),
             Positioned(
-              top: 0,
-              right: 0,
+              top: 8,
+              right: 8,
               child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                icon: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Icon(Icons.close, color: Colors.white, size: 24),
+                ),
                 onPressed: () => Navigator.pop(context),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildErrorWidget(String message) {
+    return Container(
+      padding: const EdgeInsets.all(40),
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.broken_image, color: Colors.white54, size: 48),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            style: const TextStyle(color: Colors.white54),
+          ),
+        ],
       ),
     );
   }

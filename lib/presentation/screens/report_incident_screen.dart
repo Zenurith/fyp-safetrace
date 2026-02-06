@@ -1,6 +1,9 @@
 // ignore_for_file: deprecated_member_use
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../data/models/incident_model.dart';
@@ -20,8 +23,13 @@ class ReportIncidentScreen extends StatefulWidget {
 
 class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
   final _descriptionController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _addressFocusNode = FocusNode();
   final _locationService = LocationService();
   final _mediaService = MediaUploadService();
+
+  // Maximum allowed distance in meters (5 km)
+  static const double _maxReportDistanceMeters = 5000;
 
   IncidentCategory _selectedCategory = IncidentCategory.crime;
   SeverityLevel _selectedSeverity = SeverityLevel.high;
@@ -32,12 +40,91 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
   bool _loadingLocation = false;
   bool _isSubmitting = false;
 
+  // User's actual current position (for distance validation)
+  double? _userCurrentLat;
+  double? _userCurrentLng;
+  bool _locationTooFar = false;
+
+  // Address autocomplete state
+  List<PlaceSuggestion> _suggestions = [];
+  Timer? _debounceTimer;
+  bool _showSuggestions = false;
+
+  // Map controller
+  GoogleMapController? _mapController;
+
   final List<XFile> _selectedMedia = [];
 
   @override
   void initState() {
     super.initState();
+    _addressController.addListener(_onAddressChanged);
+    _addressFocusNode.addListener(_onAddressFocusChanged);
     _detectLocation();
+  }
+
+  void _onAddressChanged() {
+    if (!_addressFocusNode.hasFocus) return;
+
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 400), () {
+      _fetchSuggestions(_addressController.text);
+    });
+  }
+
+  void _onAddressFocusChanged() {
+    if (!_addressFocusNode.hasFocus) {
+      Future.delayed(const Duration(milliseconds: 200), () {
+        if (mounted && !_addressFocusNode.hasFocus) {
+          setState(() => _showSuggestions = false);
+        }
+      });
+    }
+  }
+
+  Future<void> _fetchSuggestions(String query) async {
+    if (query.length < 3) {
+      setState(() {
+        _suggestions = [];
+        _showSuggestions = false;
+      });
+      return;
+    }
+
+    final suggestions = await _locationService.getAddressSuggestions(query);
+    if (mounted) {
+      setState(() {
+        _suggestions = suggestions;
+        _showSuggestions = suggestions.isNotEmpty;
+      });
+    }
+  }
+
+  Future<void> _selectSuggestion(PlaceSuggestion suggestion) async {
+    setState(() {
+      _showSuggestions = false;
+      _loadingLocation = true;
+    });
+    _addressController.text = suggestion.description;
+    _address = suggestion.description;
+    _addressFocusNode.unfocus();
+
+    final coords = await _locationService.getCoordinatesFromPlaceId(suggestion.placeId);
+    if (coords != null && mounted) {
+      setState(() {
+        _latitude = coords.latitude;
+        _longitude = coords.longitude;
+        _loadingLocation = false;
+      });
+      // Animate map to selected location
+      _mapController?.animateCamera(
+        CameraUpdate.newLatLng(LatLng(coords.latitude, coords.longitude)),
+      );
+      // Validate distance after selecting address
+      _validateDistance();
+    } else {
+      setState(() => _loadingLocation = false);
+    }
   }
 
   Future<void> _detectLocation() async {
@@ -51,15 +138,59 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
           _latitude = pos.latitude;
           _longitude = pos.longitude;
           _address = addr;
+          _addressController.text = addr;
+          // Store user's actual current position for distance validation
+          _userCurrentLat = pos.latitude;
+          _userCurrentLng = pos.longitude;
+          _locationTooFar = false;
         });
+        // Animate map to new location
+        _mapController?.animateCamera(
+          CameraUpdate.newLatLng(LatLng(pos.latitude, pos.longitude)),
+        );
       }
     } catch (_) {}
     if (mounted) setState(() => _loadingLocation = false);
   }
 
+  /// Calculate distance between user's current location and selected incident location
+  double _calculateDistance() {
+    if (_userCurrentLat == null || _userCurrentLng == null) {
+      return 0;
+    }
+    return Geolocator.distanceBetween(
+      _userCurrentLat!,
+      _userCurrentLng!,
+      _latitude,
+      _longitude,
+    );
+  }
+
+  /// Check if the selected location is within allowed radius
+  void _validateDistance() {
+    if (_userCurrentLat == null || _userCurrentLng == null) return;
+
+    final distance = _calculateDistance();
+    setState(() {
+      _locationTooFar = distance > _maxReportDistanceMeters;
+    });
+  }
+
+  /// Format distance for display
+  String _formatDistance(double meters) {
+    if (meters < 1000) {
+      return '${meters.round()} m';
+    }
+    return '${(meters / 1000).toStringAsFixed(1)} km';
+  }
+
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _descriptionController.dispose();
+    _addressController.dispose();
+    _addressFocusNode.dispose();
+    _mapController?.dispose();
     super.dispose();
   }
 
@@ -145,14 +276,39 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
   }
 
   Future<void> _submit() async {
+    // Validate distance before submission
+    if (_userCurrentLat != null && _userCurrentLng != null) {
+      final distance = _calculateDistance();
+      if (distance > _maxReportDistanceMeters) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Location is too far (${_formatDistance(distance)}). '
+              'You can only report incidents within ${_formatDistance(_maxReportDistanceMeters)} of your current location.',
+            ),
+            backgroundColor: AppTheme.primaryRed,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        return;
+      }
+    }
+
     final provider = context.read<IncidentProvider>();
     final userId = context.read<UserProvider>().currentUser?.id ?? 'anonymous';
 
+    // Use address from controller if available, otherwise use detected address
+    final addressToSubmit = _addressController.text.trim().isNotEmpty
+        ? _addressController.text.trim()
+        : _address;
+
     setState(() => _isSubmitting = true);
 
+    String? incidentId;
+
     try {
-      // Create incident first to get the ID
-      final incidentId = await provider.reportIncident(
+      // Create incident first to get the ID (with timeout)
+      incidentId = await provider.reportIncident(
         title: _selectedCategory.name,
         category: _selectedCategory,
         severity: _selectedSeverity,
@@ -161,39 +317,71 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
             : _descriptionController.text.trim(),
         latitude: _latitude,
         longitude: _longitude,
-        address: _address,
+        address: addressToSubmit,
         reporterId: userId,
         isAnonymous: _isAnonymous,
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          debugPrint('Incident report timed out');
+          return null;
+        },
       );
 
-      if (incidentId != null && _selectedMedia.isNotEmpty) {
-        // Upload media files
-        final mediaUrls = await _mediaService.uploadMultipleFiles(
-          _selectedMedia,
-          incidentId,
-        );
+      // Check if incident was created successfully
+      if (incidentId == null) {
+        if (mounted) {
+          setState(() => _isSubmitting = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to create incident. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
 
-        // Update incident with media URLs
-        if (mediaUrls.isNotEmpty) {
-          await provider.updateIncidentMedia(incidentId, mediaUrls);
+      // Upload media if any
+      if (_selectedMedia.isNotEmpty) {
+        try {
+          final mediaUrls = await _mediaService.uploadMultipleFiles(
+            _selectedMedia,
+            incidentId,
+          );
+
+          if (mediaUrls.isNotEmpty) {
+            await provider.updateIncidentMedia(incidentId, mediaUrls);
+          }
+        } catch (mediaError) {
+          // Media upload failed, but incident was created - still consider it a success
+          debugPrint('Media upload failed: $mediaError');
         }
       }
 
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Incident reported successfully')),
-        );
-      }
+      // Success - pop the screen
+      if (!mounted) return;
+
+      // First disable loading, then pop
+      setState(() => _isSubmitting = false);
+
+      // Small delay to ensure state is updated
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      if (!mounted) return;
+
+      Navigator.of(context).pop(true); // Pass true to indicate success
+
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
-        );
-      }
-    } finally {
+      debugPrint('Submit error: $e');
       if (mounted) {
         setState(() => _isSubmitting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -221,42 +409,204 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Container(
-                  width: double.infinity,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8F0FE),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Center(
-                    child: Icon(
-                      Icons.location_on,
-                      size: 48,
-                      color: AppTheme.primaryRed.withValues(alpha: 0.7),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 180,
+                    child: Stack(
+                      children: [
+                        GoogleMap(
+                          initialCameraPosition: CameraPosition(
+                            target: LatLng(_latitude, _longitude),
+                            zoom: 15,
+                          ),
+                          onMapCreated: (controller) {
+                            _mapController = controller;
+                          },
+                          markers: {
+                            Marker(
+                              markerId: const MarkerId('incident_location'),
+                              position: LatLng(_latitude, _longitude),
+                              icon: BitmapDescriptor.defaultMarkerWithHue(
+                                BitmapDescriptor.hueRed,
+                              ),
+                            ),
+                          },
+                          onTap: (latLng) {
+                            setState(() {
+                              _latitude = latLng.latitude;
+                              _longitude = latLng.longitude;
+                            });
+                            // Reverse geocode to get address
+                            _locationService
+                                .getAddressFromCoordinates(latLng.latitude, latLng.longitude)
+                                .then((addr) {
+                              if (mounted) {
+                                setState(() {
+                                  _address = addr;
+                                  _addressController.text = addr;
+                                });
+                                _validateDistance();
+                              }
+                            });
+                          },
+                          zoomControlsEnabled: false,
+                          myLocationEnabled: true,
+                          myLocationButtonEnabled: false,
+                        ),
+                        if (_loadingLocation)
+                          Container(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            child: const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                          ),
+                        // Tap hint
+                        Positioned(
+                          bottom: 8,
+                          left: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.6),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'Tap map to adjust location',
+                              style: TextStyle(color: Colors.white, fontSize: 11),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Automatically detected:',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                const SizedBox(height: 12),
+                // Address input with autocomplete
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: _addressController,
+                      focusNode: _addressFocusNode,
+                      decoration: InputDecoration(
+                        labelText: 'Address',
+                        hintText: 'Type to search address...',
+                        prefixIcon: const Icon(Icons.search),
+                        suffixIcon: _addressController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  _addressController.clear();
+                                  setState(() {
+                                    _suggestions = [];
+                                    _showSuggestions = false;
+                                  });
+                                },
+                              )
+                            : null,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onSubmitted: (value) {
+                        if (value.isNotEmpty) {
+                          _address = value;
+                          setState(() => _showSuggestions = false);
+                        }
+                      },
+                    ),
+                    if (_showSuggestions && _suggestions.isNotEmpty)
+                      Container(
+                        margin: const EdgeInsets.only(top: 4),
+                        constraints: const BoxConstraints(maxHeight: 200),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: _suggestions.length,
+                          itemBuilder: (context, index) {
+                            final suggestion = _suggestions[index];
+                            return ListTile(
+                              leading: const Icon(Icons.location_on_outlined,
+                                  color: AppTheme.primaryRed),
+                              title: Text(
+                                suggestion.description,
+                                style: const TextStyle(fontSize: 14),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              onTap: () => _selectSuggestion(suggestion),
+                            );
+                          },
+                        ),
+                      ),
+                  ],
                 ),
-                Text(
-                  _loadingLocation ? 'Detecting location...' : _address,
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
-                ),
                 const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: _detectLocation,
-                  icon: const Icon(Icons.location_on, size: 16),
-                  label: const Text('Adjust Location'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
+                Row(
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: _loadingLocation ? null : _detectLocation,
+                      icon: const Icon(Icons.my_location, size: 16),
+                      label: const Text('Use Current Location'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                    ),
+                    if (_userCurrentLat != null && !_locationTooFar && !_loadingLocation) ...[
+                      const SizedBox(width: 8),
+                      Text(
+                        _formatDistance(_calculateDistance()),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                // Warning if location is too far
+                if (_locationTooFar)
+                  Container(
+                    margin: const EdgeInsets.only(top: 8),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryRed.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppTheme.primaryRed.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.warning_amber_rounded,
+                            color: AppTheme.primaryRed, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Location is ${_formatDistance(_calculateDistance())} away. '
+                            'You can only report incidents within ${_formatDistance(_maxReportDistanceMeters)} of your current location.',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.primaryRed,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
                 const SizedBox(height: 24),
 
                 // Category section
@@ -465,7 +815,12 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                     const SizedBox(width: 16),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: _isSubmitting ? null : _submit,
+                        onPressed: (_isSubmitting || _locationTooFar) ? null : _submit,
+                        style: _locationTooFar
+                            ? ElevatedButton.styleFrom(
+                                backgroundColor: Colors.grey,
+                              )
+                            : null,
                         child: _isSubmitting
                             ? const SizedBox(
                                 height: 20,
@@ -475,7 +830,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                                   color: Colors.white,
                                 ),
                               )
-                            : const Text('Submit Report'),
+                            : Text(_locationTooFar ? 'Location Too Far' : 'Submit Report'),
                       ),
                     ),
                   ],

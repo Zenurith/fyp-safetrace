@@ -72,6 +72,64 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+  void _showMapMenu(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.refresh, color: AppTheme.primaryDark),
+              title: const Text('Refresh Incidents'),
+              onTap: () {
+                Navigator.pop(ctx);
+                context.read<IncidentProvider>().loadIncidents();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.filter_list, color: AppTheme.primaryDark),
+              title: const Text('Clear Filters'),
+              onTap: () {
+                Navigator.pop(ctx);
+                final provider = context.read<IncidentProvider>();
+                for (final filter in provider.activeFilters.toList()) {
+                  provider.toggleFilter(filter);
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.my_location, color: AppTheme.primaryDark),
+              title: const Text('Center Map'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _mapController?.animateCamera(
+                  CameraUpdate.newLatLng(
+                    const LatLng(AppConstants.defaultLat, AppConstants.defaultLng),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<IncidentProvider>(
@@ -129,7 +187,7 @@ class _MapScreenState extends State<MapScreen> {
                     ),
                     child: IconButton(
                       icon: const Icon(Icons.menu, color: AppTheme.primaryDark),
-                      onPressed: () {},
+                      onPressed: () => _showMapMenu(context),
                     ),
                   ),
                 ],
@@ -199,13 +257,22 @@ class _MapScreenState extends State<MapScreen> {
               child: FloatingActionButton(
                 heroTag: 'report',
                 backgroundColor: AppTheme.primaryRed,
-                onPressed: () {
-                  Navigator.push(
+                onPressed: () async {
+                  final result = await Navigator.push<bool>(
                     context,
                     MaterialPageRoute(
                       builder: (_) => const ReportIncidentScreen(),
                     ),
                   );
+                  // Show success message if incident was reported
+                  if (result == true && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Incident reported successfully!'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
                 },
                 child: const Icon(Icons.add, color: Colors.white),
               ),
