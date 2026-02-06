@@ -15,6 +15,7 @@ class _AuthScreenState extends State<AuthScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   final _nameController = TextEditingController();
   final _handleController = TextEditingController();
 
@@ -26,6 +27,7 @@ class _AuthScreenState extends State<AuthScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     _nameController.dispose();
     _handleController.dispose();
     super.dispose();
@@ -170,6 +172,27 @@ class _AuthScreenState extends State<AuthScreen> {
                           ? 'Password must be at least 6 characters'
                           : null,
                 ),
+                if (!_isLogin) ...[
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _confirmPasswordController,
+                    decoration: const InputDecoration(
+                      labelText: 'Confirm Password',
+                      prefixIcon: Icon(Icons.lock_outline),
+                      border: OutlineInputBorder(),
+                    ),
+                    obscureText: true,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please confirm your password';
+                      }
+                      if (value != _passwordController.text) {
+                        return 'Passwords do not match';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
                 const SizedBox(height: 8),
                 if (_errorMessage != null)
                   Padding(
@@ -205,6 +228,7 @@ class _AuthScreenState extends State<AuthScreen> {
                           setState(() {
                             _isLogin = !_isLogin;
                             _errorMessage = null;
+                            _confirmPasswordController.clear();
                           });
                         },
                   child: Text(

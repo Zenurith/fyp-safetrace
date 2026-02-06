@@ -8,6 +8,7 @@ import 'my_reports_screen.dart';
 import 'alert_settings_screen.dart';
 import 'admin_screen.dart';
 import 'profile_screen.dart';
+import 'community_list_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -53,6 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final screens = [
       const MapScreen(),
+      const CommunityListScreen(),
       const MyReportsScreen(),
       const AlertSettingsScreen(),
       if (isAdmin) const AdminScreen(),
@@ -68,6 +70,10 @@ class _HomeScreenState extends State<HomeScreen> {
       const BottomNavigationBarItem(
         icon: Icon(Icons.map),
         label: 'Map',
+      ),
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.groups),
+        label: 'Communities',
       ),
       const BottomNavigationBarItem(
         icon: Icon(Icons.history),

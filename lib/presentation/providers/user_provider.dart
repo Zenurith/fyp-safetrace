@@ -88,6 +88,10 @@ class UserProvider extends ChangeNotifier {
     await _repository.updateUserRole(uid, role);
   }
 
+  Future<UserModel?> getUserById(String uid) async {
+    return await _repository.getCurrentUser(uid);
+  }
+
   void clearUser() {
     _currentUser = null;
     _error = null;
