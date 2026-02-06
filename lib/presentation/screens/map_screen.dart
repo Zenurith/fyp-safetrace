@@ -68,7 +68,7 @@ class _MapScreenState extends State<MapScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => IncidentBottomSheet(incident: incident),
+      builder: (_) => IncidentBottomSheet(incidentId: incident.id),
     );
   }
 

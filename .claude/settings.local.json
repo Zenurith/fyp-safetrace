@@ -13,7 +13,10 @@
       "Bash(adb shell pm:*)",
       "Bash(adb logcat:*)",
       "Bash(where:*)",
-      "Bash(git fetch:*)"
+      "Bash(git fetch:*)",
+      "Bash(git merge:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)"
     ]
   }
 }
