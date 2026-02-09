@@ -3,6 +3,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import '../../config/app_constants.dart';
 import '../../data/models/incident_model.dart';
+import '../../data/services/location_service.dart';
 import '../../utils/app_theme.dart';
 import '../providers/incident_provider.dart';
 import '../widgets/incident_bottom_sheet.dart';
@@ -17,6 +18,47 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   GoogleMapController? _mapController;
+  final _locationService = LocationService();
+  bool _isCentering = false;
+
+  Future<void> _centerOnUserLocation() async {
+    if (_isCentering) return;
+
+    setState(() => _isCentering = true);
+
+    try {
+      // Use quick position for faster response
+      final position = await _locationService.getQuickPosition();
+      if (position != null && mounted) {
+        await _mapController?.animateCamera(
+          CameraUpdate.newLatLngZoom(
+            LatLng(position.latitude, position.longitude),
+            15,
+          ),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to get current location'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Location timeout - please try again'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isCentering = false);
+      }
+    }
+  }
 
   BitmapDescriptor _markerIcon(IncidentCategory category, SeverityLevel severity) {
     double hue;
@@ -113,14 +155,10 @@ class _MapScreenState extends State<MapScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.my_location, color: AppTheme.primaryDark),
-              title: const Text('Center Map'),
+              title: const Text('Center on My Location'),
               onTap: () {
                 Navigator.pop(ctx);
-                _mapController?.animateCamera(
-                  CameraUpdate.newLatLng(
-                    const LatLng(AppConstants.defaultLat, AppConstants.defaultLng),
-                  ),
-                );
+                _centerOnUserLocation();
               },
             ),
             const SizedBox(height: 16),
@@ -237,17 +275,17 @@ class _MapScreenState extends State<MapScreen> {
               child: FloatingActionButton.small(
                 heroTag: 'location',
                 backgroundColor: Colors.white,
-                onPressed: () {
-                  _mapController?.animateCamera(
-                    CameraUpdate.newLatLng(
-                      const LatLng(
-                        AppConstants.defaultLat,
-                        AppConstants.defaultLng,
-                      ),
-                    ),
-                  );
-                },
-                child: const Icon(Icons.my_location, color: AppTheme.primaryDark),
+                onPressed: _isCentering ? null : _centerOnUserLocation,
+                child: _isCentering
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppTheme.primaryDark,
+                        ),
+                      )
+                    : const Icon(Icons.my_location, color: AppTheme.primaryDark),
               ),
             ),
             // FAB to report

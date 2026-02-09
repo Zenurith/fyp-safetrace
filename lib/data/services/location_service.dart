@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 
 class LocationService {
   static const String _apiKey = 'AIzaSyAs0PNHYH4X3mwsJQZqdZ9q778eISZ4ifw';
-  Future<Position?> getCurrentPosition() async {
+  Future<Position?> getCurrentPosition({bool fast = false}) async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) return null;
 
@@ -16,8 +16,38 @@ class LocationService {
     }
     if (permission == LocationPermission.deniedForever) return null;
 
+    // For fast mode, try last known position first
+    if (fast) {
+      final lastKnown = await Geolocator.getLastKnownPosition();
+      if (lastKnown != null) return lastKnown;
+    }
+
     return await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
+      desiredAccuracy: fast ? LocationAccuracy.medium : LocationAccuracy.high,
+      timeLimit: Duration(seconds: fast ? 5 : 15),
+    );
+  }
+
+  /// Get position quickly - uses last known or medium accuracy
+  Future<Position?> getQuickPosition() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return null;
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) return null;
+    }
+    if (permission == LocationPermission.deniedForever) return null;
+
+    // Try last known position first (instant)
+    final lastKnown = await Geolocator.getLastKnownPosition();
+    if (lastKnown != null) return lastKnown;
+
+    // Fall back to current position with medium accuracy
+    return await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.medium,
+      timeLimit: const Duration(seconds: 5),
     );
   }
 
