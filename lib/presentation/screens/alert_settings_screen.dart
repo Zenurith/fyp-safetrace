@@ -2,8 +2,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../data/models/incident_model.dart';
+import '../../data/models/category_model.dart';
 import '../../utils/app_theme.dart';
 import '../providers/alert_settings_provider.dart';
+import '../providers/category_provider.dart';
 
 class AlertSettingsScreen extends StatelessWidget {
   const AlertSettingsScreen({super.key});
@@ -133,41 +135,9 @@ class AlertSettingsScreen extends StatelessWidget {
                   style: TextStyle(color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: IncidentCategory.values.map((cat) {
-                    final label = _categoryLabel(cat);
-                    final selected = settings.categoryFilters.contains(cat);
-                    return GestureDetector(
-                      onTap: () => provider.toggleCategory(cat),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: selected
-                              ? AppTheme.categoryColor(label).withValues(alpha: 0.1)
-                              : Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: selected
-                                ? AppTheme.categoryColor(label)
-                                : Colors.grey[300]!,
-                          ),
-                        ),
-                        child: Text(
-                          label,
-                          style: TextStyle(
-                            color: selected
-                                ? AppTheme.categoryColor(label)
-                                : Colors.grey[600],
-                            fontWeight:
-                                selected ? FontWeight.w600 : FontWeight.normal,
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
+                _CategoryFilterGrid(
+                  selectedCategories: settings.categoryFilters,
+                  onToggle: provider.toggleCategory,
                 ),
                 const SizedBox(height: 24),
                 // Active Hours
@@ -304,5 +274,125 @@ class _SeverityCheckbox extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _CategoryFilterGrid extends StatelessWidget {
+  final Set<IncidentCategory> selectedCategories;
+  final Function(IncidentCategory) onToggle;
+
+  const _CategoryFilterGrid({
+    required this.selectedCategories,
+    required this.onToggle,
+  });
+
+  IncidentCategory? _getIncidentCategoryFromName(String name) {
+    switch (name.toLowerCase()) {
+      case 'crime':
+        return IncidentCategory.crime;
+      case 'infrastructure':
+        return IncidentCategory.infrastructure;
+      case 'suspicious':
+        return IncidentCategory.suspicious;
+      case 'traffic':
+        return IncidentCategory.traffic;
+      case 'environmental':
+        return IncidentCategory.environmental;
+      case 'emergency':
+        return IncidentCategory.emergency;
+      default:
+        return null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final categoryProvider = context.watch<CategoryProvider>();
+    final enabledCategories = categoryProvider.enabledCategories;
+
+    // Filter to only show categories that have a matching IncidentCategory enum
+    final availableCategories = enabledCategories.where((cat) {
+      return _getIncidentCategoryFromName(cat.name) != null;
+    }).toList();
+
+    // If no enabled categories from provider, fall back to all enum values
+    if (availableCategories.isEmpty) {
+      return Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: IncidentCategory.values.map((cat) {
+          final label = _categoryLabel(cat);
+          final selected = selectedCategories.contains(cat);
+          return _buildCategoryChip(
+            label: label,
+            color: AppTheme.categoryColor(label),
+            selected: selected,
+            onTap: () => onToggle(cat),
+          );
+        }).toList(),
+      );
+    }
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: availableCategories.map((cat) {
+        final incidentCat = _getIncidentCategoryFromName(cat.name);
+        if (incidentCat == null) return const SizedBox.shrink();
+
+        final selected = selectedCategories.contains(incidentCat);
+        return _buildCategoryChip(
+          label: cat.name,
+          color: cat.color,
+          selected: selected,
+          onTap: () => onToggle(incidentCat),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildCategoryChip({
+    required String label,
+    required Color color,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? color.withValues(alpha: 0.1) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? color : Colors.grey[300]!,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? color : Colors.grey[600],
+            fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _categoryLabel(IncidentCategory cat) {
+    switch (cat) {
+      case IncidentCategory.crime:
+        return 'Crime';
+      case IncidentCategory.infrastructure:
+        return 'Infrastructure';
+      case IncidentCategory.suspicious:
+        return 'Suspicious';
+      case IncidentCategory.traffic:
+        return 'Traffic';
+      case IncidentCategory.environmental:
+        return 'Environmental';
+      case IncidentCategory.emergency:
+        return 'Emergency';
+    }
   }
 }

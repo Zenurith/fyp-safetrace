@@ -8,6 +8,7 @@ import 'presentation/providers/user_provider.dart';
 import 'presentation/providers/alert_settings_provider.dart';
 import 'presentation/providers/vote_provider.dart';
 import 'presentation/providers/community_provider.dart';
+import 'presentation/providers/category_provider.dart';
 import 'presentation/screens/home_screen.dart';
 import 'presentation/screens/auth_screen.dart';
 import 'utils/app_theme.dart';
@@ -32,6 +33,7 @@ class SafeTraceApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AlertSettingsProvider()),
         ChangeNotifierProvider(create: (_) => VoteProvider()),
         ChangeNotifierProvider(create: (_) => CommunityProvider()),
+        ChangeNotifierProvider(create: (_) => CategoryProvider()..initialize()),
       ],
       child: MaterialApp(
         title: 'SafeTrace',
