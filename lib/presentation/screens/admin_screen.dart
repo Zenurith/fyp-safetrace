@@ -17,15 +17,31 @@ class AdminScreen extends StatelessWidget {
     return DefaultTabController(
       length: 3,
       child: Scaffold(
+        backgroundColor: AppTheme.backgroundGrey,
         appBar: AppBar(
-          title: const Text('Admin Dashboard'),
+          title: Text(
+            'Admin Dashboard',
+            style: AppTheme.headingMedium.copyWith(color: Colors.white),
+          ),
           backgroundColor: AppTheme.primaryDark,
           foregroundColor: Colors.white,
-          bottom: const TabBar(
+          elevation: 0,
+          bottom: TabBar(
             labelColor: Colors.white,
             unselectedLabelColor: Colors.white60,
             indicatorColor: AppTheme.primaryRed,
-            tabs: [
+            indicatorWeight: 3,
+            labelStyle: const TextStyle(
+              fontFamily: AppTheme.fontFamily,
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
+            unselectedLabelStyle: const TextStyle(
+              fontFamily: AppTheme.fontFamily,
+              fontWeight: FontWeight.w400,
+              fontSize: 14,
+            ),
+            tabs: const [
               Tab(text: 'Users'),
               Tab(text: 'Incidents'),
               Tab(text: 'Categories'),
@@ -75,50 +91,121 @@ class _UsersTabState extends State<_UsersTab> {
           return const Center(child: CircularProgressIndicator());
         }
         if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}'));
+          return Center(
+            child: Text(
+              'Error loading users',
+              style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
+            ),
+          );
         }
         final users = snapshot.data ?? [];
         if (users.isEmpty) {
-          return const Center(child: Text('No users found.'));
+          return Center(
+            child: Text(
+              'No users found',
+              style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
+            ),
+          );
         }
         return ListView.separated(
           padding: const EdgeInsets.all(16),
           itemCount: users.length,
-          separatorBuilder: (_, __) => const Divider(height: 1),
+          separatorBuilder: (_, __) => const SizedBox(height: 12),
           itemBuilder: (context, index) {
             final user = users[index];
-            return ListTile(
-              leading: UserAvatar(
-                photoUrl: user.profilePhotoUrl,
-                initials: user.initials,
-                radius: 20,
-                backgroundColor: user.isAdmin
-                    ? AppTheme.primaryRed
-                    : AppTheme.accentBlue,
-              ),
-              title: Text(user.name),
-              subtitle: Text('${user.handle}  •  ${user.role}'),
-              trailing: TextButton(
-                onPressed: () async {
-                  final newRole = user.isAdmin ? 'user' : 'admin';
-                  await context
-                      .read<UserProvider>()
-                      .setUserRole(user.id, newRole);
-                  _refresh();
-                },
-                child: Text(
-                  user.isAdmin ? 'Demote' : 'Promote',
-                  style: TextStyle(
-                    color: user.isAdmin
-                        ? AppTheme.warningOrange
-                        : AppTheme.successGreen,
-                  ),
-                ),
-              ),
-            );
+            return _UserCard(user: user, onRefresh: _refresh);
           },
         );
       },
+    );
+  }
+}
+
+class _UserCard extends StatelessWidget {
+  final UserModel user;
+  final VoidCallback onRefresh;
+
+  const _UserCard({required this.user, required this.onRefresh});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: AppTheme.cardDecoration,
+      child: Row(
+        children: [
+          UserAvatar(
+            photoUrl: user.profilePhotoUrl,
+            initials: user.initials,
+            radius: 24,
+            backgroundColor: user.isAdmin ? AppTheme.primaryRed : AppTheme.primaryDark,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(user.name, style: AppTheme.headingSmall),
+                const SizedBox(height: 2),
+                Text(
+                  user.handle,
+                  style: AppTheme.caption,
+                ),
+              ],
+            ),
+          ),
+          _RoleChip(isAdmin: user.isAdmin),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: () async {
+              final newRole = user.isAdmin ? 'user' : 'admin';
+              await context.read<UserProvider>().setUserRole(user.id, newRole);
+              onRefresh();
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: user.isAdmin ? AppTheme.warningOrange : AppTheme.successGreen,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ),
+            child: Text(
+              user.isAdmin ? 'Demote' : 'Promote',
+              style: const TextStyle(
+                fontFamily: AppTheme.fontFamily,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RoleChip extends StatelessWidget {
+  final bool isAdmin;
+
+  const _RoleChip({required this.isAdmin});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isAdmin ? AppTheme.primaryRed.withValues(alpha: 0.1) : AppTheme.backgroundGrey,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: isAdmin ? AppTheme.primaryRed.withValues(alpha: 0.3) : AppTheme.cardBorder,
+        ),
+      ),
+      child: Text(
+        isAdmin ? 'Admin' : 'User',
+        style: TextStyle(
+          fontFamily: AppTheme.fontFamily,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: isAdmin ? AppTheme.primaryRed : AppTheme.textSecondary,
+        ),
+      ),
     );
   }
 }
@@ -132,56 +219,99 @@ class _IncidentsTab extends StatelessWidget {
     final incidents = incidentProvider.incidents;
 
     if (incidents.isEmpty) {
-      return const Center(child: Text('No incidents found.'));
+      return Center(
+        child: Text(
+          'No incidents found',
+          style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
+        ),
+      );
     }
 
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: incidents.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final incident = incidents[index];
-        return _IncidentListItem(incident: incident);
+        return _IncidentCard(incident: incident);
       },
     );
   }
 }
 
-class _IncidentListItem extends StatelessWidget {
+class _IncidentCard extends StatelessWidget {
   final IncidentModel incident;
 
-  const _IncidentListItem({required this.incident});
+  const _IncidentCard({required this.incident});
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: AppTheme.categoryColor(incident.categoryLabel),
-        child: const Icon(Icons.warning_amber_rounded,
-            color: Colors.white, size: 20),
-      ),
-      title: Text(incident.title),
-      subtitle: Column(
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: AppTheme.cardDecoration,
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('${incident.categoryLabel}  •  ${incident.severityLabel}'),
-          const SizedBox(height: 4),
-          _StatusChip(status: incident.status),
-        ],
-      ),
-      isThreeLine: true,
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.edit_note, color: AppTheme.accentBlue),
-            onPressed: () => _showStatusDialog(context),
-            tooltip: 'Update Status',
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppTheme.categoryColor(incident.categoryLabel).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.warning_amber_rounded,
+                  color: AppTheme.categoryColor(incident.categoryLabel),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      incident.title,
+                      style: AppTheme.headingSmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${incident.categoryLabel}  •  ${incident.severityLabel}',
+                      style: AppTheme.caption,
+                    ),
+                  ],
+                ),
+              ),
+              _StatusChip(status: incident.status),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline, color: AppTheme.primaryRed),
-            onPressed: () => _showDeleteDialog(context),
-            tooltip: 'Delete',
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  incident.address,
+                  style: AppTheme.caption,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              _ActionButton(
+                icon: Icons.edit_outlined,
+                onTap: () => _showStatusDialog(context),
+              ),
+              const SizedBox(width: 4),
+              _ActionButton(
+                icon: Icons.delete_outline,
+                color: AppTheme.primaryRed,
+                onTap: () => _showDeleteDialog(context),
+              ),
+            ],
           ),
         ],
       ),
@@ -196,64 +326,84 @@ class _IncidentListItem extends StatelessWidget {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Text('Update Incident Status'),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: Text('Update Status', style: AppTheme.headingMedium),
           content: SizedBox(
             width: double.maxFinite,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  incident.title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-                Text(
-                  incident.address,
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 12,
-                  ),
-                ),
+                Text(incident.title, style: AppTheme.headingSmall),
+                const SizedBox(height: 4),
+                Text(incident.address, style: AppTheme.caption),
                 const SizedBox(height: 16),
-                const Text(
-                  'Select Status:',
-                  style: TextStyle(fontWeight: FontWeight.w500),
-                ),
-                const SizedBox(height: 8),
                 ...IncidentStatus.values.map((status) {
-                  return RadioListTile<IncidentStatus>(
-                    value: status,
-                    groupValue: selectedStatus,
-                    title: Text(_getStatusLabel(status)),
-                    subtitle: Text(
-                      _getStatusDescription(status),
-                      style: const TextStyle(fontSize: 12),
+                  final isSelected = selectedStatus == status;
+                  return GestureDetector(
+                    onTap: () => setState(() => selectedStatus = status),
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isSelected ? _getStatusColor(status).withValues(alpha: 0.1) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isSelected ? _getStatusColor(status) : AppTheme.cardBorder,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 20,
+                            height: 20,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isSelected ? _getStatusColor(status) : AppTheme.cardBorder,
+                                width: 2,
+                              ),
+                              color: isSelected ? _getStatusColor(status) : Colors.transparent,
+                            ),
+                            child: isSelected
+                                ? const Icon(Icons.check, size: 14, color: Colors.white)
+                                : null,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _getStatusLabel(status),
+                                  style: AppTheme.bodyMedium.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                                Text(
+                                  _getStatusDescription(status),
+                                  style: AppTheme.caption,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    activeColor: _getStatusColor(status),
-                    contentPadding: EdgeInsets.zero,
-                    dense: true,
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() => selectedStatus = value);
-                      }
-                    },
                   );
                 }),
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
                 TextField(
                   controller: noteController,
+                  style: AppTheme.bodyMedium,
                   decoration: InputDecoration(
-                    labelText: 'Status Note (Optional)',
-                    hintText: 'Add a note about this status change...',
+                    labelText: 'Note (Optional)',
+                    labelStyle: AppTheme.caption,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: AppTheme.cardBorder),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: AppTheme.cardBorder),
                     ),
                   ),
                   maxLines: 2,
@@ -264,24 +414,21 @@ class _IncidentListItem extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
+              child: Text('Cancel', style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary)),
             ),
             ElevatedButton(
               onPressed: () async {
                 await context.read<IncidentProvider>().updateIncidentStatus(
                       incident.id,
                       selectedStatus,
-                      note: noteController.text.trim().isEmpty
-                          ? null
-                          : noteController.text.trim(),
+                      note: noteController.text.trim().isEmpty ? null : noteController.text.trim(),
                     );
                 if (context.mounted) {
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(
-                        'Status updated to ${_getStatusLabel(selectedStatus)}',
-                      ),
+                      content: Text('Status updated to ${_getStatusLabel(selectedStatus)}'),
+                      backgroundColor: AppTheme.successGreen,
                     ),
                   );
                 }
@@ -298,20 +445,23 @@ class _IncidentListItem extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Incident'),
-        content: Text('Are you sure you want to delete "${incident.title}"?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text('Delete Incident', style: AppTheme.headingMedium),
+        content: Text(
+          'Are you sure you want to delete "${incident.title}"?',
+          style: AppTheme.bodyMedium,
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: Text('Cancel', style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary)),
           ),
           TextButton(
             onPressed: () {
               context.read<IncidentProvider>().deleteIncident(incident.id);
               Navigator.pop(ctx);
             },
-            child: const Text('Delete',
-                style: TextStyle(color: AppTheme.primaryRed)),
+            child: Text('Delete', style: AppTheme.bodyMedium.copyWith(color: AppTheme.primaryRed)),
           ),
         ],
       ),
@@ -338,29 +488,57 @@ class _IncidentListItem extends StatelessWidget {
       case IncidentStatus.pending:
         return 'Awaiting initial review';
       case IncidentStatus.underReview:
-        return 'Being investigated by authorities';
+        return 'Being investigated';
       case IncidentStatus.verified:
-        return 'Confirmed by multiple sources';
+        return 'Confirmed by sources';
       case IncidentStatus.resolved:
-        return 'Issue has been addressed';
+        return 'Issue addressed';
       case IncidentStatus.dismissed:
-        return 'Invalid or false report';
+        return 'Invalid report';
     }
   }
 
   Color _getStatusColor(IncidentStatus status) {
     switch (status) {
       case IncidentStatus.pending:
-        return Colors.orange;
+        return AppTheme.warningOrange;
       case IncidentStatus.underReview:
-        return Colors.blue;
+        return AppTheme.primaryDark;
       case IncidentStatus.verified:
-        return Colors.green;
+        return AppTheme.successGreen;
       case IncidentStatus.resolved:
-        return Colors.teal;
+        return AppTheme.successGreen;
       case IncidentStatus.dismissed:
-        return Colors.grey;
+        return AppTheme.textSecondary;
     }
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  final IconData icon;
+  final Color? color;
+  final VoidCallback onTap;
+
+  const _ActionButton({
+    required this.icon,
+    this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppTheme.cardBorder),
+        ),
+        child: Icon(icon, size: 18, color: color ?? AppTheme.primaryDark),
+      ),
+    );
   }
 }
 
@@ -372,17 +550,18 @@ class _StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: _getStatusColor().withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: _getStatusColor().withValues(alpha: 0.5)),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: _getStatusColor().withValues(alpha: 0.3)),
       ),
       child: Text(
         _getStatusLabel(),
         style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
+          fontFamily: AppTheme.fontFamily,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
           color: _getStatusColor(),
         ),
       ),
@@ -392,15 +571,15 @@ class _StatusChip extends StatelessWidget {
   Color _getStatusColor() {
     switch (status) {
       case IncidentStatus.pending:
-        return Colors.orange;
+        return AppTheme.warningOrange;
       case IncidentStatus.underReview:
-        return Colors.blue;
+        return AppTheme.primaryDark;
       case IncidentStatus.verified:
-        return Colors.green;
+        return AppTheme.successGreen;
       case IncidentStatus.resolved:
-        return Colors.teal;
+        return AppTheme.successGreen;
       case IncidentStatus.dismissed:
-        return Colors.grey;
+        return AppTheme.textSecondary;
     }
   }
 
@@ -409,7 +588,7 @@ class _StatusChip extends StatelessWidget {
       case IncidentStatus.pending:
         return 'Pending';
       case IncidentStatus.underReview:
-        return 'Under Review';
+        return 'Review';
       case IncidentStatus.verified:
         return 'Verified';
       case IncidentStatus.resolved:
@@ -433,29 +612,36 @@ class _CategoriesTab extends StatelessWidget {
     }
 
     if (categoryProvider.error != null) {
-      return Center(child: Text('Error: ${categoryProvider.error}'));
+      return Center(
+        child: Text(
+          'Error loading categories',
+          style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
+        ),
+      );
     }
 
     return Scaffold(
+      backgroundColor: AppTheme.backgroundGrey,
       body: categories.isEmpty
-          ? const Center(child: Text('No categories found.'))
-          : ReorderableListView.builder(
+          ? Center(
+              child: Text(
+                'No categories found',
+                style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
+              ),
+            )
+          : ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: categories.length,
-              onReorder: (oldIndex, newIndex) {
-                // Handle reordering if needed
-              },
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
                 final category = categories[index];
-                return _CategoryListItem(
-                  key: ValueKey(category.id),
-                  category: category,
-                );
+                return _CategoryCard(category: category);
               },
             ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddCategoryDialog(context),
         backgroundColor: AppTheme.primaryRed,
+        elevation: 0,
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );
@@ -474,7 +660,10 @@ class _CategoriesTab extends StatelessWidget {
           if (result != null && context.mounted) {
             Navigator.pop(ctx);
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Category "$name" added')),
+              SnackBar(
+                content: Text('Category "$name" added'),
+                backgroundColor: AppTheme.successGreen,
+              ),
             );
           }
         },
@@ -483,75 +672,81 @@ class _CategoriesTab extends StatelessWidget {
   }
 }
 
-class _CategoryListItem extends StatelessWidget {
+class _CategoryCard extends StatelessWidget {
   final CategoryModel category;
 
-  const _CategoryListItem({super.key, required this.category});
+  const _CategoryCard({required this.category});
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: category.color.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(category.icon, color: category.color),
-        ),
-        title: Row(
-          children: [
-            Text(category.name),
-            if (category.isDefault) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Text(
-                  'Default',
-                  style: TextStyle(fontSize: 10, color: Colors.grey),
-                ),
-              ),
-            ],
-          ],
-        ),
-        subtitle: Text(
-          category.isEnabled ? 'Enabled' : 'Disabled',
-          style: TextStyle(
-            color: category.isEnabled ? AppTheme.successGreen : Colors.grey,
-            fontSize: 12,
-          ),
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Switch(
-              value: category.isEnabled,
-              activeColor: AppTheme.successGreen,
-              onChanged: (value) {
-                context.read<CategoryProvider>().toggleCategoryEnabled(category.id);
-              },
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: AppTheme.cardDecoration,
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: category.color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
             ),
-            if (!category.isDefault) ...[
-              IconButton(
-                icon: const Icon(Icons.edit, color: AppTheme.accentBlue),
-                onPressed: () => _showEditDialog(context),
-                tooltip: 'Edit',
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete, color: AppTheme.primaryRed),
-                onPressed: () => _showDeleteDialog(context),
-                tooltip: 'Delete',
-              ),
-            ],
+            child: Icon(category.icon, color: category.color, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(category.name, style: AppTheme.headingSmall),
+                    if (category.isDefault) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.backgroundGrey,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'Default',
+                          style: AppTheme.caption.copyWith(fontSize: 10),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  category.isEnabled ? 'Enabled' : 'Disabled',
+                  style: AppTheme.caption.copyWith(
+                    color: category.isEnabled ? AppTheme.successGreen : AppTheme.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch.adaptive(
+            value: category.isEnabled,
+            activeTrackColor: AppTheme.successGreen,
+            onChanged: (value) {
+              context.read<CategoryProvider>().toggleCategoryEnabled(category.id);
+            },
+          ),
+          if (!category.isDefault) ...[
+            _ActionButton(
+              icon: Icons.edit_outlined,
+              onTap: () => _showEditDialog(context),
+            ),
+            const SizedBox(width: 4),
+            _ActionButton(
+              icon: Icons.delete_outline,
+              color: AppTheme.primaryRed,
+              onTap: () => _showDeleteDialog(context),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -567,12 +762,14 @@ class _CategoryListItem extends StatelessWidget {
             iconName: iconName,
             colorHex: colorHex,
           );
-          final result =
-              await context.read<CategoryProvider>().updateCategory(updated);
+          final result = await context.read<CategoryProvider>().updateCategory(updated);
           if (result && context.mounted) {
             Navigator.pop(ctx);
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Category "$name" updated')),
+              SnackBar(
+                content: Text('Category "$name" updated'),
+                backgroundColor: AppTheme.successGreen,
+              ),
             );
           }
         },
@@ -584,27 +781,31 @@ class _CategoryListItem extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Category'),
-        content: Text('Are you sure you want to delete "${category.name}"?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text('Delete Category', style: AppTheme.headingMedium),
+        content: Text(
+          'Are you sure you want to delete "${category.name}"?',
+          style: AppTheme.bodyMedium,
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: Text('Cancel', style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary)),
           ),
           TextButton(
             onPressed: () async {
-              final result = await context
-                  .read<CategoryProvider>()
-                  .deleteCategory(category.id);
+              final result = await context.read<CategoryProvider>().deleteCategory(category.id);
               if (result && context.mounted) {
                 Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Category "${category.name}" deleted')),
+                  SnackBar(
+                    content: Text('Category "${category.name}" deleted'),
+                    backgroundColor: AppTheme.successGreen,
+                  ),
                 );
               }
             },
-            child: const Text('Delete',
-                style: TextStyle(color: AppTheme.primaryRed)),
+            child: Text('Delete', style: AppTheme.bodyMedium.copyWith(color: AppTheme.primaryRed)),
           ),
         ],
       ),
@@ -676,7 +877,7 @@ class _CategoryDialogState extends State<_CategoryDialog> {
     try {
       return Color(int.parse(colorHex.replaceFirst('#', '0xFF')));
     } catch (_) {
-      return Colors.grey;
+      return AppTheme.textSecondary;
     }
   }
 
@@ -685,7 +886,11 @@ class _CategoryDialogState extends State<_CategoryDialog> {
     final isEditing = widget.category != null;
 
     return AlertDialog(
-      title: Text(isEditing ? 'Edit Category' : 'Add Category'),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      title: Text(
+        isEditing ? 'Edit Category' : 'Add Category',
+        style: AppTheme.headingMedium,
+      ),
       content: SizedBox(
         width: double.maxFinite,
         child: SingleChildScrollView(
@@ -695,15 +900,23 @@ class _CategoryDialogState extends State<_CategoryDialog> {
             children: [
               TextField(
                 controller: _nameController,
+                style: AppTheme.bodyMedium,
+                onChanged: (_) => setState(() {}),
                 decoration: InputDecoration(
                   labelText: 'Category Name',
+                  labelStyle: AppTheme.caption,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppTheme.cardBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppTheme.cardBorder),
                   ),
                 ),
               ),
               const SizedBox(height: 16),
-              const Text('Icon', style: TextStyle(fontWeight: FontWeight.w500)),
+              Text('Icon', style: AppTheme.headingSmall),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -717,28 +930,25 @@ class _CategoryDialogState extends State<_CategoryDialog> {
                       height: 44,
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? _getColor(_selectedColor).withValues(alpha: 0.2)
-                            : Colors.grey[100],
+                            ? _getColor(_selectedColor).withValues(alpha: 0.1)
+                            : AppTheme.backgroundGrey,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: isSelected
-                              ? _getColor(_selectedColor)
-                              : Colors.grey[300]!,
+                          color: isSelected ? _getColor(_selectedColor) : AppTheme.cardBorder,
                           width: isSelected ? 2 : 1,
                         ),
                       ),
                       child: Icon(
                         _getIconData(iconName),
-                        color: isSelected
-                            ? _getColor(_selectedColor)
-                            : Colors.grey[600],
+                        color: isSelected ? _getColor(_selectedColor) : AppTheme.textSecondary,
+                        size: 22,
                       ),
                     ),
                   );
                 }).toList(),
               ),
               const SizedBox(height: 16),
-              const Text('Color', style: TextStyle(fontWeight: FontWeight.w500)),
+              Text('Color', style: AppTheme.headingSmall),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -754,18 +964,9 @@ class _CategoryDialogState extends State<_CategoryDialog> {
                         color: _getColor(colorHex),
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: isSelected ? Colors.white : Colors.transparent,
+                          color: isSelected ? AppTheme.primaryDark : Colors.transparent,
                           width: 3,
                         ),
-                        boxShadow: isSelected
-                            ? [
-                                BoxShadow(
-                                  color: _getColor(colorHex).withValues(alpha: 0.5),
-                                  blurRadius: 8,
-                                  spreadRadius: 2,
-                                )
-                              ]
-                            : null,
                       ),
                       child: isSelected
                           ? const Icon(Icons.check, color: Colors.white, size: 18)
@@ -779,8 +980,9 @@ class _CategoryDialogState extends State<_CategoryDialog> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
+                  color: AppTheme.backgroundGrey,
                   borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppTheme.cardBorder),
                 ),
                 child: Row(
                   children: [
@@ -788,20 +990,19 @@ class _CategoryDialogState extends State<_CategoryDialog> {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: _getColor(_selectedColor).withValues(alpha: 0.2),
+                        color: _getColor(_selectedColor).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Icon(
                         _getIconData(_selectedIcon),
                         color: _getColor(_selectedColor),
+                        size: 20,
                       ),
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      _nameController.text.isEmpty
-                          ? 'Preview'
-                          : _nameController.text,
-                      style: const TextStyle(fontWeight: FontWeight.w500),
+                      _nameController.text.isEmpty ? 'Preview' : _nameController.text,
+                      style: AppTheme.headingSmall,
                     ),
                   ],
                 ),
@@ -813,7 +1014,7 @@ class _CategoryDialogState extends State<_CategoryDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text('Cancel', style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary)),
         ),
         ElevatedButton(
           onPressed: _nameController.text.trim().isEmpty

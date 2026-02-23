@@ -44,11 +44,15 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
     final success = await provider.requestToJoin(widget.communityId, userId);
 
     if (mounted) {
+      if (success) {
+        // Reload community details to update membership status
+        await _loadCommunity();
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(success
-              ? 'Join request sent! Waiting for admin approval.'
-              : provider.error ?? 'Failed to send request'),
+              ? 'You have joined the community!'
+              : provider.error ?? 'Failed to join'),
           backgroundColor: success ? AppTheme.successGreen : AppTheme.primaryRed,
         ),
       );
@@ -415,9 +419,9 @@ class _MembershipSection extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: onRequestJoin,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.accentBlue,
+                  backgroundColor: AppTheme.primaryRed,
                 ),
-                child: const Text('Request to Join'),
+                child: const Text('Join Community'),
               ),
             ),
           ],
