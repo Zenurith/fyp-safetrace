@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../data/models/incident_model.dart';
 import '../../data/services/incident_notification_service.dart';
 import '../../data/services/location_service.dart';
+import '../../utils/app_theme.dart';
 import '../providers/user_provider.dart';
 import '../providers/incident_provider.dart';
 import '../providers/vote_provider.dart';
@@ -11,11 +12,10 @@ import '../providers/alert_settings_provider.dart';
 import '../widgets/incident_bottom_sheet.dart';
 import '../widgets/incident_notification_overlay.dart';
 import 'map_screen.dart';
-import 'my_reports_screen.dart';
 import 'alert_settings_screen.dart';
-import 'admin_screen.dart';
 import 'profile_screen.dart';
 import 'community_list_screen.dart';
+import 'report_incident_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -116,6 +116,23 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _openReportScreen() async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const ReportIncidentScreen(),
+      ),
+    );
+    if (result == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Incident reported successfully!'),
+          backgroundColor: AppTheme.successGreen,
+        ),
+      );
+    }
+  }
+
   @override
   void dispose() {
     _notificationSubscription?.cancel();
@@ -125,7 +142,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<UserProvider>().currentUser;
-    final isAdmin = user?.isAdmin ?? false;
 
     // Watch for incident changes and check for new incidents immediately
     final incidents = context.watch<IncidentProvider>().incidents;
@@ -146,63 +162,30 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     }
 
-    final screens = [
-      const MapScreen(),
-      const CommunityListScreen(),
-      const MyReportsScreen(),
-      const AlertSettingsScreen(),
-      if (isAdmin) const AdminScreen(),
-      const ProfileScreen(),
-    ];
-
-    // Reset index if it's out of bounds (e.g. role changed)
-    if (_currentIndex >= screens.length) {
-      _currentIndex = 0;
+    // Index mapping: 0=Map, 1=Community, 2=Add (action), 3=Alerts, 4=Profile
+    Widget currentScreen;
+    switch (_currentIndex) {
+      case 0:
+        currentScreen = const MapScreen();
+        break;
+      case 1:
+        currentScreen = const CommunityListScreen();
+        break;
+      case 3:
+        currentScreen = const AlertSettingsScreen();
+        break;
+      case 4:
+        currentScreen = const ProfileScreen();
+        break;
+      default:
+        currentScreen = const MapScreen();
     }
-
-    final navItems = [
-      const BottomNavigationBarItem(
-        icon: Icon(Icons.map),
-        label: 'Map',
-      ),
-      const BottomNavigationBarItem(
-        icon: Icon(Icons.groups),
-        label: 'Communities',
-      ),
-      const BottomNavigationBarItem(
-        icon: Icon(Icons.history),
-        label: 'My Reports',
-      ),
-      const BottomNavigationBarItem(
-        icon: Icon(Icons.warning_amber_rounded),
-        label: 'Alerts',
-      ),
-      if (isAdmin)
-        const BottomNavigationBarItem(
-          icon: Icon(Icons.admin_panel_settings),
-          label: 'Admin',
-        ),
-      const BottomNavigationBarItem(
-        icon: Icon(Icons.person),
-        label: 'Profile',
-      ),
-    ];
 
     return Scaffold(
       body: Stack(
         children: [
           // Main content
-          Scaffold(
-            body: screens[_currentIndex],
-            bottomNavigationBar: BottomNavigationBar(
-              currentIndex: _currentIndex,
-              onTap: (i) => setState(() => _currentIndex = i),
-              selectedItemColor: const Color(0xFFE53E3E),
-              unselectedItemColor: Colors.grey,
-              type: BottomNavigationBarType.fixed,
-              items: navItems,
-            ),
-          ),
+          currentScreen,
           // Notification overlay
           if (_currentNotification != null)
             Positioned(
@@ -225,6 +208,112 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
+        ],
+      ),
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(
+            top: BorderSide(color: AppTheme.cardBorder, width: 1),
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Map
+                _NavItem(
+                  iconPath: 'assets/icon/map.png',
+                  label: 'Map',
+                  isSelected: _currentIndex == 0,
+                  onTap: () => setState(() => _currentIndex = 0),
+                ),
+                // Community
+                _NavItem(
+                  iconPath: 'assets/icon/community.png',
+                  label: 'Community',
+                  isSelected: _currentIndex == 1,
+                  onTap: () => setState(() => _currentIndex = 1),
+                ),
+                // Add button (red circle)
+                GestureDetector(
+                  onTap: _openReportScreen,
+                  child: Container(
+                    width: 52,
+                    height: 52,
+                    decoration: const BoxDecoration(
+                      color: AppTheme.primaryRed,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.add,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                  ),
+                ),
+                // Alerts
+                _NavItem(
+                  iconPath: 'assets/icon/warning.png',
+                  label: 'Alerts',
+                  isSelected: _currentIndex == 3,
+                  onTap: () => setState(() => _currentIndex = 3),
+                ),
+                // Profile
+                _NavItem(
+                  iconPath: 'assets/icon/user.png',
+                  label: 'Profile',
+                  isSelected: _currentIndex == 4,
+                  onTap: () => setState(() => _currentIndex = 4),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  final String iconPath;
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _NavItem({
+    required this.iconPath,
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isSelected ? AppTheme.primaryRed : AppTheme.textSecondary;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ImageIcon(
+            AssetImage(iconPath),
+            size: 24,
+            color: color,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: AppTheme.fontFamily,
+              fontSize: 11,
+              fontWeight: FontWeight.w400,
+              color: color,
+            ),
+          ),
         ],
       ),
     );

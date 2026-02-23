@@ -7,7 +7,6 @@ import '../../data/services/location_service.dart';
 import '../../utils/app_theme.dart';
 import '../providers/incident_provider.dart';
 import '../widgets/incident_bottom_sheet.dart';
-import 'report_incident_screen.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -200,8 +199,9 @@ class _MapScreenState extends State<MapScreen> {
                     child: Text(
                       'Setapak, Selangor',
                       style: TextStyle(
+                        fontFamily: AppTheme.fontFamily,
                         fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w700,
                         color: AppTheme.primaryDark,
                         shadows: [
                           Shadow(
@@ -216,12 +216,7 @@ class _MapScreenState extends State<MapScreen> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(8),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
-                          blurRadius: 4,
-                        ),
-                      ],
+                      border: Border.all(color: AppTheme.cardBorder),
                     ),
                     child: IconButton(
                       icon: const Icon(Icons.menu, color: AppTheme.primaryDark),
@@ -270,49 +265,27 @@ class _MapScreenState extends State<MapScreen> {
             ),
             // My location button
             Positioned(
-              bottom: 24,
+              bottom: 100,
               right: 16,
-              child: FloatingActionButton.small(
-                heroTag: 'location',
-                backgroundColor: Colors.white,
-                onPressed: _isCentering ? null : _centerOnUserLocation,
-                child: _isCentering
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppTheme.primaryDark,
-                        ),
-                      )
-                    : const Icon(Icons.my_location, color: AppTheme.primaryDark),
-              ),
-            ),
-            // FAB to report
-            Positioned(
-              bottom: 24,
-              left: 16,
-              child: FloatingActionButton(
-                heroTag: 'report',
-                backgroundColor: AppTheme.primaryRed,
-                onPressed: () async {
-                  final result = await Navigator.push<bool>(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const ReportIncidentScreen(),
-                    ),
-                  );
-                  // Show success message if incident was reported
-                  if (result == true && context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Incident reported successfully!'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
-                },
-                child: const Icon(Icons.add, color: Colors.white),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppTheme.cardBorder),
+                ),
+                child: IconButton(
+                  onPressed: _isCentering ? null : _centerOnUserLocation,
+                  icon: _isCentering
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppTheme.primaryDark,
+                          ),
+                        )
+                      : const Icon(Icons.my_location, color: AppTheme.primaryDark),
+                ),
               ),
             ),
           ],
@@ -344,12 +317,9 @@ class _FilterChipWidget extends StatelessWidget {
         decoration: BoxDecoration(
           color: isSelected ? AppTheme.primaryDark : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 4,
-            ),
-          ],
+          border: Border.all(
+            color: isSelected ? AppTheme.primaryDark : AppTheme.cardBorder,
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -361,6 +331,7 @@ class _FilterChipWidget extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
+                fontFamily: AppTheme.fontFamily,
                 color: isSelected ? Colors.white : AppTheme.primaryDark,
                 fontSize: 13,
                 fontWeight: FontWeight.w500,

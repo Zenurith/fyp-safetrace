@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../data/models/incident_model.dart';
+import '../../utils/app_theme.dart';
 
 class IncidentNotificationOverlay extends StatefulWidget {
   final IncidentModel incident;
@@ -64,39 +65,21 @@ class _IncidentNotificationOverlayState
     super.dispose();
   }
 
-  IconData _getCategoryIcon() {
+  String _getCategoryIconPath() {
     switch (widget.incident.category) {
       case IncidentCategory.crime:
-        return Icons.warning;
-      case IncidentCategory.infrastructure:
-        return Icons.build;
+        return 'assets/icon/warning.png';
       case IncidentCategory.suspicious:
-        return Icons.visibility;
+        return 'assets/icon/eye.png';
       case IncidentCategory.traffic:
-        return Icons.traffic;
+        return 'assets/icon/warning.png';
+      case IncidentCategory.infrastructure:
+        return 'assets/icon/report.png';
       case IncidentCategory.environmental:
-        return Icons.eco;
+        return 'assets/icon/warning.png';
       case IncidentCategory.emergency:
-        return Icons.emergency;
+        return 'assets/icon/warning.png';
     }
-  }
-
-  Color _getSeverityColor() {
-    switch (widget.incident.severity) {
-      case SeverityLevel.low:
-        return Colors.orange;
-      case SeverityLevel.moderate:
-        return Colors.deepOrange;
-      case SeverityLevel.high:
-        return Colors.red;
-    }
-  }
-
-  String _formatDistance() {
-    if (widget.distance < 1) {
-      return '${(widget.distance * 1000).round()} m away';
-    }
-    return '${widget.distance.toStringAsFixed(1)} km away';
   }
 
   @override
@@ -104,75 +87,88 @@ class _IncidentNotificationOverlayState
     return SlideTransition(
       position: _slideAnimation,
       child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Material(
-            elevation: 8,
-            borderRadius: BorderRadius.circular(12),
-            color: _getSeverityColor(),
-            child: InkWell(
-              onTap: () {
-                _controller.reverse().then((_) => widget.onTap());
-              },
+        bottom: false,
+        child: GestureDetector(
+          onTap: () {
+            _controller.reverse().then((_) => widget.onTap());
+          },
+          child: Container(
+            margin: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppTheme.warningOrange,
               borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        _getCategoryIcon(),
-                        color: Colors.white,
-                        size: 28,
-                      ),
+            ),
+            child: Row(
+              children: [
+                // Category icon
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Center(
+                    child: ImageIcon(
+                      AssetImage(_getCategoryIconPath()),
+                      color: Colors.white,
+                      size: 24,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'New ${widget.incident.categoryLabel} Alert',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            widget.incident.title,
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.9),
-                              fontSize: 14,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            _formatDistance(),
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.8),
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white),
-                      onPressed: _dismissWithAnimation,
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+                const SizedBox(width: 12),
+                // Title and category tag
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'New ${widget.incident.categoryLabel} Alert',
+                        style: const TextStyle(
+                          fontFamily: AppTheme.fontFamily,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          widget.incident.categoryLabel.toLowerCase(),
+                          style: const TextStyle(
+                            fontFamily: AppTheme.fontFamily,
+                            fontWeight: FontWeight.w400,
+                            fontSize: 12,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Dismiss button
+                GestureDetector(
+                  onTap: _dismissWithAnimation,
+                  child: const Padding(
+                    padding: EdgeInsets.all(4),
+                    child: Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
