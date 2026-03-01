@@ -111,7 +111,9 @@ class _UserLoaderState extends State<_UserLoader> {
       );
 
       // Initialize push notifications after user is loaded
-      await PushNotificationService().initialize(widget.firebaseUser.uid);
+      if (mounted) {
+        await PushNotificationService().initialize(widget.firebaseUser.uid);
+      }
     }
   }
 

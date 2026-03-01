@@ -30,6 +30,8 @@ class _CommentsSectionState extends State<CommentsSection> {
 
   @override
   void dispose() {
+    // Stop listening to comments to prevent memory leak
+    context.read<CommentProvider>().stopListening(widget.incidentId);
     _commentController.dispose();
     _focusNode.dispose();
     super.dispose();

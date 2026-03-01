@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:http/http.dart' as http;
@@ -65,7 +66,9 @@ class LocationService {
         ];
         return parts.join(', ');
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Error getting address from coordinates: $e');
+    }
     return 'Unknown location';
   }
 
@@ -94,7 +97,9 @@ class LocationService {
               .toList();
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Error getting address suggestions: $e');
+    }
     return [];
   }
 
@@ -119,7 +124,9 @@ class LocationService {
           );
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Error getting coordinates from place ID: $e');
+    }
     return null;
   }
 
@@ -135,7 +142,9 @@ class LocationService {
           longitude: locations.first.longitude,
         );
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Error getting coordinates from address: $e');
+    }
     return null;
   }
 }

@@ -169,13 +169,17 @@ class UserRepository {
       }
     }
 
+    // Guard against division by zero when at max level
+    final range = nextThreshold - prevThreshold;
+    final progress = level >= _levelThresholds.length || range == 0
+        ? 1.0
+        : (points - prevThreshold) / range;
+
     return {
       'level': level,
       'title': title,
-      'pointsToNext': nextThreshold - points,
-      'progress': level >= _levelThresholds.length
-          ? 1.0
-          : (points - prevThreshold) / (nextThreshold - prevThreshold),
+      'pointsToNext': nextThreshold > points ? nextThreshold - points : 0,
+      'progress': progress.clamp(0.0, 1.0),
     };
   }
 

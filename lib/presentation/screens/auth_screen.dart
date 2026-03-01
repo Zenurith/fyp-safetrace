@@ -36,7 +36,8 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    final formState = _formKey.currentState;
+    if (formState == null || !formState.validate()) return;
 
     setState(() {
       _isSubmitting = true;
@@ -52,14 +53,28 @@ class _AuthScreenState extends State<AuthScreen> {
           email: _emailController.text.trim(),
           password: _passwordController.text,
         );
-        await userProvider.loadUser(credential.user!.uid);
+        final user = credential.user;
+        if (user == null) {
+          throw FirebaseAuthException(
+            code: 'user-null',
+            message: 'Authentication failed - no user returned',
+          );
+        }
+        await userProvider.loadUser(user.uid);
       } else {
         final credential = await auth.createUserWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text,
         );
+        final user = credential.user;
+        if (user == null) {
+          throw FirebaseAuthException(
+            code: 'user-null',
+            message: 'Account creation failed - no user returned',
+          );
+        }
         await userProvider.createUser(
-          credential.user!.uid,
+          user.uid,
           _nameController.text.trim(),
           _handleController.text.trim(),
         );

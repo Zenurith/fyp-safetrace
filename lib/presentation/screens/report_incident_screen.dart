@@ -150,8 +150,21 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
         _mapController?.animateCamera(
           CameraUpdate.newLatLng(LatLng(pos.latitude, pos.longitude)),
         );
+      } else if (mounted) {
+        // Location returned null - could be permissions issue
+        debugPrint('Location detection returned null - check permissions');
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Error detecting location: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not detect your location. Please enter address manually.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    }
     if (mounted) setState(() => _loadingLocation = false);
   }
 
