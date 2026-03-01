@@ -79,6 +79,40 @@ lib/
 - `IncidentNotificationService`: Stream-based proximity alerts using user's alert settings
 - `MediaUploadService`: Firebase Storage image uploads
 
+## Reputation System
+
+### Points
+| Action | Points |
+|--------|--------|
+| Create a report | +10 |
+| Receive upvote | +5 |
+| Receive downvote | -3 |
+| Change vote (upvote→downvote) | -8 |
+| Change vote (downvote→upvote) | +8 |
+
+### Levels
+| Level | Title | Points Required |
+|-------|-------|-----------------|
+| 1 | Newcomer | 0 |
+| 2 | Observer | 100 |
+| 3 | Reporter | 300 |
+| 4 | Contributor | 600 |
+| 5 | Guardian | 1000 |
+| 6 | Protector | 1500 |
+| 7 | Sentinel | 2500 |
+| 8 | Champion | 4000 |
+| 9 | Hero | 6000 |
+| 10 | Legend | 10000 |
+
+### Trusted Status
+- Users with 500+ points automatically get `isTrusted: true`
+- Level and trusted status recalculate after every point-affecting action
+
+### Implementation
+- `UserRepository.incrementReportCount()` - Called when creating incident
+- `UserRepository.recalculateReputation()` - Called after vote transactions
+- `UserProvider.refreshCurrentUser()` - Call to refresh UI after reputation changes
+
 ## Key Patterns
 
 - Models use `toMap()`/`fromMap()` for Firestore serialization
@@ -117,3 +151,49 @@ lib/
 - Add new bottom nav items without removing an existing one first.
 - Use `Colors.purple`, `Colors.teal`, or `Colors.blue` directly — always use `AppTheme` constants.
 - Create new color constants without a clear semantic purpose.
+
+## Common Mistakes to Avoid
+
+### Flutter API Changes
+- Use `CardThemeData` not `CardTheme` in ThemeData (Flutter 3.x)
+- Use `activeTrackColor` not `activeColor` on Switch (deprecated)
+- Use `Switch.adaptive()` for cross-platform switches
+
+### Styling
+- Never use `BoxShadow` on cards — use `AppTheme.cardDecoration` (border-only)
+- Never use `Divider` between list items — use `SizedBox(height: 12)` with cards
+- Never use raw colors (`Colors.orange`, `Colors.blue`) — use AppTheme constants
+- Always specify `fontFamily: AppTheme.fontFamily` in custom TextStyles
+
+### UI Components
+- Bottom nav icons must have labels below them for clarity
+- Use `ImageIcon(AssetImage('assets/icon/xxx.png'))` for custom icons
+- Use `AppTheme.textSecondary` for grey text, not `Colors.grey`
+
+### State Management
+- Community joining is currently **auto-approved** (no admin approval needed) for testing
+- Call `setState()` or reload data after async operations that change UI state
+
+## AppTheme Quick Reference
+
+```dart
+// Colors
+AppTheme.primaryDark      // Headers, primary text
+AppTheme.primaryRed       // Primary accent, errors, destructive actions
+AppTheme.successGreen     // Success states only
+AppTheme.warningOrange    // Warning states only
+AppTheme.textSecondary    // Grey text, captions
+AppTheme.cardBorder       // Border color for cards
+AppTheme.backgroundGrey   // Screen backgrounds
+
+// Text Styles
+AppTheme.headingLarge     // 24px, Heavy (700)
+AppTheme.headingMedium    // 20px, Heavy (700)
+AppTheme.headingSmall     // 16px, Heavy (700)
+AppTheme.bodyLarge        // 16px, Book (400)
+AppTheme.bodyMedium       // 14px, Book (400)
+AppTheme.caption          // 12px, Light (300), grey
+
+// Card styling
+AppTheme.cardDecoration   // Border-only BoxDecoration
+```

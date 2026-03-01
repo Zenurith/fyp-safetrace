@@ -5,7 +5,9 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../utils/app_theme.dart';
 import '../providers/user_provider.dart';
+import '../providers/theme_provider.dart';
 import '../widgets/user_avatar.dart';
+import 'admin_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -177,6 +179,15 @@ class ProfileScreen extends StatelessWidget {
           appBar: AppBar(
             title: const Text('Profile'),
             backgroundColor: AppTheme.profilePurple,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: () {
+                  context.read<UserProvider>().refreshCurrentUser();
+                },
+                tooltip: 'Refresh profile',
+              ),
+            ],
           ),
           body: SingleChildScrollView(
             child: Column(
@@ -324,6 +335,30 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ),
                 ),
+                // Admin Dashboard button (only for admins)
+                if (user.isAdmin) ...[
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const AdminScreen()),
+                          );
+                        },
+                        icon: const Icon(Icons.admin_panel_settings),
+                        label: const Text('Admin Dashboard'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryDark,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 24),
 
                 // Reputation Score card
@@ -397,6 +432,56 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 24),
+
+                // Settings section
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: AppTheme.cardDecorationFor(context),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Settings',
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
+                        const SizedBox(height: 12),
+                        Consumer<ThemeProvider>(
+                          builder: (context, themeProvider, _) {
+                            return Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      themeProvider.isDarkMode
+                                          ? Icons.dark_mode
+                                          : Icons.light_mode,
+                                      color: Theme.of(context).iconTheme.color,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      'Dark Mode',
+                                      style: Theme.of(context).textTheme.bodyLarge,
+                                    ),
+                                  ],
+                                ),
+                                Switch.adaptive(
+                                  value: themeProvider.isDarkMode,
+                                  onChanged: (_) => themeProvider.toggleTheme(),
+                                  activeTrackColor: AppTheme.primaryRed,
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
 
                 // Sign Out button
                 Padding(

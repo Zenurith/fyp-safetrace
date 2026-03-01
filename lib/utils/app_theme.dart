@@ -23,6 +23,13 @@ class AppTheme {
   static const Color cardBorder = Color(0xFFE2E8F0);
   static const Color textSecondary = Color(0xFF718096);
 
+  // Dark mode colors
+  static const Color darkBackground = Color(0xFF1A202C);
+  static const Color darkSurface = Color(0xFF2D3748);
+  static const Color darkCardBorder = Color(0xFF4A5568);
+  static const Color darkTextPrimary = Color(0xFFF7FAFC);
+  static const Color darkTextSecondary = Color(0xFFA0AEC0);
+
   // Font family
   static const String fontFamily = 'Avenir';
 
@@ -75,6 +82,19 @@ class AppTheme {
     borderRadius: BorderRadius.circular(12),
     border: Border.all(color: cardBorder),
   );
+
+  // Dark mode card decoration
+  static BoxDecoration get darkCardDecoration => BoxDecoration(
+    color: darkSurface,
+    borderRadius: BorderRadius.circular(12),
+    border: Border.all(color: darkCardBorder),
+  );
+
+  // Helper to get card decoration based on brightness
+  static BoxDecoration cardDecorationFor(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return isDark ? darkCardDecoration : cardDecoration;
+  }
 
   static ThemeData get lightTheme {
     return ThemeData(
@@ -177,5 +197,139 @@ class AppTheme {
     if (cat.contains('environmental')) return successGreen;
     if (cat.contains('suspicious')) return primaryDark;
     return textSecondary;
+  }
+
+  static ThemeData get darkTheme {
+    return ThemeData(
+      useMaterial3: true,
+      fontFamily: fontFamily,
+      brightness: Brightness.dark,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: primaryDark,
+        brightness: Brightness.dark,
+        primary: darkTextPrimary,
+        secondary: primaryRed,
+        surface: darkSurface,
+        error: primaryRed,
+      ),
+      scaffoldBackgroundColor: darkBackground,
+      appBarTheme: const AppBarTheme(
+        backgroundColor: darkSurface,
+        foregroundColor: darkTextPrimary,
+        elevation: 0,
+        centerTitle: false,
+        titleTextStyle: TextStyle(
+          fontFamily: fontFamily,
+          fontWeight: FontWeight.w700,
+          fontSize: 20,
+          color: darkTextPrimary,
+        ),
+      ),
+      textTheme: const TextTheme(
+        headlineLarge: TextStyle(
+          fontFamily: fontFamily,
+          fontWeight: FontWeight.w700,
+          fontSize: 24,
+          color: darkTextPrimary,
+        ),
+        headlineMedium: TextStyle(
+          fontFamily: fontFamily,
+          fontWeight: FontWeight.w700,
+          fontSize: 20,
+          color: darkTextPrimary,
+        ),
+        headlineSmall: TextStyle(
+          fontFamily: fontFamily,
+          fontWeight: FontWeight.w700,
+          fontSize: 16,
+          color: darkTextPrimary,
+        ),
+        bodyLarge: TextStyle(
+          fontFamily: fontFamily,
+          fontWeight: FontWeight.w400,
+          fontSize: 16,
+          color: darkTextPrimary,
+        ),
+        bodyMedium: TextStyle(
+          fontFamily: fontFamily,
+          fontWeight: FontWeight.w400,
+          fontSize: 14,
+          color: darkTextPrimary,
+        ),
+        bodySmall: TextStyle(
+          fontFamily: fontFamily,
+          fontWeight: FontWeight.w300,
+          fontSize: 12,
+          color: darkTextSecondary,
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: primaryRed,
+          foregroundColor: Colors.white,
+          textStyle: const TextStyle(
+            fontFamily: fontFamily,
+            fontWeight: FontWeight.w700,
+            fontSize: 16,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 16),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: darkTextPrimary,
+          textStyle: const TextStyle(
+            fontFamily: fontFamily,
+            fontWeight: FontWeight.w700,
+            fontSize: 16,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          side: const BorderSide(color: darkCardBorder),
+        ),
+      ),
+      cardTheme: CardThemeData(
+        elevation: 0,
+        color: darkSurface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: darkCardBorder),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        fillColor: darkSurface,
+        filled: true,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: darkCardBorder),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: darkCardBorder),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      ),
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: darkSurface,
+        selectedItemColor: primaryRed,
+        unselectedItemColor: darkTextSecondary,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: darkSurface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: darkSurface,
+      ),
+      dividerColor: darkCardBorder,
+      iconTheme: const IconThemeData(color: darkTextPrimary),
+    );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/incident_model.dart';
+import '../models/status_history_model.dart';
 
 class IncidentRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -98,11 +99,20 @@ class IncidentRepository {
     String id,
     IncidentStatus status, {
     String? note,
+    String? updatedBy,
   }) async {
+    final historyEntry = StatusHistoryEntry(
+      status: status,
+      timestamp: DateTime.now(),
+      updatedBy: updatedBy,
+      note: note,
+    );
+
     await _incidentsCollection.doc(id).update({
       'status': status.index,
       'statusUpdatedAt': Timestamp.now(),
       'statusNote': note,
+      'statusHistory': FieldValue.arrayUnion([historyEntry.toMap()]),
     });
   }
 

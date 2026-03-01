@@ -5,6 +5,9 @@ import '../../data/models/incident_model.dart';
 import '../../utils/app_theme.dart';
 import '../providers/incident_provider.dart';
 import '../providers/user_provider.dart';
+import 'comments_section.dart';
+import 'photo_gallery_viewer.dart';
+import 'status_timeline_widget.dart';
 import 'vote_buttons.dart';
 
 class IncidentBottomSheet extends StatelessWidget {
@@ -134,12 +137,24 @@ class IncidentBottomSheet extends StatelessWidget {
 
           // Media
           if (incident.mediaUrls.isNotEmpty) ...[
-            const Text(
-              'Media',
-              style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.primaryDark),
+            Row(
+              children: [
+                const Text(
+                  'Media',
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primaryDark),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${incident.mediaUrls.length} ${incident.mediaUrls.length == 1 ? 'photo' : 'photos'}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey[500],
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
             SizedBox(
@@ -155,48 +170,80 @@ class IncidentBottomSheet extends StatelessWidget {
                   final isLocalFile = url.startsWith('/') || url.startsWith('file://');
 
                   return GestureDetector(
-                    onTap: () => _showMediaViewer(context, url, isVideo),
-                    child: Container(
-                      width: 80,
-                      height: 80,
-                      margin: const EdgeInsets.only(right: 8),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        color: isVideo ? Colors.grey[800] : Colors.grey[200],
-                      ),
-                      clipBehavior: Clip.hardEdge,
-                      child: isVideo
-                          ? const Icon(Icons.play_circle_outline,
-                              color: Colors.white, size: 32)
-                          : isLocalFile
-                              ? Image.file(
-                                  File(url.replaceFirst('file://', '')),
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return const Icon(Icons.broken_image,
-                                        color: Colors.grey);
-                                  },
-                                )
-                              : Image.network(
-                                  url,
-                                  fit: BoxFit.cover,
-                                  loadingBuilder: (context, child, progress) {
-                                    if (progress == null) return child;
-                                    return const Center(
-                                      child: SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return const Icon(Icons.broken_image,
-                                        color: Colors.grey);
-                                  },
+                    onTap: () => PhotoGalleryViewer.show(
+                      context,
+                      incident.mediaUrls,
+                      initialIndex: index,
+                    ),
+                    child: Stack(
+                      children: [
+                        Container(
+                          width: 80,
+                          height: 80,
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            color: isVideo ? Colors.grey[800] : Colors.grey[200],
+                          ),
+                          clipBehavior: Clip.hardEdge,
+                          child: isVideo
+                              ? const Icon(Icons.play_circle_outline,
+                                  color: Colors.white, size: 32)
+                              : isLocalFile
+                                  ? Image.file(
+                                      File(url.replaceFirst('file://', '')),
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) {
+                                        return const Icon(Icons.broken_image,
+                                            color: Colors.grey);
+                                      },
+                                    )
+                                  : Image.network(
+                                      url,
+                                      fit: BoxFit.cover,
+                                      loadingBuilder: (context, child, progress) {
+                                        if (progress == null) return child;
+                                        return const Center(
+                                          child: SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      errorBuilder: (context, error, stackTrace) {
+                                        return const Icon(Icons.broken_image,
+                                            color: Colors.grey);
+                                      },
+                                    ),
+                        ),
+                        // Photo number indicator
+                        if (incident.mediaUrls.length > 1)
+                          Positioned(
+                            bottom: 4,
+                            right: 12,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black54,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '${index + 1}/${incident.mediaUrls.length}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
                                 ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   );
                 },
@@ -205,51 +252,16 @@ class IncidentBottomSheet extends StatelessWidget {
             const SizedBox(height: 16),
           ],
 
-          // Status note if available
-          if (incident.statusNote != null &&
-              incident.statusNote!.isNotEmpty) ...[
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.blue.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.info_outline,
-                          color: Colors.blue[700], size: 16),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Status Update',
-                        style: TextStyle(
-                          color: Colors.blue[700],
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    incident.statusNote!,
-                    style: TextStyle(
-                      color: Colors.blue[900],
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
+          // Status Timeline
+          StatusTimelineWidget(incident: incident),
+          const SizedBox(height: 16),
 
           // Voting section
           _VotingSection(incident: incident),
+          const SizedBox(height: 16),
+
+          // Comments section
+          CommentsSection(incidentId: incident.id),
           const SizedBox(height: 16),
 
           // Action buttons
@@ -282,112 +294,6 @@ class IncidentBottomSheet extends StatelessWidget {
     );
   }
 
-  void _showMediaViewer(BuildContext context, String url, bool isVideo) {
-    // Check if URL is a local file path or network URL
-    final isLocalFile = url.startsWith('/') || url.startsWith('file://');
-
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.black87,
-        insetPadding: const EdgeInsets.all(16),
-        child: Stack(
-          children: [
-            Center(
-              child: isVideo
-                  ? Container(
-                      padding: const EdgeInsets.all(40),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[900],
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.videocam, color: Colors.white, size: 48),
-                          SizedBox(height: 8),
-                          Text(
-                            'Video playback not implemented',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        ],
-                      ),
-                    )
-                  : InteractiveViewer(
-                      minScale: 0.5,
-                      maxScale: 4.0,
-                      child: isLocalFile
-                          ? Image.file(
-                              File(url.replaceFirst('file://', '')),
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) {
-                                return _buildErrorWidget('Failed to load local image');
-                              },
-                            )
-                          : Image.network(
-                              url,
-                              fit: BoxFit.contain,
-                              loadingBuilder: (context, child, loadingProgress) {
-                                if (loadingProgress == null) return child;
-                                return Center(
-                                  child: CircularProgressIndicator(
-                                    value: loadingProgress.expectedTotalBytes != null
-                                        ? loadingProgress.cumulativeBytesLoaded /
-                                            loadingProgress.expectedTotalBytes!
-                                        : null,
-                                    color: Colors.white,
-                                  ),
-                                );
-                              },
-                              errorBuilder: (context, error, stackTrace) {
-                                debugPrint('Image load error: $error');
-                                debugPrint('URL: $url');
-                                return _buildErrorWidget('Failed to load image');
-                              },
-                            ),
-                    ),
-            ),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: IconButton(
-                icon: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Icon(Icons.close, color: Colors.white, size: 24),
-                ),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildErrorWidget(String message) {
-    return Container(
-      padding: const EdgeInsets.all(40),
-      decoration: BoxDecoration(
-        color: Colors.grey[900],
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.broken_image, color: Colors.white54, size: 48),
-          const SizedBox(height: 8),
-          Text(
-            message,
-            style: const TextStyle(color: Colors.white54),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _VotingSection extends StatelessWidget {

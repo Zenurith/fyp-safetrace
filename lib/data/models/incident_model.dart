@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'status_history_model.dart';
 
 enum IncidentCategory {
   crime,
@@ -36,6 +37,7 @@ class IncidentModel {
   final IncidentStatus status;
   final DateTime? statusUpdatedAt;
   final String? statusNote;
+  final List<StatusHistoryEntry> statusHistory;
   final int upvotes;
   final int downvotes;
 
@@ -56,6 +58,7 @@ class IncidentModel {
     this.status = IncidentStatus.pending,
     this.statusUpdatedAt,
     this.statusNote,
+    this.statusHistory = const [],
     this.upvotes = 0,
     this.downvotes = 0,
   });
@@ -133,6 +136,7 @@ class IncidentModel {
       'statusUpdatedAt':
           statusUpdatedAt != null ? Timestamp.fromDate(statusUpdatedAt!) : null,
       'statusNote': statusNote,
+      'statusHistory': statusHistory.map((e) => e.toMap()).toList(),
       'upvotes': upvotes,
       'downvotes': downvotes,
     };
@@ -160,6 +164,10 @@ class IncidentModel {
           ? (map['statusUpdatedAt'] as Timestamp).toDate()
           : null,
       statusNote: map['statusNote'],
+      statusHistory: (map['statusHistory'] as List<dynamic>?)
+              ?.map((e) => StatusHistoryEntry.fromMap(e as Map<String, dynamic>))
+              .toList() ??
+          [],
       upvotes: map['upvotes'] ?? 0,
       downvotes: map['downvotes'] ?? 0,
     );
@@ -182,6 +190,7 @@ class IncidentModel {
     IncidentStatus? status,
     DateTime? statusUpdatedAt,
     String? statusNote,
+    List<StatusHistoryEntry>? statusHistory,
     int? upvotes,
     int? downvotes,
   }) {
@@ -202,6 +211,7 @@ class IncidentModel {
       status: status ?? this.status,
       statusUpdatedAt: statusUpdatedAt ?? this.statusUpdatedAt,
       statusNote: statusNote ?? this.statusNote,
+      statusHistory: statusHistory ?? this.statusHistory,
       upvotes: upvotes ?? this.upvotes,
       downvotes: downvotes ?? this.downvotes,
     );

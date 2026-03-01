@@ -11,6 +11,11 @@ class UserModel {
   final bool isTrusted;
   final String role;
   final String? profilePhotoUrl;
+  final bool isBanned;
+  final bool isSuspended;
+  final DateTime? suspendedUntil;
+  final String? banReason;
+  final String? fcmToken;
 
   UserModel({
     required this.id,
@@ -25,9 +30,24 @@ class UserModel {
     this.isTrusted = false,
     this.role = 'user',
     this.profilePhotoUrl,
+    this.isBanned = false,
+    this.isSuspended = false,
+    this.suspendedUntil,
+    this.banReason,
+    this.fcmToken,
   });
 
   bool get isAdmin => role == 'admin';
+
+  bool get isActivelyBanned => isBanned;
+
+  bool get isActivelySuspended {
+    if (!isSuspended) return false;
+    if (suspendedUntil == null) return false;
+    return DateTime.now().isBefore(suspendedUntil!);
+  }
+
+  bool get canAccessApp => !isActivelyBanned && !isActivelySuspended;
 
   factory UserModel.fromMap(Map<String, dynamic> map, String id) {
     return UserModel(
@@ -45,6 +65,13 @@ class UserModel {
       isTrusted: map['isTrusted'] ?? false,
       role: map['role'] ?? 'user',
       profilePhotoUrl: map['profilePhotoUrl'],
+      isBanned: map['isBanned'] ?? false,
+      isSuspended: map['isSuspended'] ?? false,
+      suspendedUntil: map['suspendedUntil'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(map['suspendedUntil'])
+          : null,
+      banReason: map['banReason'],
+      fcmToken: map['fcmToken'],
     );
   }
 
@@ -61,6 +88,11 @@ class UserModel {
       'isTrusted': isTrusted,
       'role': role,
       'profilePhotoUrl': profilePhotoUrl,
+      'isBanned': isBanned,
+      'isSuspended': isSuspended,
+      'suspendedUntil': suspendedUntil?.millisecondsSinceEpoch,
+      'banReason': banReason,
+      'fcmToken': fcmToken,
     };
   }
 
@@ -78,6 +110,13 @@ class UserModel {
     String? role,
     String? profilePhotoUrl,
     bool clearProfilePhoto = false,
+    bool? isBanned,
+    bool? isSuspended,
+    DateTime? suspendedUntil,
+    bool clearSuspendedUntil = false,
+    String? banReason,
+    bool clearBanReason = false,
+    String? fcmToken,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -92,6 +131,11 @@ class UserModel {
       isTrusted: isTrusted ?? this.isTrusted,
       role: role ?? this.role,
       profilePhotoUrl: clearProfilePhoto ? null : (profilePhotoUrl ?? this.profilePhotoUrl),
+      isBanned: isBanned ?? this.isBanned,
+      isSuspended: isSuspended ?? this.isSuspended,
+      suspendedUntil: clearSuspendedUntil ? null : (suspendedUntil ?? this.suspendedUntil),
+      banReason: clearBanReason ? null : (banReason ?? this.banReason),
+      fcmToken: fcmToken ?? this.fcmToken,
     );
   }
 

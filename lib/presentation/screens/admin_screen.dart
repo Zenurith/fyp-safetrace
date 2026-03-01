@@ -8,6 +8,13 @@ import '../providers/incident_provider.dart';
 import '../providers/user_provider.dart';
 import '../providers/category_provider.dart';
 import '../widgets/user_avatar.dart';
+import '../widgets/user_moderation_dialog.dart';
+import '../../data/services/analytics_service.dart';
+import '../widgets/analytics/stats_card.dart';
+import '../widgets/analytics/incident_trend_chart.dart';
+import '../widgets/analytics/category_pie_chart.dart';
+import '../widgets/analytics/severity_bar_chart.dart';
+import '../widgets/export_dialog.dart';
 
 class AdminScreen extends StatelessWidget {
   const AdminScreen({super.key});
@@ -15,7 +22,7 @@ class AdminScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         backgroundColor: AppTheme.backgroundGrey,
         appBar: AppBar(
@@ -26,11 +33,19 @@ class AdminScreen extends StatelessWidget {
           backgroundColor: AppTheme.primaryDark,
           foregroundColor: Colors.white,
           elevation: 0,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.download),
+              tooltip: 'Export Reports',
+              onPressed: () => ExportDialog.show(context),
+            ),
+          ],
           bottom: TabBar(
             labelColor: Colors.white,
             unselectedLabelColor: Colors.white60,
             indicatorColor: AppTheme.primaryRed,
             indicatorWeight: 3,
+            isScrollable: true,
             labelStyle: const TextStyle(
               fontFamily: AppTheme.fontFamily,
               fontWeight: FontWeight.w700,
@@ -45,6 +60,7 @@ class AdminScreen extends StatelessWidget {
               Tab(text: 'Users'),
               Tab(text: 'Incidents'),
               Tab(text: 'Categories'),
+              Tab(text: 'Analytics'),
             ],
           ),
         ),
@@ -53,6 +69,7 @@ class AdminScreen extends StatelessWidget {
             _UsersTab(),
             _IncidentsTab(),
             _CategoriesTab(),
+            _AnalyticsTab(),
           ],
         ),
       ),
@@ -132,48 +149,155 @@ class _UserCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: AppTheme.cardDecoration,
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          UserAvatar(
-            photoUrl: user.profilePhotoUrl,
-            initials: user.initials,
-            radius: 24,
-            backgroundColor: user.isAdmin ? AppTheme.primaryRed : AppTheme.primaryDark,
+          Row(
+            children: [
+              Stack(
+                children: [
+                  UserAvatar(
+                    photoUrl: user.profilePhotoUrl,
+                    initials: user.initials,
+                    radius: 24,
+                    backgroundColor: user.isAdmin ? AppTheme.primaryRed : AppTheme.primaryDark,
+                  ),
+                  if (user.isBanned || user.isActivelySuspended)
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: user.isBanned ? AppTheme.primaryRed : AppTheme.warningOrange,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                        child: Icon(
+                          user.isBanned ? Icons.block : Icons.timer,
+                          size: 10,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            user.name,
+                            style: AppTheme.headingSmall,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (user.isBanned) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryRed,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'BANNED',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ] else if (user.isActivelySuspended) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: AppTheme.warningOrange,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'SUSPENDED',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      user.handle,
+                      style: AppTheme.caption,
+                    ),
+                  ],
+                ),
+              ),
+              _RoleChip(isAdmin: user.isAdmin),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(user.name, style: AppTheme.headingSmall),
-                const SizedBox(height: 2),
-                Text(
-                  user.handle,
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${user.points} pts  •  ${user.reports} reports  •  Level ${user.level}',
                   style: AppTheme.caption,
                 ),
-              ],
-            ),
-          ),
-          _RoleChip(isAdmin: user.isAdmin),
-          const SizedBox(width: 8),
-          TextButton(
-            onPressed: () async {
-              final newRole = user.isAdmin ? 'user' : 'admin';
-              await context.read<UserProvider>().setUserRole(user.id, newRole);
-              onRefresh();
-            },
-            style: TextButton.styleFrom(
-              foregroundColor: user.isAdmin ? AppTheme.warningOrange : AppTheme.successGreen,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            ),
-            child: Text(
-              user.isAdmin ? 'Demote' : 'Promote',
-              style: const TextStyle(
-                fontFamily: AppTheme.fontFamily,
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
               ),
-            ),
+              TextButton(
+                onPressed: () async {
+                  final newRole = user.isAdmin ? 'user' : 'admin';
+                  await context.read<UserProvider>().setUserRole(user.id, newRole);
+                  onRefresh();
+                },
+                style: TextButton.styleFrom(
+                  foregroundColor: user.isAdmin ? AppTheme.warningOrange : AppTheme.successGreen,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  user.isAdmin ? 'Demote' : 'Promote',
+                  style: const TextStyle(
+                    fontFamily: AppTheme.fontFamily,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              TextButton(
+                onPressed: () async {
+                  final result = await UserModerationDialog.show(context, user);
+                  if (result == true) {
+                    onRefresh();
+                  }
+                },
+                style: TextButton.styleFrom(
+                  foregroundColor: AppTheme.primaryRed,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text(
+                  'Moderate',
+                  style: TextStyle(
+                    fontFamily: AppTheme.fontFamily,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -596,6 +720,104 @@ class _StatusChip extends StatelessWidget {
       case IncidentStatus.dismissed:
         return 'Dismissed';
     }
+  }
+}
+
+class _AnalyticsTab extends StatelessWidget {
+  const _AnalyticsTab();
+
+  @override
+  Widget build(BuildContext context) {
+    final incidentProvider = context.watch<IncidentProvider>();
+    final incidents = incidentProvider.allIncidents;
+    final analytics = AnalyticsService.calculateAnalytics(incidents);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Stats grid
+          Row(
+            children: [
+              Expanded(
+                child: StatsCard(
+                  title: 'Total Incidents',
+                  value: '${analytics.totalIncidents}',
+                  icon: Icons.warning_amber_rounded,
+                  color: AppTheme.primaryDark,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: StatsCard(
+                  title: 'Active',
+                  value: '${analytics.activeIncidents}',
+                  icon: Icons.pending_actions,
+                  color: AppTheme.warningOrange,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: StatsCard(
+                  title: 'Resolved',
+                  value: '${analytics.resolvedIncidents}',
+                  icon: Icons.check_circle_outline,
+                  color: AppTheme.successGreen,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: StatsCard(
+                  title: 'Last 24h',
+                  value: '${analytics.incidentsLast24h}',
+                  icon: Icons.schedule,
+                  color: AppTheme.primaryRed,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: StatsCard(
+                  title: 'Last 7 Days',
+                  value: '${analytics.incidentsLast7d}',
+                  icon: Icons.date_range,
+                  color: AppTheme.accentBlue,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: StatsCard(
+                  title: 'Avg Resolution',
+                  value: '${analytics.averageResolutionDays.toStringAsFixed(1)}d',
+                  icon: Icons.timer_outlined,
+                  color: AppTheme.profilePurple,
+                  subtitle: 'days',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Trend chart
+          IncidentTrendChart(data: analytics.trendData),
+          const SizedBox(height: 16),
+
+          // Category and severity charts
+          CategoryPieChart(data: analytics.categoryDistribution),
+          const SizedBox(height: 16),
+          SeverityBarChart(data: analytics.severityDistribution),
+          const SizedBox(height: 32),
+        ],
+      ),
+    );
   }
 }
 

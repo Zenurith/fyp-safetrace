@@ -98,6 +98,19 @@ class UserProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Refresh current user data (call after reputation-affecting actions)
+  Future<void> refreshCurrentUser() async {
+    if (_currentUser == null) return;
+
+    try {
+      _currentUser = await _repository.getCurrentUser(_currentUser!.id);
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+    }
+  }
+
   Future<XFile?> pickProfilePhoto({ImageSource source = ImageSource.gallery}) async {
     return await _mediaService.pickProfilePhoto(source: source);
   }

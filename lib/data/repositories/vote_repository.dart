@@ -1,9 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/vote_model.dart';
 import '../models/incident_model.dart';
+import 'user_repository.dart';
 
 class VoteRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final UserRepository _userRepository = UserRepository();
 
   CollectionReference<Map<String, dynamic>> get _votesCollection =>
       _firestore.collection('votes');
@@ -81,7 +83,7 @@ class VoteRepository {
     final reporterRef = _usersCollection.doc(reporterId);
     final voterRef = _usersCollection.doc(voterId);
 
-    return await _firestore.runTransaction<VoteModel?>((transaction) async {
+    final result = await _firestore.runTransaction<VoteModel?>((transaction) async {
       // Read all documents first (required for Firestore transactions)
       final existingVoteDoc = await transaction.get(voteRef);
       final incidentDoc = await transaction.get(incidentRef);
@@ -159,6 +161,13 @@ class VoteRepository {
 
       return vote;
     });
+
+    // Recalculate reporter's level after transaction completes
+    if (result != null) {
+      await _userRepository.recalculateReputation(reporterId);
+    }
+
+    return result;
   }
 
   /// Changes an existing vote to a different type.
@@ -173,7 +182,7 @@ class VoteRepository {
     final incidentRef = _incidentsCollection.doc(incidentId);
     final reporterRef = _usersCollection.doc(reporterId);
 
-    return await _firestore.runTransaction<VoteModel?>((transaction) async {
+    final result = await _firestore.runTransaction<VoteModel?>((transaction) async {
       // Read all documents first
       final existingVoteDoc = await transaction.get(voteRef);
       final incidentDoc = await transaction.get(incidentRef);
@@ -258,6 +267,13 @@ class VoteRepository {
 
       return updatedVote;
     });
+
+    // Recalculate reporter's level after transaction completes
+    if (result != null) {
+      await _userRepository.recalculateReputation(reporterId);
+    }
+
+    return result;
   }
 
   /// Removes a vote from an incident.
@@ -272,7 +288,7 @@ class VoteRepository {
     final reporterRef = _usersCollection.doc(reporterId);
     final voterRef = _usersCollection.doc(voterId);
 
-    return await _firestore.runTransaction<bool>((transaction) async {
+    final result = await _firestore.runTransaction<bool>((transaction) async {
       // Read all documents first
       final existingVoteDoc = await transaction.get(voteRef);
       final incidentDoc = await transaction.get(incidentRef);
@@ -351,6 +367,13 @@ class VoteRepository {
 
       return true;
     });
+
+    // Recalculate reporter's level after transaction completes
+    if (result) {
+      await _userRepository.recalculateReputation(reporterId);
+    }
+
+    return result;
   }
 
   /// Gets the user's vote for a specific incident.

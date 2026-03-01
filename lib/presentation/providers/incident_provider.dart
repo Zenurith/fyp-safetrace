@@ -1,14 +1,19 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import '../../data/models/incident_model.dart';
 import '../../data/repositories/incident_repository.dart';
+import '../../data/repositories/user_repository.dart';
 
 class IncidentProvider extends ChangeNotifier {
   final IncidentRepository _repository = IncidentRepository();
+  final UserRepository _userRepository = UserRepository();
 
   List<IncidentModel> _incidents = [];
   List<IncidentModel> _myReports = [];
   final Set<String> _activeFilters = {};
+  final Set<SeverityLevel> _severityFilters = {};
+  final Set<IncidentStatus> _statusFilters = {};
+  DateTimeRange? _dateRange;
   IncidentModel? _selectedIncident;
   bool _isLoading = false;
   String? _error;
@@ -17,28 +22,69 @@ class IncidentProvider extends ChangeNotifier {
 
   List<IncidentModel> get incidents {
     var list = _incidents;
-    if (_activeFilters.isEmpty) return list;
+
+    // Return all if no filters active
+    if (_activeFilters.isEmpty &&
+        _severityFilters.isEmpty &&
+        _statusFilters.isEmpty &&
+        _dateRange == null) {
+      return list;
+    }
 
     return list.where((i) {
+      // Time filter
       if (_activeFilters.contains('Last 24 hours')) {
         final cutoff = DateTime.now().subtract(const Duration(hours: 24));
         if (i.reportedAt.isBefore(cutoff)) return false;
       }
+
+      // Date range filter
+      if (_dateRange != null) {
+        if (i.reportedAt.isBefore(_dateRange!.start) ||
+            i.reportedAt.isAfter(_dateRange!.end.add(const Duration(days: 1)))) {
+          return false;
+        }
+      }
+
+      // Category filters
       final categoryFilters =
           _activeFilters.where((f) => f != 'Last 24 hours').toSet();
       if (categoryFilters.isNotEmpty &&
           !categoryFilters.contains(i.categoryLabel)) {
         return false;
       }
+
+      // Severity filters
+      if (_severityFilters.isNotEmpty && !_severityFilters.contains(i.severity)) {
+        return false;
+      }
+
+      // Status filters
+      if (_statusFilters.isNotEmpty && !_statusFilters.contains(i.status)) {
+        return false;
+      }
+
       return true;
     }).toList();
   }
 
+  /// Get all incidents unfiltered (for search)
+  List<IncidentModel> get allIncidents => _incidents;
+
   List<IncidentModel> get myReports => _myReports;
   Set<String> get activeFilters => _activeFilters;
+  Set<SeverityLevel> get severityFilters => _severityFilters;
+  Set<IncidentStatus> get statusFilters => _statusFilters;
+  DateTimeRange? get dateRange => _dateRange;
   IncidentModel? get selectedIncident => _selectedIncident;
   bool get isLoading => _isLoading;
   String? get error => _error;
+
+  bool get hasActiveFilters =>
+      _activeFilters.isNotEmpty ||
+      _severityFilters.isNotEmpty ||
+      _statusFilters.isNotEmpty ||
+      _dateRange != null;
 
   void startListening() {
     _incidentsSubscription?.cancel();
@@ -114,6 +160,41 @@ class IncidentProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void toggleSeverityFilter(SeverityLevel severity) {
+    if (_severityFilters.contains(severity)) {
+      _severityFilters.remove(severity);
+    } else {
+      _severityFilters.add(severity);
+    }
+    notifyListeners();
+  }
+
+  void toggleStatusFilter(IncidentStatus status) {
+    if (_statusFilters.contains(status)) {
+      _statusFilters.remove(status);
+    } else {
+      _statusFilters.add(status);
+    }
+    notifyListeners();
+  }
+
+  void setDateRange(DateTimeRange? range) {
+    _dateRange = range;
+    // Remove 'Last 24 hours' if custom date range is set
+    if (range != null) {
+      _activeFilters.remove('Last 24 hours');
+    }
+    notifyListeners();
+  }
+
+  void clearAllFilters() {
+    _activeFilters.clear();
+    _severityFilters.clear();
+    _statusFilters.clear();
+    _dateRange = null;
+    notifyListeners();
+  }
+
   void selectIncident(IncidentModel? incident) {
     _selectedIncident = incident;
     notifyListeners();
@@ -151,6 +232,10 @@ class IncidentProvider extends ChangeNotifier {
         status: IncidentStatus.pending,
       );
       final id = await _repository.add(incident);
+
+      // Award points and increment report count for the reporter
+      await _userRepository.incrementReportCount(reporterId);
+
       _isLoading = false;
       notifyListeners();
       return id;
