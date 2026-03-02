@@ -103,6 +103,12 @@ class IncidentBottomSheet extends StatelessWidget {
               ),
             ],
           ),
+
+          // Image verification badge (for admins)
+          if (incident.verificationScore != null) ...[
+            const SizedBox(height: 8),
+            _ImageVerificationBadge(incident: incident),
+          ],
           const SizedBox(height: 16),
 
           // Location
@@ -423,5 +429,132 @@ class _StatusBadge extends StatelessWidget {
       case IncidentStatus.dismissed:
         return 'Dismissed';
     }
+  }
+}
+
+class _ImageVerificationBadge extends StatelessWidget {
+  final IncidentModel incident;
+
+  const _ImageVerificationBadge({required this.incident});
+
+  @override
+  Widget build(BuildContext context) {
+    final currentUser = context.watch<UserProvider>().currentUser;
+    final isAdmin = currentUser?.isAdmin ?? false;
+    final score = incident.verificationScore ?? 0;
+    final needsReview = incident.needsImageReview;
+
+    // Only show detailed info to admins, but show basic verification to all
+    final color = _getVerificationColor(score);
+    final icon = needsReview ? Icons.warning_amber_rounded : Icons.verified_outlined;
+
+    return GestureDetector(
+      onTap: isAdmin && incident.verificationNote != null
+          ? () => _showVerificationDetails(context)
+          : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 6),
+            Text(
+              needsReview ? 'Needs Review' : 'Image Verified',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: color,
+              ),
+            ),
+            if (isAdmin) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '${(score * 100).toInt()}%',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(Icons.info_outline, size: 12, color: color),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _getVerificationColor(double score) {
+    if (score >= 0.7) return AppTheme.successGreen;
+    if (score >= 0.4) return AppTheme.warningOrange;
+    return AppTheme.primaryRed;
+  }
+
+  void _showVerificationDetails(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.image_search, color: AppTheme.primaryDark),
+            SizedBox(width: 8),
+            Text('Image Verification'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildDetailRow('Status', incident.imageVerified == true ? 'Valid' : 'Flagged'),
+            _buildDetailRow('Confidence', '${((incident.verificationScore ?? 0) * 100).toInt()}% (${incident.verificationLabel ?? "N/A"})'),
+            const SizedBox(height: 12),
+            const Text(
+              'AI Analysis:',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              incident.verificationNote ?? 'No details available',
+              style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Text(
+            '$label: ',
+            style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+          ),
+          Text(value, style: const TextStyle(fontSize: 13)),
+        ],
+      ),
+    );
   }
 }

@@ -7,9 +7,10 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../data/models/incident_model.dart';
-import '../../data/models/category_model.dart';
+import '../../data/models/image_verification_result.dart';
 import '../../data/services/location_service.dart';
 import '../../data/services/media_upload_service.dart';
+import '../../data/services/image_verification_service.dart';
 import '../../config/app_constants.dart';
 import '../../utils/app_theme.dart';
 import '../providers/incident_provider.dart';
@@ -29,6 +30,9 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
   final _addressFocusNode = FocusNode();
   final _locationService = LocationService();
   final _mediaService = MediaUploadService();
+  final _verificationService = ImageVerificationService(
+    apiKey: AppConstants.geminiApiKey,
+  );
 
   // Maximum allowed distance in meters (5 km)
   static const double _maxReportDistanceMeters = 5000;
@@ -41,6 +45,8 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
   String _address = 'Jalan Genting Klang, Setapak';
   bool _loadingLocation = false;
   bool _isSubmitting = false;
+  bool _isVerifying = false;
+  ImageVerificationResult? _verificationResult;
 
   // User's actual current position (for distance validation)
   double? _userCurrentLat;
@@ -319,6 +325,40 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
 
     setState(() => _isSubmitting = true);
 
+    // Verify images if any are selected
+    if (_selectedMedia.isNotEmpty && _verificationService.isConfigured) {
+      setState(() => _isVerifying = true);
+
+      try {
+        final imageBytes = await _selectedMedia.first.readAsBytes();
+        final result = await _verificationService.verifyImage(
+          imageBytes: imageBytes,
+          categoryName: _categoryLabel(_selectedCategory),
+          description: _descriptionController.text.trim(),
+        );
+
+        setState(() {
+          _verificationResult = result;
+          _isVerifying = false;
+        });
+
+        // If verification failed with low confidence, warn the user
+        if (!result.isValid || result.isLowConfidence) {
+          if (mounted) {
+            final shouldContinue = await _showVerificationWarningDialog(result);
+            if (!shouldContinue) {
+              setState(() => _isSubmitting = false);
+              return;
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Image verification error: $e');
+        setState(() => _isVerifying = false);
+        // Continue with submission even if verification fails
+      }
+    }
+
     String? incidentId;
 
     try {
@@ -335,6 +375,9 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
         address: addressToSubmit,
         reporterId: userId,
         isAnonymous: _isAnonymous,
+        imageVerified: _verificationResult?.isValid,
+        verificationScore: _verificationResult?.confidenceScore,
+        verificationNote: _verificationResult?.explanation,
       ).timeout(
         const Duration(seconds: 30),
         onTimeout: () {
@@ -377,6 +420,11 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
       // Success - pop the screen
       if (!mounted) return;
 
+      // Check if auto-approved
+      final wasAutoApproved = _verificationResult != null &&
+          _verificationResult!.isValid &&
+          _verificationResult!.isHighConfidence;
+
       // First disable loading, then pop
       setState(() => _isSubmitting = false);
 
@@ -384,6 +432,31 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
       await Future.delayed(const Duration(milliseconds: 100));
 
       if (!mounted) return;
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(
+                wasAutoApproved ? Icons.verified : Icons.schedule,
+                color: Colors.white,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  wasAutoApproved
+                      ? 'Report verified and published!'
+                      : 'Report submitted for review',
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: wasAutoApproved ? AppTheme.successGreen : AppTheme.warningOrange,
+          duration: const Duration(seconds: 3),
+        ),
+      );
 
       Navigator.of(context).pop(true); // Pass true to indicate success
 
@@ -399,6 +472,104 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
         );
       }
     }
+  }
+
+  Future<bool> _showVerificationWarningDialog(ImageVerificationResult result) async {
+    return await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(
+              result.isValid ? Icons.warning_amber : Icons.error_outline,
+              color: result.isValid ? AppTheme.warningOrange : AppTheme.primaryRed,
+            ),
+            const SizedBox(width: 8),
+            const Text('Image Verification'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              result.explanation,
+              style: const TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Text('Confidence: '),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: _getConfidenceColor(result.confidenceScore),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      '${(result.confidenceScore * 100).toInt()}% (${result.confidenceLabel})',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (result.concerns.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              const Text(
+                'Concerns:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              ...result.concerns.map((c) => Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: Text('• $c', style: const TextStyle(fontSize: 13)),
+              )),
+            ],
+            const SizedBox(height: 16),
+            Text(
+              result.isValid
+                  ? 'The image may not clearly match your report. Do you want to submit anyway?'
+                  : 'The image does not appear to match your selected category. Please review your submission.',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey[700],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Go Back'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: result.isValid ? AppTheme.warningOrange : AppTheme.primaryRed,
+            ),
+            child: const Text('Submit Anyway'),
+          ),
+        ],
+      ),
+    ) ?? false;
+  }
+
+  Color _getConfidenceColor(double score) {
+    if (score >= 0.7) return AppTheme.successGreen;
+    if (score >= 0.4) return AppTheme.warningOrange;
+    return AppTheme.primaryRed;
   }
 
   @override
@@ -807,16 +978,16 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
           if (_isSubmitting)
             Container(
               color: Colors.black.withValues(alpha: 0.3),
-              child: const Center(
+              child: Center(
                 child: Card(
                   child: Padding(
-                    padding: EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(20),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        CircularProgressIndicator(),
-                        SizedBox(height: 16),
-                        Text('Submitting report...'),
+                        const CircularProgressIndicator(),
+                        const SizedBox(height: 16),
+                        Text(_isVerifying ? 'Verifying image...' : 'Submitting report...'),
                       ],
                     ),
                   ),

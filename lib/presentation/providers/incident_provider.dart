@@ -211,11 +211,19 @@ class IncidentProvider extends ChangeNotifier {
     required String reporterId,
     bool isAnonymous = false,
     List<String> mediaUrls = const [],
+    bool? imageVerified,
+    double? verificationScore,
+    String? verificationNote,
   }) async {
     _isLoading = true;
     notifyListeners();
 
     try {
+      // Auto-approve if image verification passed with high confidence (70%+)
+      final autoApprove = imageVerified == true &&
+          verificationScore != null &&
+          verificationScore >= 0.7;
+
       final incident = IncidentModel(
         id: '',
         title: title,
@@ -229,7 +237,10 @@ class IncidentProvider extends ChangeNotifier {
         reporterId: reporterId,
         isAnonymous: isAnonymous,
         mediaUrls: mediaUrls,
-        status: IncidentStatus.pending,
+        status: autoApprove ? IncidentStatus.verified : IncidentStatus.pending,
+        imageVerified: imageVerified,
+        verificationScore: verificationScore,
+        verificationNote: verificationNote,
       );
       final id = await _repository.add(incident);
 

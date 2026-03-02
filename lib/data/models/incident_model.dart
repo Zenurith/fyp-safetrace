@@ -41,6 +41,11 @@ class IncidentModel {
   final int upvotes;
   final int downvotes;
 
+  // Image verification fields
+  final bool? imageVerified;
+  final double? verificationScore;
+  final String? verificationNote;
+
   IncidentModel({
     required this.id,
     required this.title,
@@ -61,6 +66,9 @@ class IncidentModel {
     this.statusHistory = const [],
     this.upvotes = 0,
     this.downvotes = 0,
+    this.imageVerified,
+    this.verificationScore,
+    this.verificationNote,
   });
 
   int get voteScore => upvotes - downvotes;
@@ -118,6 +126,18 @@ class IncidentModel {
   bool get isActive =>
       status != IncidentStatus.resolved && status != IncidentStatus.dismissed;
 
+  /// Returns true if image verification flagged this report for review
+  bool get needsImageReview =>
+      imageVerified == false || (verificationScore != null && verificationScore! < 0.5);
+
+  /// Returns verification confidence label
+  String? get verificationLabel {
+    if (verificationScore == null) return null;
+    if (verificationScore! >= 0.7) return 'High';
+    if (verificationScore! >= 0.4) return 'Medium';
+    return 'Low';
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'title': title,
@@ -139,6 +159,9 @@ class IncidentModel {
       'statusHistory': statusHistory.map((e) => e.toMap()).toList(),
       'upvotes': upvotes,
       'downvotes': downvotes,
+      'imageVerified': imageVerified,
+      'verificationScore': verificationScore,
+      'verificationNote': verificationNote,
     };
   }
 
@@ -170,6 +193,9 @@ class IncidentModel {
           [],
       upvotes: map['upvotes'] ?? 0,
       downvotes: map['downvotes'] ?? 0,
+      imageVerified: map['imageVerified'],
+      verificationScore: (map['verificationScore'] as num?)?.toDouble(),
+      verificationNote: map['verificationNote'],
     );
   }
 
@@ -193,6 +219,9 @@ class IncidentModel {
     List<StatusHistoryEntry>? statusHistory,
     int? upvotes,
     int? downvotes,
+    bool? imageVerified,
+    double? verificationScore,
+    String? verificationNote,
   }) {
     return IncidentModel(
       id: id ?? this.id,
@@ -214,6 +243,9 @@ class IncidentModel {
       statusHistory: statusHistory ?? this.statusHistory,
       upvotes: upvotes ?? this.upvotes,
       downvotes: downvotes ?? this.downvotes,
+      imageVerified: imageVerified ?? this.imageVerified,
+      verificationScore: verificationScore ?? this.verificationScore,
+      verificationNote: verificationNote ?? this.verificationNote,
     );
   }
 }
