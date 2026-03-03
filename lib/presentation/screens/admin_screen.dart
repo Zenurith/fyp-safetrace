@@ -334,31 +334,231 @@ class _RoleChip extends StatelessWidget {
   }
 }
 
-class _IncidentsTab extends StatelessWidget {
+class _IncidentsTab extends StatefulWidget {
   const _IncidentsTab();
+
+  @override
+  State<_IncidentsTab> createState() => _IncidentsTabState();
+}
+
+class _IncidentsTabState extends State<_IncidentsTab> {
+  String _searchQuery = '';
+  IncidentStatus? _statusFilter;
+  String _dateFilter = 'all';
+
+  @override
+  void initState() {
+    super.initState();
+    // Fetch all incidents (including old ones) for admin view
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<IncidentProvider>().startListeningAll();
+    });
+  }
+
+  List<IncidentModel> _filterIncidents(List<IncidentModel> incidents) {
+    return incidents.where((incident) {
+      // Search filter
+      if (_searchQuery.isNotEmpty) {
+        final query = _searchQuery.toLowerCase();
+        if (!incident.title.toLowerCase().contains(query) &&
+            !incident.address.toLowerCase().contains(query) &&
+            !incident.description.toLowerCase().contains(query)) {
+          return false;
+        }
+      }
+
+      // Date filter
+      if (_dateFilter != 'all') {
+        final now = DateTime.now();
+        DateTime cutoff;
+        switch (_dateFilter) {
+          case '7days':
+            cutoff = now.subtract(const Duration(days: 7));
+            break;
+          case '30days':
+            cutoff = now.subtract(const Duration(days: 30));
+            break;
+          default:
+            cutoff = DateTime(2000);
+        }
+        if (incident.reportedAt.isBefore(cutoff)) {
+          return false;
+        }
+      }
+
+      // Status filter
+      if (_statusFilter != null && incident.status != _statusFilter) {
+        return false;
+      }
+
+      return true;
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
     final incidentProvider = context.watch<IncidentProvider>();
-    final incidents = incidentProvider.incidents;
+    final allIncidents = incidentProvider.allIncidents;
+    final incidents = _filterIncidents(allIncidents);
 
-    if (incidents.isEmpty) {
-      return Center(
-        child: Text(
-          'No incidents found',
-          style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
+    return Column(
+      children: [
+        // Filters section
+        Container(
+          padding: const EdgeInsets.all(12),
+          color: Colors.white,
+          child: Column(
+            children: [
+              // Search bar
+              TextField(
+                onChanged: (value) => setState(() => _searchQuery = value),
+                style: AppTheme.bodyMedium,
+                decoration: InputDecoration(
+                  hintText: 'Search incidents...',
+                  hintStyle: AppTheme.caption,
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppTheme.cardBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppTheme.cardBorder),
+                  ),
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: 8),
+              // Filter chips row
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    // Status filter chips
+                    _FilterChip(
+                      label: 'All Status',
+                      isSelected: _statusFilter == null,
+                      onTap: () => setState(() => _statusFilter = null),
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterChip(
+                      label: 'Pending',
+                      isSelected: _statusFilter == IncidentStatus.pending,
+                      color: AppTheme.warningOrange,
+                      onTap: () => setState(() => _statusFilter = IncidentStatus.pending),
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterChip(
+                      label: 'Verified',
+                      isSelected: _statusFilter == IncidentStatus.verified,
+                      color: AppTheme.successGreen,
+                      onTap: () => setState(() => _statusFilter = IncidentStatus.verified),
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterChip(
+                      label: 'Resolved',
+                      isSelected: _statusFilter == IncidentStatus.resolved,
+                      color: AppTheme.successGreen,
+                      onTap: () => setState(() => _statusFilter = IncidentStatus.resolved),
+                    ),
+                    const SizedBox(width: 16),
+                    // Date filter chips
+                    _FilterChip(
+                      label: 'All Time',
+                      isSelected: _dateFilter == 'all',
+                      onTap: () => setState(() => _dateFilter = 'all'),
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterChip(
+                      label: '7 Days',
+                      isSelected: _dateFilter == '7days',
+                      onTap: () => setState(() => _dateFilter = '7days'),
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterChip(
+                      label: '30 Days',
+                      isSelected: _dateFilter == '30days',
+                      onTap: () => setState(() => _dateFilter = '30days'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
-      );
-    }
+        // Results count
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '${incidents.length} incidents',
+              style: AppTheme.caption,
+            ),
+          ),
+        ),
+        // Incidents list
+        Expanded(
+          child: incidents.isEmpty
+              ? Center(
+                  child: Text(
+                    'No incidents found',
+                    style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
+                  ),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: incidents.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final incident = incidents[index];
+                    return _IncidentCard(incident: incident);
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+}
 
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: incidents.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final incident = incidents[index];
-        return _IncidentCard(incident: incident);
-      },
+class _FilterChip extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+  final Color? color;
+  final VoidCallback onTap;
+
+  const _FilterChip({
+    required this.label,
+    required this.isSelected,
+    this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final chipColor = color ?? AppTheme.primaryDark;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? chipColor.withValues(alpha: 0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? chipColor : AppTheme.cardBorder,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontFamily: AppTheme.fontFamily,
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+            color: isSelected ? chipColor : AppTheme.textSecondary,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -454,85 +654,97 @@ class _IncidentCard extends StatelessWidget {
           title: Text('Update Status', style: AppTheme.headingMedium),
           content: SizedBox(
             width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(incident.title, style: AppTheme.headingSmall),
-                const SizedBox(height: 4),
-                Text(incident.address, style: AppTheme.caption),
-                const SizedBox(height: 16),
-                ...IncidentStatus.values.map((status) {
-                  final isSelected = selectedStatus == status;
-                  return GestureDetector(
-                    onTap: () => setState(() => selectedStatus = status),
-                    child: Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: isSelected ? _getStatusColor(status).withValues(alpha: 0.1) : Colors.transparent,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: isSelected ? _getStatusColor(status) : AppTheme.cardBorder,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    incident.title,
+                    style: AppTheme.headingSmall,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    incident.address,
+                    style: AppTheme.caption,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 16),
+                  ...IncidentStatus.values.map((status) {
+                    final isSelected = selectedStatus == status;
+                    return GestureDetector(
+                      onTap: () => setState(() => selectedStatus = status),
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isSelected ? _getStatusColor(status).withValues(alpha: 0.1) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isSelected ? _getStatusColor(status) : AppTheme.cardBorder,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 20,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isSelected ? _getStatusColor(status) : AppTheme.cardBorder,
+                                  width: 2,
+                                ),
+                                color: isSelected ? _getStatusColor(status) : Colors.transparent,
+                              ),
+                              child: isSelected
+                                  ? const Icon(Icons.check, size: 14, color: Colors.white)
+                                  : null,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _getStatusLabel(status),
+                                    style: AppTheme.bodyMedium.copyWith(fontWeight: FontWeight.w700),
+                                  ),
+                                  Text(
+                                    _getStatusDescription(status),
+                                    style: AppTheme.caption,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 20,
-                            height: 20,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isSelected ? _getStatusColor(status) : AppTheme.cardBorder,
-                                width: 2,
-                              ),
-                              color: isSelected ? _getStatusColor(status) : Colors.transparent,
-                            ),
-                            child: isSelected
-                                ? const Icon(Icons.check, size: 14, color: Colors.white)
-                                : null,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _getStatusLabel(status),
-                                  style: AppTheme.bodyMedium.copyWith(fontWeight: FontWeight.w700),
-                                ),
-                                Text(
-                                  _getStatusDescription(status),
-                                  style: AppTheme.caption,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                    );
+                  }),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: noteController,
+                    style: AppTheme.bodyMedium,
+                    decoration: InputDecoration(
+                      labelText: 'Note (Optional)',
+                      labelStyle: AppTheme.caption,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: AppTheme.cardBorder),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: AppTheme.cardBorder),
                       ),
                     ),
-                  );
-                }),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: noteController,
-                  style: AppTheme.bodyMedium,
-                  decoration: InputDecoration(
-                    labelText: 'Note (Optional)',
-                    labelStyle: AppTheme.caption,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: AppTheme.cardBorder),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: AppTheme.cardBorder),
-                    ),
+                    maxLines: 2,
                   ),
-                  maxLines: 2,
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           actions: [

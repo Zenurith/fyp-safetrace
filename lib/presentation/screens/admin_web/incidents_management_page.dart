@@ -17,6 +17,7 @@ class _IncidentsManagementPageState extends State<IncidentsManagementPage> {
   IncidentStatus? _statusFilter;
   String? _categoryFilter;
   SeverityLevel? _severityFilter;
+  String _dateFilter = 'all'; // 'all', '7days', '30days', '90days'
 
   List<IncidentModel> _filterIncidents(List<IncidentModel> incidents) {
     return incidents.where((incident) {
@@ -25,6 +26,28 @@ class _IncidentsManagementPageState extends State<IncidentsManagementPage> {
         final query = _searchQuery.toLowerCase();
         if (!incident.title.toLowerCase().contains(query) &&
             !incident.address.toLowerCase().contains(query)) {
+          return false;
+        }
+      }
+
+      // Date filter
+      if (_dateFilter != 'all') {
+        final now = DateTime.now();
+        DateTime cutoff;
+        switch (_dateFilter) {
+          case '7days':
+            cutoff = now.subtract(const Duration(days: 7));
+            break;
+          case '30days':
+            cutoff = now.subtract(const Duration(days: 30));
+            break;
+          case '90days':
+            cutoff = now.subtract(const Duration(days: 90));
+            break;
+          default:
+            cutoff = DateTime(2000);
+        }
+        if (incident.reportedAt.isBefore(cutoff)) {
           return false;
         }
       }
@@ -147,10 +170,25 @@ class _IncidentsManagementPageState extends State<IncidentsManagementPage> {
               ),
               const SizedBox(width: 12),
 
+              // Date filter
+              _buildDropdown<String>(
+                value: _dateFilter,
+                hint: 'All Time',
+                items: const [
+                  DropdownMenuItem(value: 'all', child: Text('All Time')),
+                  DropdownMenuItem(value: '7days', child: Text('Last 7 Days')),
+                  DropdownMenuItem(value: '30days', child: Text('Last 30 Days')),
+                  DropdownMenuItem(value: '90days', child: Text('Last 90 Days')),
+                ],
+                onChanged: (value) => setState(() => _dateFilter = value ?? 'all'),
+              ),
+              const SizedBox(width: 12),
+
               // Clear filters
               if (_statusFilter != null ||
                   _categoryFilter != null ||
                   _severityFilter != null ||
+                  _dateFilter != 'all' ||
                   _searchQuery.isNotEmpty)
                 TextButton.icon(
                   onPressed: () => setState(() {
@@ -158,6 +196,7 @@ class _IncidentsManagementPageState extends State<IncidentsManagementPage> {
                     _statusFilter = null;
                     _categoryFilter = null;
                     _severityFilter = null;
+                    _dateFilter = 'all';
                   }),
                   icon: const Icon(Icons.clear, size: 18),
                   label: const Text('Clear'),

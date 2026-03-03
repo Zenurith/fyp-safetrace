@@ -86,9 +86,26 @@ class IncidentProvider extends ChangeNotifier {
       _statusFilters.isNotEmpty ||
       _dateRange != null;
 
+  /// Start listening to recent incidents (last 7 days) - for map/main feed
   void startListening() {
     _incidentsSubscription?.cancel();
     _incidentsSubscription = _repository.watchAll().listen(
+      (incidents) {
+        _incidents = incidents;
+        _error = null;
+        notifyListeners();
+      },
+      onError: (e) {
+        _error = e.toString();
+        notifyListeners();
+      },
+    );
+  }
+
+  /// Start listening to ALL incidents including old ones - for admin dashboard
+  void startListeningAll() {
+    _incidentsSubscription?.cancel();
+    _incidentsSubscription = _repository.watchAllIncludingOld().listen(
       (incidents) {
         _incidents = incidents;
         _error = null;
@@ -259,9 +276,12 @@ class IncidentProvider extends ChangeNotifier {
   }
 
   Future<void> updateIncidentMedia(String id, List<String> mediaUrls) async {
+    debugPrint('IncidentProvider: Updating media for incident $id with ${mediaUrls.length} URLs');
     try {
       await _repository.updateMediaUrls(id, mediaUrls);
+      debugPrint('IncidentProvider: Media URLs updated successfully');
     } catch (e) {
+      debugPrint('IncidentProvider: Failed to update media URLs: $e');
       _error = e.toString();
       notifyListeners();
     }

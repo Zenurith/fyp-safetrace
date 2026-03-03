@@ -41,8 +41,8 @@ class _AdminWebShellState extends State<AdminWebShell> {
     super.initState();
     // Initialize all providers for admin panel
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Start listening to incidents
-      context.read<IncidentProvider>().startListening();
+      // Start listening to ALL incidents (including old ones) for admin
+      context.read<IncidentProvider>().startListeningAll();
       // Start listening to communities
       context.read<CommunityProvider>().startListening();
       // Start listening to flags for badge count

@@ -410,19 +410,27 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
 
       // Upload media if any
       if (_selectedMedia.isNotEmpty) {
+        debugPrint('Report: Starting media upload for ${_selectedMedia.length} files');
         try {
           final mediaUrls = await _mediaService.uploadMultipleFiles(
             _selectedMedia,
             incidentId,
           );
 
+          debugPrint('Report: Got ${mediaUrls.length} URLs back');
           if (mediaUrls.isNotEmpty) {
+            debugPrint('Report: Updating incident with media URLs');
             await provider.updateIncidentMedia(incidentId, mediaUrls);
+            debugPrint('Report: Media URLs updated successfully');
+          } else {
+            debugPrint('Report: WARNING - No media URLs returned, skipping update');
           }
         } catch (mediaError) {
           // Media upload failed, but incident was created - still consider it a success
-          debugPrint('Media upload failed: $mediaError');
+          debugPrint('Report: Media upload failed: $mediaError');
         }
+      } else {
+        debugPrint('Report: No media selected, skipping upload');
       }
 
       // Success - pop the screen

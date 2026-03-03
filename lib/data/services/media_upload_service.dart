@@ -1,4 +1,5 @@
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 
@@ -33,6 +34,9 @@ class MediaUploadService {
 
   Future<String?> uploadFile(XFile file, String incidentId) async {
     try {
+      debugPrint('MediaUpload: Starting upload for incident $incidentId');
+      debugPrint('MediaUpload: File path: ${file.path}');
+
       final extension = file.path.split('.').last.toLowerCase();
       final isVideo = ['mp4', 'mov', 'avi', 'mkv'].contains(extension);
       final folder = isVideo ? 'videos' : 'images';
@@ -41,6 +45,8 @@ class MediaUploadService {
 
       // Use readAsBytes() and putData() for cross-platform compatibility
       final bytes = await file.readAsBytes();
+      debugPrint('MediaUpload: Read ${bytes.length} bytes, uploading...');
+
       final uploadTask = ref.putData(
         bytes,
         SettableMetadata(
@@ -49,21 +55,28 @@ class MediaUploadService {
       );
 
       final snapshot = await uploadTask;
-      return await snapshot.ref.getDownloadURL();
-    } catch (e) {
+      final url = await snapshot.ref.getDownloadURL();
+      debugPrint('MediaUpload: Success! URL: $url');
+      return url;
+    } catch (e, stackTrace) {
+      debugPrint('MediaUpload: FAILED - $e');
+      debugPrint('MediaUpload: Stack trace - $stackTrace');
       return null;
     }
   }
 
   Future<List<String>> uploadMultipleFiles(
       List<XFile> files, String incidentId) async {
+    debugPrint('MediaUpload: Uploading ${files.length} files for incident $incidentId');
     final urls = <String>[];
-    for (final file in files) {
-      final url = await uploadFile(file, incidentId);
+    for (int i = 0; i < files.length; i++) {
+      debugPrint('MediaUpload: Uploading file ${i + 1}/${files.length}');
+      final url = await uploadFile(files[i], incidentId);
       if (url != null) {
         urls.add(url);
       }
     }
+    debugPrint('MediaUpload: Completed. ${urls.length}/${files.length} successful');
     return urls;
   }
 

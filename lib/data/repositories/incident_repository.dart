@@ -1,14 +1,31 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../models/incident_model.dart';
 import '../models/status_history_model.dart';
 
 class IncidentRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  // Hide incidents older than 7 days
+  static const int maxIncidentAgeDays = 7;
+
   CollectionReference<Map<String, dynamic>> get _incidentsCollection =>
       _firestore.collection('incidents');
 
+  /// Watch recent incidents only (last 7 days) - for map and main feed
   Stream<List<IncidentModel>> watchAll() {
+    final cutoff = DateTime.now().subtract(const Duration(days: maxIncidentAgeDays));
+    return _incidentsCollection
+        .where('reportedAt', isGreaterThan: Timestamp.fromDate(cutoff))
+        .orderBy('reportedAt', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => IncidentModel.fromMap(doc.data(), doc.id))
+            .toList());
+  }
+
+  /// Watch all incidents including old ones - for admin dashboard
+  Stream<List<IncidentModel>> watchAllIncludingOld() {
     return _incidentsCollection
         .orderBy('reportedAt', descending: true)
         .snapshots()
@@ -27,7 +44,20 @@ class IncidentRepository {
             .toList());
   }
 
+  /// Get recent incidents only (last 7 days)
   Future<List<IncidentModel>> getAll() async {
+    final cutoff = DateTime.now().subtract(const Duration(days: maxIncidentAgeDays));
+    final snapshot = await _incidentsCollection
+        .where('reportedAt', isGreaterThan: Timestamp.fromDate(cutoff))
+        .orderBy('reportedAt', descending: true)
+        .get();
+    return snapshot.docs
+        .map((doc) => IncidentModel.fromMap(doc.data(), doc.id))
+        .toList();
+  }
+
+  /// Get all incidents including old ones - for admin
+  Future<List<IncidentModel>> getAllIncludingOld() async {
     final snapshot = await _incidentsCollection
         .orderBy('reportedAt', descending: true)
         .get();
@@ -117,8 +147,10 @@ class IncidentRepository {
   }
 
   Future<void> updateMediaUrls(String id, List<String> mediaUrls) async {
+    debugPrint('IncidentRepository: Updating mediaUrls for $id: $mediaUrls');
     await _incidentsCollection.doc(id).update({
       'mediaUrls': mediaUrls,
     });
+    debugPrint('IncidentRepository: Firestore update complete');
   }
 }

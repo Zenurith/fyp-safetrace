@@ -1,0 +1,27 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Incident media - authenticated users can upload, anyone authenticated can view
+    match /incidents/{incidentId}/{folder}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+                   && request.resource.size < 10 * 1024 * 1024  // Max 10MB
+                   && (folder == 'images' || folder == 'videos');
+    }
+
+    // Profile photos - users can manage their own
+    match /profile_photos/{userId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId
+                   && request.resource.size < 5 * 1024 * 1024;  // Max 5MB
+    }
+
+    // Community media
+    match /communities/{communityId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+                   && request.resource.size < 10 * 1024 * 1024;
+    }
+  }
+}

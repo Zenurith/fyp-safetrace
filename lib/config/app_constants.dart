@@ -1,9 +1,9 @@
-class AppConstants {
-  static const String googleMapsApiKey = 'AIzaSyAs0PNHYH4X3mwsJQZqdZ9q778eISZ4ifw';
+import 'secrets.dart';
 
-  // Gemini API key for image verification
-  // Get your key from: https://aistudio.google.com/app/apikey
-  static const String geminiApiKey = 'AIzaSyBOC3xw1ZtqhxCFKbeMcXJdvqgFC2AoJXQ';
+class AppConstants {
+  // API keys loaded from secrets.dart (not committed to git)
+  static const String googleMapsApiKey = Secrets.googleMapsApiKey;
+  static const String geminiApiKey = Secrets.geminiApiKey;
 
   static const double defaultLat = 3.1862;
   static const double defaultLng = 101.7234;
