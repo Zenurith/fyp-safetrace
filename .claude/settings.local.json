@@ -20,7 +20,9 @@
       "Bash(git commit:*)",
       "Bash(git stash drop:*)",
       "Bash(flutter test)",
-      "Bash(flutter build:*)"
+      "Bash(flutter build:*)",
+      "WebSearch",
+      "Bash(flutter devices:*)"
     ]
   }
 }

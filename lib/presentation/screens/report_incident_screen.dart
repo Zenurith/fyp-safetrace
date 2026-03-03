@@ -1,6 +1,7 @@
 // ignore_for_file: deprecated_member_use
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -330,11 +331,14 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     setState(() => _isSubmitting = true);
 
     // Verify images if any are selected
+    debugPrint('Report: Media count=${_selectedMedia.length}, isConfigured=${_verificationService.isConfigured}');
     if (_selectedMedia.isNotEmpty && _verificationService.isConfigured) {
+      debugPrint('Report: Starting image verification...');
       setState(() => _isVerifying = true);
 
       try {
         final imageBytes = await _selectedMedia.first.readAsBytes();
+        debugPrint('Report: Read ${imageBytes.length} bytes from image');
         final result = await _verificationService.verifyImage(
           imageBytes: imageBytes,
           categoryName: _categoryLabel(_selectedCategory),
