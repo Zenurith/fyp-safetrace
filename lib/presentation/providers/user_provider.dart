@@ -92,6 +92,13 @@ class UserProvider extends ChangeNotifier {
     return await _repository.getCurrentUser(uid);
   }
 
+  Future<void> updateLocation(double latitude, double longitude) async {
+    if (_currentUser == null) return;
+    try {
+      await _repository.updateUserLocation(_currentUser!.id, latitude, longitude);
+    } catch (_) {}
+  }
+
   void clearUser() {
     _currentUser = null;
     _error = null;

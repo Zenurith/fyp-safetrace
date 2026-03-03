@@ -2,14 +2,23 @@ import 'package:flutter/foundation.dart';
 import '../../data/models/alert_settings_model.dart';
 import '../../data/models/incident_model.dart';
 import '../../data/repositories/alert_repository.dart';
+import '../../data/repositories/user_repository.dart';
 
 class AlertSettingsProvider extends ChangeNotifier {
   final AlertRepository _repository = AlertRepository();
+  final UserRepository _userRepository = UserRepository();
+
+  String? _userId;
 
   AlertSettingsModel get settings => _repository.getSettings();
 
+  void setUserId(String uid) {
+    _userId = uid;
+  }
+
   void updateRadius(double km) {
     _repository.saveSettings(settings.copyWith(radiusKm: km));
+    _syncToFirestore();
     notifyListeners();
   }
 
@@ -21,6 +30,7 @@ class AlertSettingsProvider extends ChangeNotifier {
       current.add(level);
     }
     _repository.saveSettings(settings.copyWith(severityFilters: current));
+    _syncToFirestore();
     notifyListeners();
   }
 
@@ -32,16 +42,24 @@ class AlertSettingsProvider extends ChangeNotifier {
       current.add(category);
     }
     _repository.saveSettings(settings.copyWith(categoryFilters: current));
+    _syncToFirestore();
     notifyListeners();
   }
 
   void toggleActiveHours(bool enabled) {
     _repository.saveSettings(settings.copyWith(activeHoursEnabled: enabled));
+    _syncToFirestore();
     notifyListeners();
   }
 
   void saveSettings() {
-    // Already persisted via repository on each change
+    _syncToFirestore();
     notifyListeners();
+  }
+
+  void _syncToFirestore() {
+    if (_userId != null) {
+      _userRepository.updateAlertSettings(_userId!, settings.toMap());
+    }
   }
 }

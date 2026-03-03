@@ -65,6 +65,17 @@ class UserRepository {
     await _usersCollection.doc(uid).update({'profilePhotoUrl': photoUrl});
   }
 
+  Future<void> updateUserLocation(String uid, double latitude, double longitude) async {
+    await _usersCollection.doc(uid).update({
+      'lastLatitude': latitude,
+      'lastLongitude': longitude,
+    });
+  }
+
+  Future<void> updateAlertSettings(String uid, Map<String, dynamic> settings) async {
+    await _usersCollection.doc(uid).update({'alertSettings': settings});
+  }
+
   Future<void> updatePoints(String uid, int delta) async {
     await _usersCollection.doc(uid).update({
       'points': FieldValue.increment(delta),

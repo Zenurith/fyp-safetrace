@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
@@ -23,6 +24,110 @@ class _MapScreenState extends State<MapScreen> {
   final _locationService = LocationService();
   bool _isCentering = false;
   bool _showHeatmap = false;
+  final Map<IncidentCategory, BitmapDescriptor> _markerIconCache = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMarkerIcons();
+  }
+
+  Future<void> _loadMarkerIcons() async {
+    for (final category in IncidentCategory.values) {
+      _markerIconCache[category] = await _buildCategoryMarker(category);
+    }
+    if (mounted) setState(() {});
+  }
+
+  Future<BitmapDescriptor> _buildCategoryMarker(IncidentCategory category) async {
+    final color = _categoryColor(category);
+    final iconData = _categoryIconData(category);
+
+    const double size = 80;
+    const double pinHeight = 100;
+
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, size, pinHeight));
+
+    final paint = Paint()..color = color;
+
+    // Draw pin circle (head)
+    canvas.drawCircle(const Offset(size / 2, size / 2), size / 2, paint);
+
+    // Draw pin tail (triangle)
+    final path = Path();
+    path.moveTo(size * 0.35, size * 0.82);
+    path.lineTo(size * 0.65, size * 0.82);
+    path.lineTo(size / 2, pinHeight);
+    path.close();
+    canvas.drawPath(path, paint);
+
+    // White border on circle
+    final borderPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4;
+    canvas.drawCircle(const Offset(size / 2, size / 2), size / 2 - 2, borderPaint);
+
+    // Draw category icon
+    final iconPainter = TextPainter(textDirection: ui.TextDirection.ltr);
+    iconPainter.text = TextSpan(
+      text: String.fromCharCode(iconData.codePoint),
+      style: TextStyle(
+        fontSize: 34,
+        fontFamily: iconData.fontFamily,
+        package: iconData.fontPackage,
+        color: Colors.white,
+      ),
+    );
+    iconPainter.layout();
+    iconPainter.paint(
+      canvas,
+      Offset(
+        (size - iconPainter.width) / 2,
+        (size - iconPainter.height) / 2,
+      ),
+    );
+
+    final picture = recorder.endRecording();
+    final img = await picture.toImage(size.toInt(), pinHeight.toInt());
+    final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+    return BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
+  }
+
+  Color _categoryColor(IncidentCategory category) {
+    switch (category) {
+      case IncidentCategory.crime:
+        return Colors.red;
+      case IncidentCategory.traffic:
+        return Colors.orange;
+      case IncidentCategory.emergency:
+        return Colors.pink[700]!;
+      case IncidentCategory.infrastructure:
+        return Colors.blue;
+      case IncidentCategory.environmental:
+        return Colors.green[700]!;
+      case IncidentCategory.suspicious:
+        return Colors.deepPurple;
+    }
+  }
+
+  IconData _categoryIconData(IncidentCategory category) {
+    switch (category) {
+      case IncidentCategory.crime:
+        return Icons.shield;
+      case IncidentCategory.infrastructure:
+        return Icons.construction;
+      case IncidentCategory.suspicious:
+        return Icons.visibility;
+      case IncidentCategory.traffic:
+        return Icons.directions_car;
+      case IncidentCategory.environmental:
+        return Icons.eco;
+      case IncidentCategory.emergency:
+        return Icons.local_hospital;
+    }
+  }
 
   Future<void> _centerOnUserLocation() async {
     if (_isCentering) return;
@@ -64,28 +169,7 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   BitmapDescriptor _markerIcon(IncidentCategory category, SeverityLevel severity) {
-    double hue;
-    switch (category) {
-      case IncidentCategory.crime:
-        hue = BitmapDescriptor.hueRed;
-        break;
-      case IncidentCategory.traffic:
-        hue = BitmapDescriptor.hueOrange;
-        break;
-      case IncidentCategory.emergency:
-        hue = BitmapDescriptor.hueRose;
-        break;
-      case IncidentCategory.infrastructure:
-        hue = BitmapDescriptor.hueAzure;
-        break;
-      case IncidentCategory.environmental:
-        hue = BitmapDescriptor.hueGreen;
-        break;
-      case IncidentCategory.suspicious:
-        hue = BitmapDescriptor.hueViolet;
-        break;
-    }
-    return BitmapDescriptor.defaultMarkerWithHue(hue);
+    return _markerIconCache[category] ?? BitmapDescriptor.defaultMarker;
   }
 
   Set<Marker> _buildMarkers(List<IncidentModel> incidents) {

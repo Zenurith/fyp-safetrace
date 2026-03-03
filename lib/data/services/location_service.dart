@@ -72,17 +72,29 @@ class LocationService {
     return 'Unknown location';
   }
 
-  /// Get autocomplete suggestions for an address query
-  Future<List<PlaceSuggestion>> getAddressSuggestions(String query) async {
+  /// Get autocomplete suggestions for an address query, biased to user's location
+  Future<List<PlaceSuggestion>> getAddressSuggestions(
+    String query, {
+    double? latitude,
+    double? longitude,
+    int radiusMeters = 50000, // 50km — roughly within the same state
+  }) async {
     if (query.isEmpty) return [];
 
     try {
-      final url = Uri.parse(
-        'https://maps.googleapis.com/maps/api/place/autocomplete/json'
-        '?input=${Uri.encodeComponent(query)}'
-        '&types=address'
-        '&key=$_apiKey',
-      );
+      String urlStr =
+          'https://maps.googleapis.com/maps/api/place/autocomplete/json'
+          '?input=${Uri.encodeComponent(query)}'
+          '&types=address'
+          '&key=$_apiKey';
+
+      if (latitude != null && longitude != null) {
+        urlStr += '&location=$latitude,$longitude'
+            '&radius=$radiusMeters'
+            '&strictbounds=true';
+      }
+
+      final url = Uri.parse(urlStr);
 
       final response = await http.get(url);
       if (response.statusCode == 200) {

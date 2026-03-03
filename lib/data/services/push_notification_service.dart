@@ -181,6 +181,8 @@ class PushNotificationService {
 /// Background message handler - must be a top-level function
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Handle background messages
-  // Note: You cannot access UI from this handler
+  // FCM automatically shows the notification in the system tray when the app
+  // is in background/terminated, as long as the message contains a
+  // 'notification' payload (which our Cloud Function sends).
+  // No additional handling needed here.
 }

@@ -16,6 +16,9 @@ class UserModel {
   final DateTime? suspendedUntil;
   final String? banReason;
   final String? fcmToken;
+  final double? lastLatitude;
+  final double? lastLongitude;
+  final Map<String, dynamic>? alertSettings;
 
   UserModel({
     required this.id,
@@ -35,6 +38,9 @@ class UserModel {
     this.suspendedUntil,
     this.banReason,
     this.fcmToken,
+    this.lastLatitude,
+    this.lastLongitude,
+    this.alertSettings,
   });
 
   bool get isAdmin => role == 'admin';
@@ -72,6 +78,9 @@ class UserModel {
           : null,
       banReason: map['banReason'],
       fcmToken: map['fcmToken'],
+      lastLatitude: (map['lastLatitude'] as num?)?.toDouble(),
+      lastLongitude: (map['lastLongitude'] as num?)?.toDouble(),
+      alertSettings: map['alertSettings'] as Map<String, dynamic>?,
     );
   }
 
@@ -93,6 +102,9 @@ class UserModel {
       'suspendedUntil': suspendedUntil?.millisecondsSinceEpoch,
       'banReason': banReason,
       'fcmToken': fcmToken,
+      'lastLatitude': lastLatitude,
+      'lastLongitude': lastLongitude,
+      'alertSettings': alertSettings,
     };
   }
 
@@ -117,6 +129,9 @@ class UserModel {
     String? banReason,
     bool clearBanReason = false,
     String? fcmToken,
+    double? lastLatitude,
+    double? lastLongitude,
+    Map<String, dynamic>? alertSettings,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -136,6 +151,9 @@ class UserModel {
       suspendedUntil: clearSuspendedUntil ? null : (suspendedUntil ?? this.suspendedUntil),
       banReason: clearBanReason ? null : (banReason ?? this.banReason),
       fcmToken: fcmToken ?? this.fcmToken,
+      lastLatitude: lastLatitude ?? this.lastLatitude,
+      lastLongitude: lastLongitude ?? this.lastLongitude,
+      alertSettings: alertSettings ?? this.alertSettings,
     );
   }
 

@@ -99,7 +99,11 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
       return;
     }
 
-    final suggestions = await _locationService.getAddressSuggestions(query);
+    final suggestions = await _locationService.getAddressSuggestions(
+      query,
+      latitude: _userCurrentLat,
+      longitude: _userCurrentLng,
+    );
     if (mounted) {
       setState(() {
         _suggestions = suggestions;

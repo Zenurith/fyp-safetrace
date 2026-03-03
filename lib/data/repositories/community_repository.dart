@@ -96,17 +96,18 @@ class CommunityRepository {
 
   /// Get all communities where the user is an approved member
   Future<List<CommunityModel>> getUserCommunities(String userId) async {
-    // Get all approved memberships for this user
+    // Query by userId only (avoids composite index requirement), filter status client-side
     final membershipSnapshot = await _membersCollection
         .where('userId', isEqualTo: userId)
-        .where('status', isEqualTo: MemberStatus.approved.index)
         .get();
 
-    if (membershipSnapshot.docs.isEmpty) {
-      return [];
-    }
+    final approvedDocs = membershipSnapshot.docs
+        .where((doc) => doc.data()['status'] == MemberStatus.approved.index)
+        .toList();
 
-    final communityIds = membershipSnapshot.docs
+    if (approvedDocs.isEmpty) return [];
+
+    final communityIds = approvedDocs
         .map((doc) => doc.data()['communityId'] as String)
         .toList();
 

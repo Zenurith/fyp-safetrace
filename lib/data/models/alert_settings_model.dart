@@ -24,6 +24,32 @@ class AlertSettingsModel {
               IncidentCategory.emergency,
             };
 
+  Map<String, dynamic> toMap() {
+    return {
+      'radiusKm': radiusKm,
+      'severityFilters': severityFilters.map((e) => e.index).toList(),
+      'categoryFilters': categoryFilters.map((e) => e.index).toList(),
+      'activeHoursEnabled': activeHoursEnabled,
+      'activeFrom': activeFrom,
+      'activeTo': activeTo,
+    };
+  }
+
+  factory AlertSettingsModel.fromMap(Map<String, dynamic> map) {
+    return AlertSettingsModel(
+      radiusKm: (map['radiusKm'] ?? 2.0).toDouble(),
+      severityFilters: (map['severityFilters'] as List?)
+          ?.map((i) => SeverityLevel.values[i as int])
+          .toSet(),
+      categoryFilters: (map['categoryFilters'] as List?)
+          ?.map((i) => IncidentCategory.values[i as int])
+          .toSet(),
+      activeHoursEnabled: map['activeHoursEnabled'] ?? true,
+      activeFrom: map['activeFrom'] ?? '07:00 AM',
+      activeTo: map['activeTo'] ?? '11:00 PM',
+    );
+  }
+
   AlertSettingsModel copyWith({
     double? radiusKm,
     Set<SeverityLevel>? severityFilters,

@@ -46,6 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context.read<IncidentProvider>().startListening();
       _loadUserVotesIfNeeded();
       _initNotifications();
+      _wireUpAlertSettings();
     });
   }
 
@@ -64,6 +65,13 @@ class _HomeScreenState extends State<HomeScreen> {
     _updateUserLocation();
   }
 
+  void _wireUpAlertSettings() {
+    final userId = context.read<UserProvider>().currentUser?.id;
+    if (userId != null) {
+      context.read<AlertSettingsProvider>().setUserId(userId);
+    }
+  }
+
   Future<void> _updateUserLocation() async {
     try {
       final position = await _locationService.getCurrentPosition();
@@ -72,8 +80,12 @@ class _HomeScreenState extends State<HomeScreen> {
           position.latitude,
           position.longitude,
         );
-        // Check incidents immediately after getting location
+        // Save location to Firestore so Cloud Function can use it
         if (mounted) {
+          context.read<UserProvider>().updateLocation(
+            position.latitude,
+            position.longitude,
+          );
           _checkForNewIncidents();
         }
       }
