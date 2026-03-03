@@ -78,13 +78,15 @@ class _IncidentsManagementPageState extends State<IncidentsManagementPage> {
                 flex: 2,
                 child: TextField(
                   onChanged: (value) => setState(() => _searchQuery = value),
-                  style: AppTheme.bodyMedium,
+                  style: AppTheme.bodyMedium.copyWith(
+                    color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                  ),
                   decoration: InputDecoration(
                     hintText: 'Search by title or location...',
                     hintStyle: AppTheme.bodyMedium.copyWith(
-                      color: AppTheme.textSecondary,
+                      color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
                     ),
-                    prefixIcon: const Icon(Icons.search, size: 20),
+                    prefixIcon: Icon(Icons.search, size: 20, color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -170,7 +172,9 @@ class _IncidentsManagementPageState extends State<IncidentsManagementPage> {
           alignment: Alignment.centerLeft,
           child: Text(
             '${incidents.length} incidents',
-            style: AppTheme.caption,
+            style: AppTheme.caption.copyWith(
+              color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+            ),
           ),
         ),
 
@@ -227,7 +231,14 @@ class _IncidentsManagementPageState extends State<IncidentsManagementPage> {
       child: DropdownButtonHideUnderline(
         child: DropdownButton<T>(
           value: value,
-          hint: Text(hint, style: AppTheme.bodyMedium),
+          hint: Text(hint, style: AppTheme.bodyMedium.copyWith(
+            color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+          )),
+          style: AppTheme.bodyMedium.copyWith(
+            color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+          ),
+          dropdownColor: isDark ? AppTheme.darkSurface : Colors.white,
+          iconEnabledColor: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
           items: items,
           onChanged: onChanged,
         ),

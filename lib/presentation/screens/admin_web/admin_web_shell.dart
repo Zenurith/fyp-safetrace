@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../utils/app_theme.dart';
 import '../../providers/flag_provider.dart';
+import '../../providers/incident_provider.dart';
+import '../../providers/community_provider.dart';
 import '../../widgets/admin_web/admin_sidebar.dart';
 import '../../widgets/admin_web/admin_header.dart';
 import '../../widgets/admin_web/responsive_layout.dart';
@@ -37,9 +39,15 @@ class _AdminWebShellState extends State<AdminWebShell> {
   @override
   void initState() {
     super.initState();
-    // Start listening to flags for badge count
+    // Initialize all providers for admin panel
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Start listening to incidents
+      context.read<IncidentProvider>().startListening();
+      // Start listening to communities
+      context.read<CommunityProvider>().startListening();
+      // Start listening to flags for badge count
       context.read<FlagProvider>().startListeningPending();
+      context.read<FlagProvider>().startListening();
     });
   }
 

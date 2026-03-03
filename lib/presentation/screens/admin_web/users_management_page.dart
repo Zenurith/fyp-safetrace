@@ -81,13 +81,15 @@ class _UsersManagementPageState extends State<UsersManagementPage> {
                 flex: 2,
                 child: TextField(
                   onChanged: (value) => setState(() => _searchQuery = value),
-                  style: AppTheme.bodyMedium,
+                  style: AppTheme.bodyMedium.copyWith(
+                    color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                  ),
                   decoration: InputDecoration(
                     hintText: 'Search by name or handle...',
                     hintStyle: AppTheme.bodyMedium.copyWith(
-                      color: AppTheme.textSecondary,
+                      color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
                     ),
-                    prefixIcon: const Icon(Icons.search, size: 20),
+                    prefixIcon: Icon(Icons.search, size: 20, color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -236,10 +238,15 @@ class _FilterDropdown extends StatelessWidget {
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: value,
+          style: AppTheme.bodyMedium.copyWith(
+            color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+          ),
+          dropdownColor: isDark ? AppTheme.darkSurface : Colors.white,
+          iconEnabledColor: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
           items: items.entries.map((e) {
             return DropdownMenuItem(
               value: e.key,
-              child: Text(e.value, style: AppTheme.bodyMedium),
+              child: Text(e.value),
             );
           }).toList(),
           onChanged: onChanged,
