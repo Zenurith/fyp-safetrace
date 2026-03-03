@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -13,8 +14,11 @@ import 'presentation/providers/community_provider.dart';
 import 'presentation/providers/category_provider.dart';
 import 'presentation/providers/theme_provider.dart';
 import 'presentation/providers/comment_provider.dart';
+import 'presentation/providers/flag_provider.dart';
 import 'presentation/screens/home_screen.dart';
 import 'presentation/screens/auth_screen.dart';
+import 'presentation/screens/admin_web/admin_web_shell.dart';
+import 'presentation/screens/admin_web/access_denied_screen.dart';
 import 'utils/app_theme.dart';
 
 void main() async {
@@ -44,6 +48,7 @@ class SafeTraceApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => CommunityProvider()),
         ChangeNotifierProvider(create: (_) => CategoryProvider()..initialize()),
         ChangeNotifierProvider(create: (_) => CommentProvider()),
+        ChangeNotifierProvider(create: (_) => FlagProvider()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {
@@ -145,6 +150,16 @@ class _UserLoaderState extends State<_UserLoader> {
       );
     }
 
+    // Web platform routing - show admin panel for admins, access denied for others
+    if (kIsWeb) {
+      if (userProvider.currentUser!.isAdmin) {
+        return const AdminWebShell();
+      } else {
+        return const AccessDeniedScreen();
+      }
+    }
+
+    // Mobile platform - show normal home screen
     return const HomeScreen();
   }
 }
