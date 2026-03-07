@@ -24,7 +24,8 @@
       "WebSearch",
       "Bash(flutter devices:*)",
       "Bash(npm update:*)",
-      "Bash(flutter test:*)"
+      "Bash(flutter test:*)",
+      "Bash(gh pr:*)"
     ]
   }
 }

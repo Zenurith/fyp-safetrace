@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../repositories/user_repository.dart';
-import '../../presentation/widgets/incident_bottom_sheet.dart';
 
 class PushNotificationService {
   static final PushNotificationService _instance = PushNotificationService._internal();
@@ -18,9 +17,18 @@ class PushNotificationService {
   bool _isInitialized = false;
   GlobalKey<NavigatorState>? _navigatorKey;
 
-  /// Set the navigator key for navigation from notification taps
+  /// Callback set by the presentation layer to handle incident navigation.
+  /// Receives the navigator context and the incidentId from the notification.
+  void Function(BuildContext context, String incidentId)? _onIncidentTap;
+
+  /// Set the navigator key for context access from notification taps.
   void setNavigatorKey(GlobalKey<NavigatorState> key) {
     _navigatorKey = key;
+  }
+
+  /// Set the callback that the presentation layer uses to navigate to an incident.
+  void setOnIncidentTap(void Function(BuildContext context, String incidentId) callback) {
+    _onIncidentTap = callback;
   }
 
   Future<void> initialize(String? userId) async {
@@ -132,13 +140,7 @@ class PushNotificationService {
   void _navigateToIncident(String incidentId) {
     final context = _navigatorKey?.currentContext;
     if (context == null) return;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => IncidentBottomSheet(incidentId: incidentId),
-    );
+    _onIncidentTap?.call(context, incidentId);
   }
 
   Future<void> _showLocalNotification({

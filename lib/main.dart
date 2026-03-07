@@ -17,6 +17,7 @@ import 'presentation/providers/flag_provider.dart';
 import 'presentation/providers/post_provider.dart';
 import 'presentation/screens/home_screen.dart';
 import 'presentation/screens/auth_screen.dart';
+import 'presentation/widgets/incident_bottom_sheet.dart';
 import 'presentation/screens/admin_web/admin_web_shell.dart';
 import 'presentation/screens/admin_web/admin_auth_screen.dart';
 import 'presentation/screens/admin_web/access_denied_screen.dart';
@@ -122,6 +123,14 @@ class _UserLoaderState extends State<_UserLoader> {
       if (mounted) {
         final pushService = PushNotificationService();
         pushService.setNavigatorKey(navigatorKey);
+        pushService.setOnIncidentTap((context, incidentId) {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (_) => IncidentBottomSheet(incidentId: incidentId),
+          );
+        });
         await pushService.initialize(widget.firebaseUser.uid);
       }
     }

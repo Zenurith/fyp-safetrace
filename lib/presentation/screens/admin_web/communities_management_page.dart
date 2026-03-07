@@ -39,7 +39,6 @@ class _CommunitiesManagementPageState extends State<CommunitiesManagementPage> {
     final communityProvider = context.watch<CommunityProvider>();
     final allCommunities = communityProvider.communities;
     final communities = _filterCommunities(allCommunities);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Column(
       children: [
@@ -170,8 +169,6 @@ class _CommunityCardState extends State<_CommunityCard> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Container(
       decoration: AppTheme.cardDecorationFor(context),
       child: Column(
@@ -415,8 +412,6 @@ class _StatBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Column(
       children: [
         Row(
@@ -455,7 +450,6 @@ class _MemberChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final isAdmin = member.isAdmin;
 
     return Container(

@@ -207,6 +207,21 @@ class _IncidentSearchTile extends StatelessWidget {
                         ),
                       ],
                     ),
+                    if (incident.description.isNotEmpty &&
+                        incident.description.toLowerCase().contains(query.toLowerCase()) &&
+                        !incident.title.toLowerCase().contains(query.toLowerCase())) ...[
+                      const SizedBox(height: 4),
+                      _buildHighlightedText(
+                        _descriptionSnippet(incident.description, query),
+                        query,
+                        TextStyle(
+                          fontFamily: AppTheme.fontFamily,
+                          fontSize: 12,
+                          color: AppTheme.textSecondary,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 4),
                     Text(
                       incident.timeAgo,
@@ -228,6 +243,15 @@ class _IncidentSearchTile extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _descriptionSnippet(String description, String query) {
+    final index = description.toLowerCase().indexOf(query.toLowerCase());
+    if (index < 0) return description;
+    final start = (index - 30).clamp(0, description.length);
+    final end = (index + query.length + 40).clamp(0, description.length);
+    final snippet = description.substring(start, end);
+    return '${start > 0 ? '…' : ''}$snippet${end < description.length ? '…' : ''}';
   }
 
   Widget _buildHighlightedText(String text, String query, TextStyle style) {

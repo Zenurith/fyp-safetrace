@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../data/models/incident_model.dart';
-import '../../data/models/category_model.dart';
 import '../../utils/app_theme.dart';
 import '../providers/alert_settings_provider.dart';
 import '../providers/category_provider.dart';
@@ -205,22 +204,6 @@ class AlertSettingsScreen extends StatelessWidget {
     );
   }
 
-  String _categoryLabel(IncidentCategory cat) {
-    switch (cat) {
-      case IncidentCategory.crime:
-        return 'Crime';
-      case IncidentCategory.infrastructure:
-        return 'Infrastructure';
-      case IncidentCategory.suspicious:
-        return 'Suspicious';
-      case IncidentCategory.traffic:
-        return 'Traffic';
-      case IncidentCategory.environmental:
-        return 'Environmental';
-      case IncidentCategory.emergency:
-        return 'Emergency';
-    }
-  }
 }
 
 class _SeverityCheckbox extends StatelessWidget {

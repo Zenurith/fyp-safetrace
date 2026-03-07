@@ -231,6 +231,7 @@ class IncidentProvider extends ChangeNotifier {
     bool? imageVerified,
     double? verificationScore,
     String? verificationNote,
+    String? communityId,
   }) async {
     _isLoading = true;
     notifyListeners();
@@ -258,6 +259,7 @@ class IncidentProvider extends ChangeNotifier {
         imageVerified: imageVerified,
         verificationScore: verificationScore,
         verificationNote: verificationNote,
+        communityId: communityId,
       );
       final id = await _repository.add(incident);
 

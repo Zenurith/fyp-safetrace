@@ -78,6 +78,7 @@ lib/
 - `LocationService`: GPS positioning with Google Places API for autocomplete
 - `IncidentNotificationService`: Stream-based proximity alerts using user's alert settings
 - `MediaUploadService`: Firebase Storage image uploads
+- `ImageVerificationService` (`data/services/image_verification_service.dart`): Gemini AI image verification called during incident reporting. Checks that uploaded photos match the reported category before submission. API key from `AppConstants.geminiApiKey`. If unconfigured or API fails, defaults to `serviceUnavailable()` (isValid=false, sent for manual review).
 
 ## Reputation System
 
@@ -151,6 +152,11 @@ lib/
 - Add new bottom nav items without removing an existing one first.
 - Use `Colors.purple`, `Colors.teal`, or `Colors.blue` directly — always use `AppTheme` constants.
 - Create new color constants without a clear semantic purpose.
+
+## Known Bugs & Issues
+
+### Communities Feature
+Communities are **location-based groups** (center point + radius). Membership eligibility uses the **Haversine formula**. Members can create posts/discussions within the community. Joining is currently **auto-approved** (no admin approval) for testing.
 
 ## Common Mistakes to Avoid
 
