@@ -23,8 +23,6 @@ class SeverityBarChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     if (data.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(16),
@@ -34,7 +32,7 @@ class SeverityBarChart extends StatelessWidget {
           child: Text(
             'No data available',
             style: TextStyle(
-              color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+              color: AppTheme.textSecondary,
             ),
           ),
         ),
@@ -62,7 +60,7 @@ class SeverityBarChart extends StatelessWidget {
               fontFamily: AppTheme.fontFamily,
               fontSize: 14,
               fontWeight: FontWeight.w700,
-              color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+              color: AppTheme.primaryDark,
             ),
           ),
           const SizedBox(height: 16),
@@ -125,7 +123,7 @@ class SeverityBarChart extends StatelessWidget {
                           style: TextStyle(
                             fontFamily: AppTheme.fontFamily,
                             fontSize: 10,
-                            color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                            color: AppTheme.textSecondary,
                           ),
                         );
                       },
@@ -139,7 +137,7 @@ class SeverityBarChart extends StatelessWidget {
                   horizontalInterval: maxCount > 5 ? (maxCount / 5).ceilToDouble() : 1,
                   getDrawingHorizontalLine: (value) {
                     return FlLine(
-                      color: isDark ? AppTheme.darkCardBorder : AppTheme.cardBorder,
+                      color: AppTheme.cardBorder,
                       strokeWidth: 1,
                     );
                   },

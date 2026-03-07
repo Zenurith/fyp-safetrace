@@ -10,7 +10,9 @@ import '../../widgets/analytics/stats_card.dart';
 import '../../widgets/admin_web/responsive_layout.dart';
 
 class AdminDashboardPage extends StatefulWidget {
-  const AdminDashboardPage({super.key});
+  final ValueChanged<int>? onNavigate;
+
+  const AdminDashboardPage({super.key, this.onNavigate});
 
   @override
   State<AdminDashboardPage> createState() => _AdminDashboardPageState();
@@ -43,7 +45,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final communityProvider = context.watch<CommunityProvider>();
     final incidents = incidentProvider.allIncidents;
     final analytics = AnalyticsService.calculateAnalytics(incidents);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final columns = ResponsiveLayout.getGridColumns(context);
 
     return SingleChildScrollView(
@@ -62,14 +63,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 Text(
                   'Welcome to SafeTrace Admin',
                   style: AppTheme.headingLarge.copyWith(
-                    color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                    color: AppTheme.primaryDark,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Monitor and manage your community safety platform from this dashboard.',
                   style: AppTheme.bodyMedium.copyWith(
-                    color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                    color: AppTheme.textSecondary,
                   ),
                 ),
               ],
@@ -81,7 +82,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           Text(
             'Overview',
             style: AppTheme.headingMedium.copyWith(
-              color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+              color: AppTheme.primaryDark,
             ),
           ),
           const SizedBox(height: 16),
@@ -138,7 +139,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           Text(
             'Quick Actions',
             style: AppTheme.headingMedium.copyWith(
-              color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+              color: AppTheme.primaryDark,
             ),
           ),
           const SizedBox(height: 16),
@@ -152,24 +153,21 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 label: 'Review Flags',
                 count: flagProvider.pendingCount,
                 color: AppTheme.warningOrange,
-                onTap: () {
-                  // Navigate to flags (index 5)
-                  // This is handled by parent shell
-                },
+                onTap: () => widget.onNavigate?.call(5),
               ),
               _QuickActionCard(
                 icon: Icons.warning_amber_outlined,
                 label: 'Pending Incidents',
                 count: incidents.where((i) => i.status.index == 0).length,
                 color: AppTheme.primaryRed,
-                onTap: () {},
+                onTap: () => widget.onNavigate?.call(2),
               ),
               _QuickActionCard(
                 icon: Icons.groups_outlined,
                 label: 'Communities',
                 count: communityProvider.communities.length,
                 color: AppTheme.accentBlue,
-                onTap: () {},
+                onTap: () => widget.onNavigate?.call(4),
               ),
             ],
           ),
@@ -179,7 +177,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           Text(
             'Activity Summary',
             style: AppTheme.headingMedium.copyWith(
-              color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+              color: AppTheme.primaryDark,
             ),
           ),
           const SizedBox(height: 16),
@@ -193,15 +191,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   label: 'Incidents this week',
                   value: '${analytics.incidentsLast7d}',
                   icon: Icons.trending_up,
-                  isDark: isDark,
-                ),
+),
                 const Divider(height: 24),
                 _SummaryRow(
                   label: 'Average resolution time',
                   value: '${analytics.averageResolutionDays.toStringAsFixed(1)} days',
                   icon: Icons.timer_outlined,
-                  isDark: isDark,
-                ),
+),
                 const Divider(height: 24),
                 _SummaryRow(
                   label: 'Resolution rate',
@@ -209,8 +205,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       ? '${((analytics.resolvedIncidents / analytics.totalIncidents) * 100).toStringAsFixed(1)}%'
                       : 'N/A',
                   icon: Icons.check_circle_outline,
-                  isDark: isDark,
-                ),
+),
               ],
             ),
           ),
@@ -237,8 +232,6 @@ class _QuickActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -268,13 +261,13 @@ class _QuickActionCard extends StatelessWidget {
                       label,
                       style: AppTheme.bodyMedium.copyWith(
                         fontWeight: FontWeight.w500,
-                        color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                        color: AppTheme.primaryDark,
                       ),
                     ),
                     Text(
                       '$count items',
                       style: AppTheme.caption.copyWith(
-                        color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                        color: AppTheme.textSecondary,
                       ),
                     ),
                   ],
@@ -292,13 +285,11 @@ class _SummaryRow extends StatelessWidget {
   final String label;
   final String value;
   final IconData icon;
-  final bool isDark;
 
   const _SummaryRow({
     required this.label,
     required this.value,
     required this.icon,
-    required this.isDark,
   });
 
   @override
@@ -308,21 +299,21 @@ class _SummaryRow extends StatelessWidget {
         Icon(
           icon,
           size: 20,
-          color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+          color: AppTheme.textSecondary,
         ),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
             label,
             style: AppTheme.bodyMedium.copyWith(
-              color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+              color: AppTheme.textSecondary,
             ),
           ),
         ),
         Text(
           value,
           style: AppTheme.headingSmall.copyWith(
-            color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+            color: AppTheme.primaryDark,
           ),
         ),
       ],

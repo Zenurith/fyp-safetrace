@@ -184,8 +184,6 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: AppTheme.cardDecorationFor(context),
@@ -209,13 +207,13 @@ class _StatCard extends StatelessWidget {
               Text(
                 value,
                 style: AppTheme.headingMedium.copyWith(
-                  color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                  color: AppTheme.primaryDark,
                 ),
               ),
               Text(
                 label,
                 style: AppTheme.caption.copyWith(
-                  color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                  color: AppTheme.textSecondary,
                 ),
               ),
             ],
@@ -233,8 +231,6 @@ class _CategoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: AppTheme.cardDecorationFor(context),
@@ -264,7 +260,7 @@ class _CategoryCard extends StatelessWidget {
                       child: Text(
                         category.name,
                         style: AppTheme.headingSmall.copyWith(
-                          color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                          color: AppTheme.primaryDark,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -274,7 +270,7 @@ class _CategoryCard extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: isDark ? AppTheme.darkCardBorder : AppTheme.backgroundGrey,
+                          color: AppTheme.backgroundGrey,
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
@@ -313,7 +309,7 @@ class _CategoryCard extends StatelessWidget {
               icon: Icon(
                 Icons.edit_outlined,
                 size: 20,
-                color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                color: AppTheme.textSecondary,
               ),
               tooltip: 'Edit',
             ),

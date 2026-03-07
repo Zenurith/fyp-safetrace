@@ -64,6 +64,14 @@ class VoteRepository {
     return null;
   }
 
+  /// Determines vote weight based on user trust status.
+  /// Trusted users (500+ points) get 2x vote weight.
+  int _getVoteWeight(Map<String, dynamic>? voterData) {
+    if (voterData == null) return 1;
+    final isTrusted = voterData['isTrusted'] ?? false;
+    return isTrusted ? 2 : 1;
+  }
+
   /// Casts a vote on an incident using a Firestore transaction.
   /// Returns the created vote, or null if the user is trying to vote on their own report.
   Future<VoteModel?> castVote({
@@ -117,8 +125,10 @@ class VoteRepository {
       final currentDownvotes = incidentData['downvotes'] ?? 0;
       final currentStatus = IncidentStatus.values[incidentData['status'] ?? 0];
 
-      final newUpvotes = type == VoteType.upvote ? currentUpvotes + 1 : currentUpvotes;
-      final newDownvotes = type == VoteType.downvote ? currentDownvotes + 1 : currentDownvotes;
+      // Trusted users get 2x vote weight
+      final weight = _getVoteWeight(voterDoc.exists ? voterDoc.data() : null);
+      final newUpvotes = type == VoteType.upvote ? currentUpvotes + weight : currentUpvotes;
+      final newDownvotes = type == VoteType.downvote ? currentDownvotes + weight : currentDownvotes;
 
       // Calculate if status should auto-change
       final newStatus = _calculateAutoStatus(

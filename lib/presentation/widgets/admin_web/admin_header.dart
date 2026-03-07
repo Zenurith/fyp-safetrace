@@ -20,16 +20,14 @@ class AdminHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final userProvider = context.watch<UserProvider>();
     final currentUser = userProvider.currentUser;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Container(
       height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 24),
       decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkSurface : Colors.white,
+        color: Colors.white,
         border: Border(
           bottom: BorderSide(
-            color: isDark ? AppTheme.darkCardBorder : AppTheme.cardBorder,
+            color: AppTheme.cardBorder,
           ),
         ),
       ),
@@ -40,7 +38,7 @@ class AdminHeader extends StatelessWidget {
             child: Text(
               title,
               style: AppTheme.headingMedium.copyWith(
-                color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                color: AppTheme.primaryDark,
               ),
             ),
           ),
@@ -53,7 +51,7 @@ class AdminHeader extends StatelessWidget {
             onPressed: () => ExportDialog.show(context),
             icon: Icon(
               Icons.download_outlined,
-              color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+              color: AppTheme.textSecondary,
             ),
             tooltip: 'Export Data',
           ),
@@ -64,9 +62,7 @@ class AdminHeader extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: isDark
-                    ? AppTheme.darkCardBorder.withValues(alpha: 0.3)
-                    : AppTheme.backgroundGrey,
+                color: AppTheme.backgroundGrey,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Row(
@@ -83,7 +79,7 @@ class AdminHeader extends StatelessWidget {
                     currentUser.name,
                     style: AppTheme.bodyMedium.copyWith(
                       fontWeight: FontWeight.w500,
-                      color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                      color: AppTheme.primaryDark,
                     ),
                   ),
                 ],
@@ -125,7 +121,7 @@ class AdminHeader extends StatelessWidget {
             },
             icon: Icon(
               Icons.logout,
-              color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+              color: AppTheme.textSecondary,
             ),
             tooltip: 'Sign Out',
           ),

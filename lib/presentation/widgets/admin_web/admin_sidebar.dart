@@ -66,7 +66,7 @@ class AdminSidebar extends StatelessWidget {
               ],
             ),
           ),
-          const Divider(color: AppTheme.darkCardBorder, height: 1),
+          const Divider(color: Color(0xFF4A5568), height: 1),
 
           // Navigation items
           Expanded(
@@ -128,7 +128,7 @@ class AdminSidebar extends StatelessWidget {
           ),
 
           // Collapse toggle
-          const Divider(color: AppTheme.darkCardBorder, height: 1),
+          const Divider(color: Color(0xFF4A5568), height: 1),
           InkWell(
             onTap: onToggleExpanded,
             child: Container(
@@ -139,7 +139,7 @@ class AdminSidebar extends StatelessWidget {
                 children: [
                   Icon(
                     expanded ? Icons.chevron_left : Icons.chevron_right,
-                    color: AppTheme.darkTextSecondary,
+                    color: Colors.white60,
                     size: 20,
                   ),
                 ],
@@ -195,7 +195,7 @@ class _NavItem extends StatelessWidget {
                   children: [
                     Icon(
                       icon,
-                      color: isSelected ? AppTheme.primaryRed : AppTheme.darkTextSecondary,
+                      color: isSelected ? AppTheme.primaryRed : Colors.white60,
                       size: 22,
                     ),
                     if (badgeCount != null && badgeCount! > 0 && !expanded)
@@ -234,7 +234,7 @@ class _NavItem extends StatelessWidget {
                         fontFamily: AppTheme.fontFamily,
                         fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
                         fontSize: 14,
-                        color: isSelected ? Colors.white : AppTheme.darkTextSecondary,
+                        color: isSelected ? Colors.white : Colors.white60,
                       ),
                     ),
                   ),

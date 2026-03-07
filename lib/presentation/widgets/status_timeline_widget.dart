@@ -11,8 +11,6 @@ class StatusTimelineWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     // Build timeline entries from status history
     final entries = _buildTimelineEntries();
 
@@ -28,7 +26,7 @@ class StatusTimelineWidget extends StatelessWidget {
             Icon(
               Icons.timeline,
               size: 18,
-              color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+              color: AppTheme.textSecondary,
             ),
             const SizedBox(width: 8),
             Text(
@@ -36,7 +34,7 @@ class StatusTimelineWidget extends StatelessWidget {
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
-                color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                color: AppTheme.primaryDark,
               ),
             ),
           ],
@@ -124,7 +122,6 @@ class _TimelineEntry extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final color = _getStatusColor();
 
     return IntrinsicHeight(
@@ -142,7 +139,7 @@ class _TimelineEntry extends StatelessWidget {
                   height: 8,
                   color: isFirst
                       ? Colors.transparent
-                      : (isDark ? AppTheme.darkCardBorder : AppTheme.cardBorder),
+                      : (AppTheme.cardBorder),
                 ),
                 // Dot
                 Container(
@@ -163,7 +160,7 @@ class _TimelineEntry extends StatelessWidget {
                     width: 2,
                     color: isLast
                         ? Colors.transparent
-                        : (isDark ? AppTheme.darkCardBorder : AppTheme.cardBorder),
+                        : (AppTheme.cardBorder),
                   ),
                 ),
               ],
@@ -203,9 +200,7 @@ class _TimelineEntry extends StatelessWidget {
                         _formatTimestamp(),
                         style: TextStyle(
                           fontSize: 11,
-                          color: isDark
-                              ? AppTheme.darkTextSecondary
-                              : AppTheme.textSecondary,
+                          color: AppTheme.textSecondary,
                         ),
                       ),
                     ],
@@ -216,9 +211,7 @@ class _TimelineEntry extends StatelessWidget {
                       note!,
                       style: TextStyle(
                         fontSize: 13,
-                        color: isDark
-                            ? AppTheme.darkTextPrimary
-                            : AppTheme.primaryDark,
+                        color: AppTheme.primaryDark,
                       ),
                     ),
                   ],
@@ -229,9 +222,7 @@ class _TimelineEntry extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 11,
                         fontStyle: FontStyle.italic,
-                        color: isDark
-                            ? AppTheme.darkTextSecondary
-                            : AppTheme.textSecondary,
+                        color: AppTheme.textSecondary,
                       ),
                     ),
                   ],

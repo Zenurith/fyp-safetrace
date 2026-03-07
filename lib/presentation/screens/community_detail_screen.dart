@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../data/models/community_member_model.dart';
+import '../../data/models/incident_model.dart';
+import '../../data/models/post_model.dart';
 import '../../utils/app_theme.dart';
 import '../providers/community_provider.dart';
+import '../providers/incident_provider.dart';
+import '../providers/post_provider.dart';
 import '../providers/user_provider.dart';
+import '../widgets/incident_bottom_sheet.dart';
 import 'community_admin_screen.dart';
 
 class CommunityDetailScreen extends StatefulWidget {
@@ -32,6 +37,11 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
     final provider = context.read<CommunityProvider>();
     await provider.loadCommunityDetails(widget.communityId, userId);
     _isAdmin = await provider.isAdmin(widget.communityId, userId);
+
+    // Start listening to posts for this community
+    if (mounted) {
+      context.read<PostProvider>().startListening(widget.communityId);
+    }
 
     if (mounted) setState(() => _isLoading = false);
   }
@@ -340,7 +350,368 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                 ],
               ),
             ),
+            // Community Posts (visible to approved members)
+            if (membership != null && membership.isApproved) ...[
+              const SizedBox(height: 8),
+              _CommunityPostsSection(
+                communityId: widget.communityId,
+                isAdmin: _isAdmin,
+              ),
+            ],
+
+            // Nearby Incidents within community radius
+            if (membership != null && membership.isApproved) ...[
+              const SizedBox(height: 8),
+              _CommunityIncidentsSection(community: community),
+            ],
             const SizedBox(height: 32),
+          ],
+        ),
+      ),
+      floatingActionButton: (membership != null && membership.isApproved)
+          ? FloatingActionButton(
+              backgroundColor: AppTheme.primaryRed,
+              onPressed: () => _showCreatePostDialog(context),
+              child: const Icon(Icons.edit, color: Colors.white),
+            )
+          : null,
+    );
+  }
+
+  void _showCreatePostDialog(BuildContext context) {
+    final titleController = TextEditingController();
+    final contentController = TextEditingController();
+    final userId = context.read<UserProvider>().currentUser?.id;
+    if (userId == null) return;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text('New Post', style: AppTheme.headingMedium),
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: titleController,
+                style: AppTheme.bodyMedium,
+                decoration: InputDecoration(
+                  labelText: 'Title',
+                  labelStyle: AppTheme.caption,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppTheme.cardBorder),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: contentController,
+                style: AppTheme.bodyMedium,
+                maxLines: 4,
+                decoration: InputDecoration(
+                  labelText: 'Content',
+                  labelStyle: AppTheme.caption,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppTheme.cardBorder),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel',
+                style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (titleController.text.trim().isEmpty ||
+                  contentController.text.trim().isEmpty) return;
+              final postProvider = context.read<PostProvider>();
+              await postProvider.createPost(
+                authorId: userId,
+                communityId: widget.communityId,
+                title: titleController.text.trim(),
+                content: contentController.text.trim(),
+              );
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryRed),
+            child: const Text('Post'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CommunityPostsSection extends StatelessWidget {
+  final String communityId;
+  final bool isAdmin;
+
+  const _CommunityPostsSection({
+    required this.communityId,
+    required this.isAdmin,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final postProvider = context.watch<PostProvider>();
+    final posts = postProvider.communityPosts;
+    final currentUserId = context.read<UserProvider>().currentUser?.id;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                'Posts',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '(${posts.length})',
+                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (posts.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.forum_outlined, size: 40, color: Colors.grey[400]),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No posts yet. Be the first to share!',
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            )
+          else
+            ...posts.map((post) => _PostCard(
+                  post: post,
+                  canDelete: isAdmin || post.authorId == currentUserId,
+                )),
+        ],
+      ),
+    );
+  }
+}
+
+class _PostCard extends StatelessWidget {
+  final PostModel post;
+  final bool canDelete;
+
+  const _PostCard({required this.post, required this.canDelete});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: AppTheme.cardDecoration,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  post.title,
+                  style: AppTheme.headingSmall,
+                ),
+              ),
+              Text(
+                post.timeAgo,
+                style: AppTheme.caption,
+              ),
+              if (canDelete) ...[
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Delete Post'),
+                        content: const Text('Are you sure?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: const Text('Cancel'),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              context.read<PostProvider>().deletePost(post.id);
+                              Navigator.pop(ctx);
+                            },
+                            child: const Text('Delete',
+                                style: TextStyle(color: AppTheme.primaryRed)),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  child: Icon(Icons.delete_outline, size: 18, color: Colors.grey[400]),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            post.content,
+            style: AppTheme.bodyMedium.copyWith(height: 1.4),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CommunityIncidentsSection extends StatelessWidget {
+  final dynamic community; // CommunityModel
+
+  const _CommunityIncidentsSection({required this.community});
+
+  @override
+  Widget build(BuildContext context) {
+    final allIncidents = context.watch<IncidentProvider>().allIncidents;
+    final nearbyIncidents = allIncidents.where((incident) {
+      return community.isLocationWithinRadius(
+          incident.latitude, incident.longitude);
+    }).toList();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                'Nearby Incidents',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '(${nearbyIncidents.length})',
+                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (nearbyIncidents.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.shield_outlined, size: 40, color: Colors.grey[400]),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No incidents reported in this area',
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            )
+          else
+            ...nearbyIncidents.take(5).map((incident) => _IncidentCard(
+                  incident: incident,
+                )),
+          if (nearbyIncidents.length > 5)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '+ ${nearbyIncidents.length - 5} more incidents in this area',
+                style: AppTheme.caption,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IncidentCard extends StatelessWidget {
+  final IncidentModel incident;
+
+  const _IncidentCard({required this.incident});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (_) => IncidentBottomSheet(incidentId: incident.id),
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: AppTheme.cardDecoration,
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: incident.severity == SeverityLevel.high
+                    ? AppTheme.primaryRed.withValues(alpha: 0.1)
+                    : AppTheme.warningOrange.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.warning_amber_rounded,
+                size: 20,
+                color: incident.severity == SeverityLevel.high
+                    ? AppTheme.primaryRed
+                    : AppTheme.warningOrange,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    incident.title,
+                    style: AppTheme.headingSmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${incident.categoryLabel}  •  ${incident.severityLabel}  •  ${incident.timeAgo}',
+                    style: AppTheme.caption,
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

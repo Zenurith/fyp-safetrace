@@ -19,8 +19,6 @@ class StatsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: AppTheme.cardDecorationFor(context),
@@ -44,7 +42,7 @@ class StatsCard extends StatelessWidget {
                   style: TextStyle(
                     fontFamily: AppTheme.fontFamily,
                     fontSize: 11,
-                    color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                    color: AppTheme.textSecondary,
                   ),
                 ),
             ],
@@ -56,7 +54,7 @@ class StatsCard extends StatelessWidget {
               fontFamily: AppTheme.fontFamily,
               fontSize: 28,
               fontWeight: FontWeight.w700,
-              color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+              color: AppTheme.primaryDark,
             ),
           ),
           const SizedBox(height: 4),
@@ -65,7 +63,7 @@ class StatsCard extends StatelessWidget {
             style: TextStyle(
               fontFamily: AppTheme.fontFamily,
               fontSize: 13,
-              color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+              color: AppTheme.textSecondary,
             ),
           ),
         ],

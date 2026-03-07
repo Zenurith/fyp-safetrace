@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../utils/app_theme.dart';
 import '../providers/user_provider.dart';
-import '../providers/theme_provider.dart';
 import '../widgets/user_avatar.dart';
 import 'admin_screen.dart';
 
@@ -426,56 +425,6 @@ class ProfileScreen extends StatelessWidget {
                             valueColor: const AlwaysStoppedAnimation(
                                 AppTheme.successGreen),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Settings section
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: AppTheme.cardDecorationFor(context),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Settings',
-                          style: Theme.of(context).textTheme.headlineSmall,
-                        ),
-                        const SizedBox(height: 12),
-                        Consumer<ThemeProvider>(
-                          builder: (context, themeProvider, _) {
-                            return Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(
-                                      themeProvider.isDarkMode
-                                          ? Icons.dark_mode
-                                          : Icons.light_mode,
-                                      color: Theme.of(context).iconTheme.color,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                      'Dark Mode',
-                                      style: Theme.of(context).textTheme.bodyLarge,
-                                    ),
-                                  ],
-                                ),
-                                Switch.adaptive(
-                                  value: themeProvider.isDarkMode,
-                                  onChanged: (_) => themeProvider.toggleTheme(),
-                                  activeTrackColor: AppTheme.primaryRed,
-                                ),
-                              ],
-                            );
-                          },
                         ),
                       ],
                     ),

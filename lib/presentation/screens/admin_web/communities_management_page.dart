@@ -47,10 +47,10 @@ class _CommunitiesManagementPageState extends State<CommunitiesManagementPage> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: isDark ? AppTheme.darkSurface : Colors.white,
+            color: Colors.white,
             border: Border(
               bottom: BorderSide(
-                color: isDark ? AppTheme.darkCardBorder : AppTheme.cardBorder,
+                color: AppTheme.cardBorder,
               ),
             ),
           ),
@@ -60,25 +60,25 @@ class _CommunitiesManagementPageState extends State<CommunitiesManagementPage> {
                 child: TextField(
                   onChanged: (value) => setState(() => _searchQuery = value),
                   style: AppTheme.bodyMedium.copyWith(
-                    color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                    color: AppTheme.primaryDark,
                   ),
                   decoration: InputDecoration(
                     hintText: 'Search communities by name or location...',
                     hintStyle: AppTheme.bodyMedium.copyWith(
-                      color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                      color: AppTheme.textSecondary,
                     ),
-                    prefixIcon: Icon(Icons.search, size: 20, color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary),
+                    prefixIcon: Icon(Icons.search, size: 20, color: AppTheme.textSecondary),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                       borderSide: BorderSide(
-                        color: isDark ? AppTheme.darkCardBorder : AppTheme.cardBorder,
+                        color: AppTheme.cardBorder,
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                       borderSide: BorderSide(
-                        color: isDark ? AppTheme.darkCardBorder : AppTheme.cardBorder,
+                        color: AppTheme.cardBorder,
                       ),
                     ),
                   ),
@@ -88,7 +88,7 @@ class _CommunitiesManagementPageState extends State<CommunitiesManagementPage> {
               Text(
                 '${communities.length} communities',
                 style: AppTheme.caption.copyWith(
-                  color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                  color: AppTheme.textSecondary,
                 ),
               ),
             ],
@@ -224,9 +224,7 @@ class _CommunityCardState extends State<_CommunityCard> {
                               child: Text(
                                 widget.community.name,
                                 style: AppTheme.headingSmall.copyWith(
-                                  color: isDark
-                                      ? AppTheme.darkTextPrimary
-                                      : AppTheme.primaryDark,
+                                  color: AppTheme.primaryDark,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -272,18 +270,14 @@ class _CommunityCardState extends State<_CommunityCard> {
                             Icon(
                               Icons.location_on_outlined,
                               size: 14,
-                              color: isDark
-                                  ? AppTheme.darkTextSecondary
-                                  : AppTheme.textSecondary,
+                              color: AppTheme.textSecondary,
                             ),
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
                                 widget.community.address,
                                 style: AppTheme.caption.copyWith(
-                                  color: isDark
-                                      ? AppTheme.darkTextSecondary
-                                      : AppTheme.textSecondary,
+                                  color: AppTheme.textSecondary,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -316,9 +310,7 @@ class _CommunityCardState extends State<_CommunityCard> {
                     turns: _isExpanded ? 0.5 : 0,
                     child: Icon(
                       Icons.keyboard_arrow_down,
-                      color: isDark
-                          ? AppTheme.darkTextSecondary
-                          : AppTheme.textSecondary,
+                      color: AppTheme.textSecondary,
                     ),
                   ),
                 ],
@@ -330,7 +322,7 @@ class _CommunityCardState extends State<_CommunityCard> {
           if (_isExpanded) ...[
             Divider(
               height: 1,
-              color: isDark ? AppTheme.darkCardBorder : AppTheme.cardBorder,
+              color: AppTheme.cardBorder,
             ),
             Padding(
               padding: const EdgeInsets.all(16),
@@ -343,18 +335,14 @@ class _CommunityCardState extends State<_CommunityCard> {
                       'Description',
                       style: AppTheme.caption.copyWith(
                         fontWeight: FontWeight.w700,
-                        color: isDark
-                            ? AppTheme.darkTextSecondary
-                            : AppTheme.textSecondary,
+                        color: AppTheme.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       widget.community.description,
                       style: AppTheme.bodyMedium.copyWith(
-                        color: isDark
-                            ? AppTheme.darkTextPrimary
-                            : AppTheme.primaryDark,
+                        color: AppTheme.primaryDark,
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -368,9 +356,7 @@ class _CommunityCardState extends State<_CommunityCard> {
                         'Members (${_members?.length ?? widget.community.memberCount})',
                         style: AppTheme.caption.copyWith(
                           fontWeight: FontWeight.w700,
-                          color: isDark
-                              ? AppTheme.darkTextSecondary
-                              : AppTheme.textSecondary,
+                          color: AppTheme.textSecondary,
                         ),
                       ),
                       if (_loadingMembers)
@@ -439,13 +425,13 @@ class _StatBadge extends StatelessWidget {
             Icon(
               icon,
               size: 16,
-              color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+              color: AppTheme.textSecondary,
             ),
             const SizedBox(width: 4),
             Text(
               value,
               style: AppTheme.headingSmall.copyWith(
-                color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                color: AppTheme.primaryDark,
               ),
             ),
           ],
@@ -454,7 +440,7 @@ class _StatBadge extends StatelessWidget {
           label,
           style: AppTheme.caption.copyWith(
             fontSize: 10,
-            color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+            color: AppTheme.textSecondary,
           ),
         ),
       ],
@@ -477,12 +463,12 @@ class _MemberChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: isAdmin
             ? AppTheme.primaryRed.withValues(alpha: 0.1)
-            : (isDark ? AppTheme.darkCardBorder : AppTheme.backgroundGrey),
+            : AppTheme.backgroundGrey,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isAdmin
               ? AppTheme.primaryRed.withValues(alpha: 0.3)
-              : (isDark ? AppTheme.darkCardBorder : AppTheme.cardBorder),
+              : (AppTheme.cardBorder),
         ),
       ),
       child: Row(
@@ -504,7 +490,7 @@ class _MemberChip extends StatelessWidget {
               fontWeight: isAdmin ? FontWeight.w700 : FontWeight.w400,
               color: isAdmin
                   ? AppTheme.primaryRed
-                  : (isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark),
+                  : (AppTheme.primaryDark),
             ),
           ),
         ],

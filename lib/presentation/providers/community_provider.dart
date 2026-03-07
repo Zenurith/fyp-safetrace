@@ -87,6 +87,7 @@ class CommunityProvider extends ChangeNotifier {
     required double radius,
     required String address,
     bool isPublic = true,
+    bool requiresApproval = false,
     String? imageUrl,
   }) async {
     _isLoading = true;
@@ -103,6 +104,7 @@ class CommunityProvider extends ChangeNotifier {
         radius: radius,
         address: address,
         isPublic: isPublic,
+        requiresApproval: requiresApproval,
         createdAt: DateTime.now(),
         imageUrl: imageUrl,
       );

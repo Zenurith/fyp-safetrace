@@ -100,8 +100,6 @@ class _FlagDialogState extends State<FlagDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return AlertDialog(
       title: Row(
         children: [
@@ -119,7 +117,7 @@ class _FlagDialogState extends State<FlagDialog> {
               'Why are you reporting this?',
               style: TextStyle(
                 fontWeight: FontWeight.w600,
-                color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                color: AppTheme.primaryDark,
               ),
             ),
             const SizedBox(height: 12),

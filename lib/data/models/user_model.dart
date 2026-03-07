@@ -166,7 +166,7 @@ class UserModel {
   }
 
   int get pointsToNextLevel {
-    const thresholds = [0, 100, 300, 600, 1000, 1500];
+    const thresholds = [0, 100, 300, 600, 1000, 1500, 2500, 4000, 6000, 10000];
     if (level < thresholds.length) {
       return thresholds[level] - points;
     }
@@ -174,7 +174,7 @@ class UserModel {
   }
 
   double get levelProgress {
-    const thresholds = [0, 100, 300, 600, 1000, 1500];
+    const thresholds = [0, 100, 300, 600, 1000, 1500, 2500, 4000, 6000, 10000];
     if (level >= thresholds.length) return 1.0;
     final prev = level > 0 ? thresholds[level - 1] : 0;
     final next = thresholds[level];

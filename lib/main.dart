@@ -12,14 +12,18 @@ import 'presentation/providers/alert_settings_provider.dart';
 import 'presentation/providers/vote_provider.dart';
 import 'presentation/providers/community_provider.dart';
 import 'presentation/providers/category_provider.dart';
-import 'presentation/providers/theme_provider.dart';
 import 'presentation/providers/comment_provider.dart';
 import 'presentation/providers/flag_provider.dart';
+import 'presentation/providers/post_provider.dart';
 import 'presentation/screens/home_screen.dart';
 import 'presentation/screens/auth_screen.dart';
 import 'presentation/screens/admin_web/admin_web_shell.dart';
+import 'presentation/screens/admin_web/admin_auth_screen.dart';
 import 'presentation/screens/admin_web/access_denied_screen.dart';
 import 'utils/app_theme.dart';
+
+/// Global navigator key for navigation from services (e.g., notification taps)
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,7 +44,6 @@ class SafeTraceApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => IncidentProvider()),
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => AlertSettingsProvider()),
@@ -49,18 +52,14 @@ class SafeTraceApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => CategoryProvider()..initialize()),
         ChangeNotifierProvider(create: (_) => CommentProvider()),
         ChangeNotifierProvider(create: (_) => FlagProvider()),
+        ChangeNotifierProvider(create: (_) => PostProvider()),
       ],
-      child: Consumer<ThemeProvider>(
-        builder: (context, themeProvider, _) {
-          return MaterialApp(
-            title: 'SafeTrace',
-            debugShowCheckedModeBanner: false,
-            theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
-            themeMode: themeProvider.themeMode,
-            home: const AuthGate(),
-          );
-        },
+      child: MaterialApp(
+        title: 'SafeTrace',
+        navigatorKey: navigatorKey,
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme,
+        home: const AuthGate(),
       ),
     );
   }
@@ -85,6 +84,10 @@ class AuthGate extends StatelessWidget {
           return _UserLoader(firebaseUser: firebaseUser);
         }
 
+        // Use web-specific auth screen for admin dashboard
+        if (kIsWeb) {
+          return const AdminAuthScreen();
+        }
         return const AuthScreen();
       },
     );
@@ -117,7 +120,9 @@ class _UserLoaderState extends State<_UserLoader> {
 
       // Initialize push notifications after user is loaded
       if (mounted) {
-        await PushNotificationService().initialize(widget.firebaseUser.uid);
+        final pushService = PushNotificationService();
+        pushService.setNavigatorKey(navigatorKey);
+        await pushService.initialize(widget.firebaseUser.uid);
       }
     }
   }

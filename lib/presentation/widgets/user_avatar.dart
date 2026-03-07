@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-class UserAvatar extends StatelessWidget {
+class UserAvatar extends StatefulWidget {
   final String? photoUrl;
   final String initials;
   final double radius;
@@ -21,41 +21,110 @@ class UserAvatar extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final bgColor = backgroundColor ?? Colors.teal;
-    final fgColor = foregroundColor ?? Colors.white;
+  State<UserAvatar> createState() => _UserAvatarState();
+}
 
-    Widget avatar;
-    if (photoUrl != null && photoUrl!.isNotEmpty) {
-      avatar = CircleAvatar(
-        radius: radius,
-        backgroundColor: bgColor,
-        backgroundImage: NetworkImage(photoUrl!),
-        onBackgroundImageError: (_, __) {},
-        child: null,
-      );
-    } else {
-      avatar = CircleAvatar(
-        radius: radius,
-        backgroundColor: bgColor,
-        child: Text(
-          initials,
-          style: TextStyle(
-            fontSize: radius * 0.7,
-            fontWeight: FontWeight.bold,
-            color: fgColor,
-          ),
-        ),
-      );
+class _UserAvatarState extends State<UserAvatar> {
+  bool _imageError = false;
+  bool _imageLoaded = false;
+
+  @override
+  void didUpdateWidget(UserAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.photoUrl != widget.photoUrl) {
+      setState(() {
+        _imageError = false;
+        _imageLoaded = false;
+      });
     }
+  }
 
-    if (borderWidth != null && borderWidth! > 0) {
+  bool get _hasValidUrl =>
+      widget.photoUrl != null && widget.photoUrl!.isNotEmpty;
+
+  bool get _shouldShowImage => _hasValidUrl && !_imageError;
+
+  @override
+  Widget build(BuildContext context) {
+    final bgColor = widget.backgroundColor ?? Colors.teal;
+    final fgColor = widget.foregroundColor ?? Colors.white;
+    final size = widget.radius * 2;
+
+    Widget avatar = Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: bgColor,
+        shape: BoxShape.circle,
+      ),
+      child: _shouldShowImage
+          ? ClipOval(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Show initials as fallback while loading
+                  if (!_imageLoaded)
+                    Center(
+                      child: Text(
+                        widget.initials,
+                        style: TextStyle(
+                          fontSize: widget.radius * 0.7,
+                          fontWeight: FontWeight.bold,
+                          color: fgColor,
+                        ),
+                      ),
+                    ),
+                  // Network image with proper error handling
+                  Image.network(
+                    widget.photoUrl!,
+                    width: size,
+                    height: size,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) {
+                        // Image loaded successfully
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted && !_imageLoaded) {
+                            setState(() => _imageLoaded = true);
+                          }
+                        });
+                        return child;
+                      }
+                      // Still loading - show nothing (initials are behind)
+                      return const SizedBox.shrink();
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      // Error loading image - will show initials
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted && !_imageError) {
+                          setState(() => _imageError = true);
+                        }
+                      });
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                ],
+              ),
+            )
+          : Center(
+              child: Text(
+                widget.initials,
+                style: TextStyle(
+                  fontSize: widget.radius * 0.7,
+                  fontWeight: FontWeight.bold,
+                  color: fgColor,
+                ),
+              ),
+            ),
+    );
+
+    if (widget.borderWidth != null && widget.borderWidth! > 0) {
       return Container(
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           border: Border.all(
-            color: borderColor ?? Colors.amber,
-            width: borderWidth!,
+            color: widget.borderColor ?? Colors.amber,
+            width: widget.borderWidth!,
           ),
         ),
         child: avatar,

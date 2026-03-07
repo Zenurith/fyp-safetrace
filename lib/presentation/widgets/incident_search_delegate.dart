@@ -15,16 +15,15 @@ class IncidentSearchDelegate extends SearchDelegate<IncidentModel?> {
   @override
   ThemeData appBarTheme(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     return theme.copyWith(
       appBarTheme: AppBarTheme(
-        backgroundColor: isDark ? AppTheme.darkSurface : Colors.white,
-        foregroundColor: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+        backgroundColor: Colors.white,
+        foregroundColor: AppTheme.primaryDark,
         elevation: 0,
       ),
       inputDecorationTheme: InputDecorationTheme(
         hintStyle: TextStyle(
-          color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+          color: AppTheme.textSecondary,
         ),
         border: InputBorder.none,
       ),
@@ -98,7 +97,6 @@ class IncidentSearchDelegate extends SearchDelegate<IncidentModel?> {
   }
 
   Widget _buildEmptyState(BuildContext context, String message) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -106,14 +104,14 @@ class IncidentSearchDelegate extends SearchDelegate<IncidentModel?> {
           Icon(
             Icons.search,
             size: 64,
-            color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+            color: AppTheme.textSecondary,
           ),
           const SizedBox(height: 16),
           Text(
             message,
             style: TextStyle(
               fontFamily: AppTheme.fontFamily,
-              color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+              color: AppTheme.textSecondary,
             ),
             textAlign: TextAlign.center,
           ),
@@ -136,8 +134,6 @@ class _IncidentSearchTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
@@ -172,7 +168,7 @@ class _IncidentSearchTile extends StatelessWidget {
                         fontFamily: AppTheme.fontFamily,
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
-                        color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                        color: AppTheme.primaryDark,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -203,9 +199,7 @@ class _IncidentSearchTile extends StatelessWidget {
                             style: TextStyle(
                               fontFamily: AppTheme.fontFamily,
                               fontSize: 12,
-                              color: isDark
-                                  ? AppTheme.darkTextSecondary
-                                  : AppTheme.textSecondary,
+                              color: AppTheme.textSecondary,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -219,9 +213,7 @@ class _IncidentSearchTile extends StatelessWidget {
                       style: TextStyle(
                         fontFamily: AppTheme.fontFamily,
                         fontSize: 11,
-                        color: isDark
-                            ? AppTheme.darkTextSecondary
-                            : AppTheme.textSecondary,
+                        color: AppTheme.textSecondary,
                       ),
                     ),
                   ],
@@ -229,7 +221,7 @@ class _IncidentSearchTile extends StatelessWidget {
               ),
               Icon(
                 Icons.chevron_right,
-                color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                color: AppTheme.textSecondary,
               ),
             ],
           ),

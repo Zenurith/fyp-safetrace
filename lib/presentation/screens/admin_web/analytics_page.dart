@@ -17,7 +17,6 @@ class AnalyticsPage extends StatelessWidget {
     final incidentProvider = context.watch<IncidentProvider>();
     final incidents = incidentProvider.allIncidents;
     final analytics = AnalyticsService.calculateAnalytics(incidents);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final columns = ResponsiveLayout.getGridColumns(context);
     final isDesktop = ResponsiveLayout.isDesktop(context);
 
@@ -30,7 +29,7 @@ class AnalyticsPage extends StatelessWidget {
           Text(
             'Key Metrics',
             style: AppTheme.headingMedium.copyWith(
-              color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+              color: AppTheme.primaryDark,
             ),
           ),
           const SizedBox(height: 16),
@@ -88,7 +87,7 @@ class AnalyticsPage extends StatelessWidget {
           Text(
             'Trends & Distribution',
             style: AppTheme.headingMedium.copyWith(
-              color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+              color: AppTheme.primaryDark,
             ),
           ),
           const SizedBox(height: 16),
@@ -103,7 +102,7 @@ class AnalyticsPage extends StatelessWidget {
                 Text(
                   'Incident Trend (Last 7 Days)',
                   style: AppTheme.headingSmall.copyWith(
-                    color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                    color: AppTheme.primaryDark,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -131,9 +130,7 @@ class AnalyticsPage extends StatelessWidget {
                         Text(
                           'By Category',
                           style: AppTheme.headingSmall.copyWith(
-                            color: isDark
-                                ? AppTheme.darkTextPrimary
-                                : AppTheme.primaryDark,
+                            color: AppTheme.primaryDark,
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -156,9 +153,7 @@ class AnalyticsPage extends StatelessWidget {
                         Text(
                           'By Severity',
                           style: AppTheme.headingSmall.copyWith(
-                            color: isDark
-                                ? AppTheme.darkTextPrimary
-                                : AppTheme.primaryDark,
+                            color: AppTheme.primaryDark,
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -183,7 +178,7 @@ class AnalyticsPage extends StatelessWidget {
                   Text(
                     'By Category',
                     style: AppTheme.headingSmall.copyWith(
-                      color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                      color: AppTheme.primaryDark,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -204,7 +199,7 @@ class AnalyticsPage extends StatelessWidget {
                   Text(
                     'By Severity',
                     style: AppTheme.headingSmall.copyWith(
-                      color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                      color: AppTheme.primaryDark,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -222,7 +217,7 @@ class AnalyticsPage extends StatelessWidget {
           Text(
             'Summary',
             style: AppTheme.headingMedium.copyWith(
-              color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+              color: AppTheme.primaryDark,
             ),
           ),
           const SizedBox(height: 16),
@@ -236,7 +231,6 @@ class AnalyticsPage extends StatelessWidget {
                   label: 'Total incidents reported',
                   value: '${analytics.totalIncidents}',
                   icon: Icons.warning_amber_rounded,
-                  isDark: isDark,
                 ),
                 const Divider(height: 24),
                 _SummaryRow(
@@ -245,28 +239,24 @@ class AnalyticsPage extends StatelessWidget {
                       ? '${((analytics.resolvedIncidents / analytics.totalIncidents) * 100).toStringAsFixed(1)}%'
                       : 'N/A',
                   icon: Icons.check_circle_outline,
-                  isDark: isDark,
                 ),
                 const Divider(height: 24),
                 _SummaryRow(
                   label: 'Average time to resolution',
                   value: '${analytics.averageResolutionDays.toStringAsFixed(1)} days',
                   icon: Icons.timer_outlined,
-                  isDark: isDark,
                 ),
                 const Divider(height: 24),
                 _SummaryRow(
                   label: 'Most active period',
                   value: 'Last 7 days: ${analytics.incidentsLast7d} incidents',
                   icon: Icons.trending_up,
-                  isDark: isDark,
                 ),
                 const Divider(height: 24),
                 _SummaryRow(
                   label: 'Current active incidents',
                   value: '${analytics.activeIncidents}',
                   icon: Icons.pending_actions,
-                  isDark: isDark,
                 ),
               ],
             ),
@@ -282,13 +272,10 @@ class _SummaryRow extends StatelessWidget {
   final String label;
   final String value;
   final IconData icon;
-  final bool isDark;
-
   const _SummaryRow({
     required this.label,
     required this.value,
     required this.icon,
-    required this.isDark,
   });
 
   @override
@@ -298,21 +285,21 @@ class _SummaryRow extends StatelessWidget {
         Icon(
           icon,
           size: 20,
-          color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+          color: AppTheme.textSecondary,
         ),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
             label,
             style: AppTheme.bodyMedium.copyWith(
-              color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+              color: AppTheme.textSecondary,
             ),
           ),
         ),
         Text(
           value,
           style: AppTheme.headingSmall.copyWith(
-            color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+            color: AppTheme.primaryDark,
           ),
         ),
       ],

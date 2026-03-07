@@ -77,8 +77,6 @@ class _IncidentsManagementPageState extends State<IncidentsManagementPage> {
     final categoryProvider = context.watch<CategoryProvider>();
     final allIncidents = incidentProvider.allIncidents;
     final incidents = _filterIncidents(allIncidents);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     final categoryNames = categoryProvider.categories.map((c) => c.name).toList();
 
     return Column(
@@ -87,10 +85,10 @@ class _IncidentsManagementPageState extends State<IncidentsManagementPage> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: isDark ? AppTheme.darkSurface : Colors.white,
+            color: Colors.white,
             border: Border(
               bottom: BorderSide(
-                color: isDark ? AppTheme.darkCardBorder : AppTheme.cardBorder,
+                color: AppTheme.cardBorder,
               ),
             ),
           ),
@@ -102,25 +100,25 @@ class _IncidentsManagementPageState extends State<IncidentsManagementPage> {
                 child: TextField(
                   onChanged: (value) => setState(() => _searchQuery = value),
                   style: AppTheme.bodyMedium.copyWith(
-                    color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                    color: AppTheme.primaryDark,
                   ),
                   decoration: InputDecoration(
                     hintText: 'Search by title or location...',
                     hintStyle: AppTheme.bodyMedium.copyWith(
-                      color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                      color: AppTheme.textSecondary,
                     ),
-                    prefixIcon: Icon(Icons.search, size: 20, color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary),
+                    prefixIcon: Icon(Icons.search, size: 20, color: AppTheme.textSecondary),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                       borderSide: BorderSide(
-                        color: isDark ? AppTheme.darkCardBorder : AppTheme.cardBorder,
+                        color: AppTheme.cardBorder,
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                       borderSide: BorderSide(
-                        color: isDark ? AppTheme.darkCardBorder : AppTheme.cardBorder,
+                        color: AppTheme.cardBorder,
                       ),
                     ),
                   ),
@@ -212,7 +210,7 @@ class _IncidentsManagementPageState extends State<IncidentsManagementPage> {
           child: Text(
             '${incidents.length} incidents',
             style: AppTheme.caption.copyWith(
-              color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+              color: AppTheme.textSecondary,
             ),
           ),
         ),
@@ -257,27 +255,25 @@ class _IncidentsManagementPageState extends State<IncidentsManagementPage> {
     required List<DropdownMenuItem<T>> items,
     required ValueChanged<T?> onChanged,
   }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: isDark ? AppTheme.darkCardBorder : AppTheme.cardBorder,
+          color: AppTheme.cardBorder,
         ),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<T>(
           value: value,
           hint: Text(hint, style: AppTheme.bodyMedium.copyWith(
-            color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+            color: AppTheme.textSecondary,
           )),
           style: AppTheme.bodyMedium.copyWith(
-            color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+            color: AppTheme.primaryDark,
           ),
-          dropdownColor: isDark ? AppTheme.darkSurface : Colors.white,
-          iconEnabledColor: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+          dropdownColor: Colors.white,
+          iconEnabledColor: AppTheme.textSecondary,
           items: items,
           onChanged: onChanged,
         ),
@@ -319,8 +315,6 @@ class _IncidentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: AppTheme.cardDecorationFor(context),
@@ -350,7 +344,7 @@ class _IncidentCard extends StatelessWidget {
                 Text(
                   incident.title,
                   style: AppTheme.headingSmall.copyWith(
-                    color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                    color: AppTheme.primaryDark,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -361,14 +355,14 @@ class _IncidentCard extends StatelessWidget {
                     Icon(
                       Icons.location_on_outlined,
                       size: 14,
-                      color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                      color: AppTheme.textSecondary,
                     ),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
                         incident.address,
                         style: AppTheme.caption.copyWith(
-                          color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                          color: AppTheme.textSecondary,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -394,6 +388,56 @@ class _IncidentCard extends StatelessWidget {
             color: AppTheme.severityColor(incident.severityLabel),
           ),
           const SizedBox(width: 12),
+
+          // Image verification badge
+          if (incident.verificationScore != null) ...[
+            Tooltip(
+              message: incident.verificationNote ?? 'No details',
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: (incident.imageVerified == true
+                          ? AppTheme.successGreen
+                          : AppTheme.warningOrange)
+                      .withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: (incident.imageVerified == true
+                            ? AppTheme.successGreen
+                            : AppTheme.warningOrange)
+                        .withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      incident.imageVerified == true
+                          ? Icons.verified
+                          : Icons.image_not_supported_outlined,
+                      size: 12,
+                      color: incident.imageVerified == true
+                          ? AppTheme.successGreen
+                          : AppTheme.warningOrange,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${(incident.verificationScore! * 100).toInt()}%',
+                      style: TextStyle(
+                        fontFamily: AppTheme.fontFamily,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: incident.imageVerified == true
+                            ? AppTheme.successGreen
+                            : AppTheme.warningOrange,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
 
           // Votes
           Column(
@@ -740,8 +784,6 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -750,13 +792,13 @@ class _ActionButton extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isDark ? AppTheme.darkCardBorder : AppTheme.cardBorder,
+            color: AppTheme.cardBorder,
           ),
         ),
         child: Icon(
           icon,
           size: 18,
-          color: color ?? (isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark),
+          color: color ?? (AppTheme.primaryDark),
         ),
       ),
     );

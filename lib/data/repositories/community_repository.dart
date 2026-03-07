@@ -127,13 +127,18 @@ class CommunityRepository {
 
   // ==================== Membership Management ====================
 
-  /// Request to join a community (auto-approved for testing)
+  /// Request to join a community.
+  /// Auto-approves if community doesn't require approval, otherwise creates a pending request.
   Future<String> requestToJoin(String communityId, String userId) async {
     // Check if already a member or has pending request
     final existingMembership = await _membersCollection
         .where('communityId', isEqualTo: communityId)
         .where('userId', isEqualTo: userId)
         .get();
+
+    // Check if community requires approval
+    final communityDoc = await _communitiesCollection.doc(communityId).get();
+    final requiresApproval = communityDoc.data()?['requiresApproval'] ?? false;
 
     if (existingMembership.docs.isNotEmpty) {
       final member = CommunityMemberModel.fromMap(
@@ -143,38 +148,49 @@ class CommunityRepository {
       if (member.isApproved) {
         throw Exception('Already a member of this community');
       }
-      // Auto-approve: update existing record to approved
-      await _membersCollection.doc(existingMembership.docs.first.id).update({
-        'status': MemberStatus.approved.index,
-        'requestedAt': Timestamp.now(),
-        'approvedAt': Timestamp.now(),
-        'approvedBy': 'auto',
-      });
-      // Increment member count
-      await _communitiesCollection.doc(communityId).update({
-        'memberCount': FieldValue.increment(1),
-      });
+      if (member.isPending) {
+        throw Exception('Join request already pending');
+      }
+
+      if (requiresApproval) {
+        // Set to pending for admin approval
+        await _membersCollection.doc(existingMembership.docs.first.id).update({
+          'status': MemberStatus.pending.index,
+          'requestedAt': Timestamp.now(),
+        });
+      } else {
+        // Auto-approve
+        await _membersCollection.doc(existingMembership.docs.first.id).update({
+          'status': MemberStatus.approved.index,
+          'requestedAt': Timestamp.now(),
+          'approvedAt': Timestamp.now(),
+          'approvedBy': 'auto',
+        });
+        await _communitiesCollection.doc(communityId).update({
+          'memberCount': FieldValue.increment(1),
+        });
+      }
       return existingMembership.docs.first.id;
     }
 
-    // Auto-approve: create as approved member directly
     final member = CommunityMemberModel(
       id: '',
       communityId: communityId,
       userId: userId,
-      status: MemberStatus.approved,
+      status: requiresApproval ? MemberStatus.pending : MemberStatus.approved,
       role: MemberRole.member,
       requestedAt: DateTime.now(),
-      approvedAt: DateTime.now(),
-      approvedBy: 'auto',
+      approvedAt: requiresApproval ? null : DateTime.now(),
+      approvedBy: requiresApproval ? null : 'auto',
     );
 
     final docRef = await _membersCollection.add(member.toMap());
 
-    // Increment member count
-    await _communitiesCollection.doc(communityId).update({
-      'memberCount': FieldValue.increment(1),
-    });
+    if (!requiresApproval) {
+      await _communitiesCollection.doc(communityId).update({
+        'memberCount': FieldValue.increment(1),
+      });
+    }
 
     return docRef.id;
   }

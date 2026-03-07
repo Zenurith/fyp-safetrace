@@ -143,7 +143,6 @@ class _UserModerationDialogState extends State<UserModerationDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final user = widget.user;
 
     return AlertDialog(
@@ -168,7 +167,7 @@ class _UserModerationDialogState extends State<UserModerationDialog> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isDark ? AppTheme.darkSurface : AppTheme.backgroundGrey,
+                color: AppTheme.backgroundGrey,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Column(
@@ -209,7 +208,7 @@ class _UserModerationDialogState extends State<UserModerationDialog> {
                           'Reason: ${user.banReason}',
                           style: TextStyle(
                             fontSize: 12,
-                            color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                            color: AppTheme.textSecondary,
                           ),
                         ),
                       ),
@@ -249,7 +248,7 @@ class _UserModerationDialogState extends State<UserModerationDialog> {
               Text(
                 'This user is currently banned.',
                 style: TextStyle(
-                  color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                  color: AppTheme.textSecondary,
                 ),
               ),
               const SizedBox(height: 12),
@@ -268,7 +267,7 @@ class _UserModerationDialogState extends State<UserModerationDialog> {
               Text(
                 'This user is currently suspended.',
                 style: TextStyle(
-                  color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                  color: AppTheme.textSecondary,
                 ),
               ),
               const SizedBox(height: 12),
@@ -289,7 +288,7 @@ class _UserModerationDialogState extends State<UserModerationDialog> {
                 'Suspend User',
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
-                  color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                  color: AppTheme.primaryDark,
                 ),
               ),
               const SizedBox(height: 8),
@@ -328,7 +327,7 @@ class _UserModerationDialogState extends State<UserModerationDialog> {
                 'Ban User (Permanent)',
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
-                  color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                  color: AppTheme.primaryDark,
                 ),
               ),
               const SizedBox(height: 8),
@@ -375,9 +374,7 @@ class _UserModerationDialogState extends State<UserModerationDialog> {
             label,
             style: TextStyle(
               fontSize: 12,
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? AppTheme.darkTextSecondary
-                  : AppTheme.textSecondary,
+              color: AppTheme.textSecondary,
             ),
           ),
           Text(

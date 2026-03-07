@@ -38,8 +38,6 @@ class _FlagsManagementPageState extends State<FlagsManagementPage>
   @override
   Widget build(BuildContext context) {
     final flagProvider = context.watch<FlagProvider>();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     final pendingFlags = flagProvider.pendingFlags;
     final allFlags = flagProvider.flags;
     final reviewedFlags = allFlags.where((f) => f.status != FlagStatus.pending).toList();
@@ -49,17 +47,17 @@ class _FlagsManagementPageState extends State<FlagsManagementPage>
         // Tab bar
         Container(
           decoration: BoxDecoration(
-            color: isDark ? AppTheme.darkSurface : Colors.white,
+            color: Colors.white,
             border: Border(
               bottom: BorderSide(
-                color: isDark ? AppTheme.darkCardBorder : AppTheme.cardBorder,
+                color: AppTheme.cardBorder,
               ),
             ),
           ),
           child: TabBar(
             controller: _tabController,
             labelColor: AppTheme.primaryRed,
-            unselectedLabelColor: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+            unselectedLabelColor: AppTheme.textSecondary,
             indicatorColor: AppTheme.primaryRed,
             indicatorWeight: 3,
             labelStyle: const TextStyle(
@@ -170,8 +168,6 @@ class _FlagCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: AppTheme.cardDecorationFor(context),
@@ -206,9 +202,7 @@ class _FlagCard extends StatelessWidget {
                         Text(
                           flag.targetTypeLabel,
                           style: AppTheme.headingSmall.copyWith(
-                            color: isDark
-                                ? AppTheme.darkTextPrimary
-                                : AppTheme.primaryDark,
+                            color: AppTheme.primaryDark,
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -219,9 +213,7 @@ class _FlagCard extends StatelessWidget {
                     Text(
                       'Reported by ${flag.reporterName} • ${flag.timeAgo}',
                       style: AppTheme.caption.copyWith(
-                        color: isDark
-                            ? AppTheme.darkTextSecondary
-                            : AppTheme.textSecondary,
+                        color: AppTheme.textSecondary,
                       ),
                     ),
                   ],
@@ -264,9 +256,7 @@ class _FlagCard extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: isDark
-                  ? AppTheme.darkCardBorder.withValues(alpha: 0.3)
-                  : AppTheme.backgroundGrey,
+              color: AppTheme.backgroundGrey,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
@@ -276,16 +266,14 @@ class _FlagCard extends StatelessWidget {
                   'Reason',
                   style: AppTheme.caption.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: isDark
-                        ? AppTheme.darkTextSecondary
-                        : AppTheme.textSecondary,
+                    color: AppTheme.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   flag.reason,
                   style: AppTheme.bodyMedium.copyWith(
-                    color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                    color: AppTheme.primaryDark,
                   ),
                 ),
                 if (flag.details != null && flag.details!.isNotEmpty) ...[
@@ -293,9 +281,7 @@ class _FlagCard extends StatelessWidget {
                   Text(
                     flag.details!,
                     style: AppTheme.bodyMedium.copyWith(
-                      color: isDark
-                          ? AppTheme.darkTextSecondary
-                          : AppTheme.textSecondary,
+                      color: AppTheme.textSecondary,
                     ),
                   ),
                 ],
@@ -330,7 +316,7 @@ class _FlagCard extends StatelessWidget {
                   Text(
                     flag.resolutionNote!,
                     style: AppTheme.bodyMedium.copyWith(
-                      color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                      color: AppTheme.primaryDark,
                     ),
                   ),
                 ],
@@ -345,7 +331,7 @@ class _FlagCard extends StatelessWidget {
               Text(
                 'Target ID: ',
                 style: AppTheme.caption.copyWith(
-                  color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                  color: AppTheme.textSecondary,
                 ),
               ),
               Expanded(
@@ -353,7 +339,7 @@ class _FlagCard extends StatelessWidget {
                   flag.targetId,
                   style: AppTheme.caption.copyWith(
                     fontFamily: 'monospace',
-                    color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                    color: AppTheme.textSecondary,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),

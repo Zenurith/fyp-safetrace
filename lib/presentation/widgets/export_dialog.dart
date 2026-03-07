@@ -66,7 +66,6 @@ class _ExportDialogState extends State<ExportDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final incidents = context.watch<IncidentProvider>().allIncidents;
 
     return AlertDialog(
@@ -84,7 +83,7 @@ class _ExportDialogState extends State<ExportDialog> {
           Text(
             '${incidents.length} incidents will be exported',
             style: TextStyle(
-              color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+              color: AppTheme.textSecondary,
             ),
           ),
           const SizedBox(height: 20),
@@ -92,7 +91,7 @@ class _ExportDialogState extends State<ExportDialog> {
             'Select format:',
             style: TextStyle(
               fontWeight: FontWeight.w600,
-              color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+              color: AppTheme.primaryDark,
             ),
           ),
           const SizedBox(height: 12),
@@ -140,8 +139,6 @@ class _ExportOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -149,7 +146,7 @@ class _ExportOption extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           border: Border.all(
-            color: isDark ? AppTheme.darkCardBorder : AppTheme.cardBorder,
+            color: AppTheme.cardBorder,
           ),
           borderRadius: BorderRadius.circular(12),
         ),
@@ -173,7 +170,7 @@ class _ExportOption extends StatelessWidget {
                     style: TextStyle(
                       fontFamily: AppTheme.fontFamily,
                       fontWeight: FontWeight.w600,
-                      color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                      color: AppTheme.primaryDark,
                     ),
                   ),
                   Text(
@@ -181,7 +178,7 @@ class _ExportOption extends StatelessWidget {
                     style: TextStyle(
                       fontFamily: AppTheme.fontFamily,
                       fontSize: 12,
-                      color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                      color: AppTheme.textSecondary,
                     ),
                   ),
                 ],
@@ -196,7 +193,7 @@ class _ExportOption extends StatelessWidget {
             else
               Icon(
                 Icons.chevron_right,
-                color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                color: AppTheme.textSecondary,
               ),
           ],
         ),

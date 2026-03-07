@@ -53,7 +53,6 @@ class _AdminWebShellState extends State<AdminWebShell> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final isMobile = ResponsiveLayout.isMobile(context);
 
     // Auto-collapse sidebar on mobile
@@ -66,7 +65,7 @@ class _AdminWebShellState extends State<AdminWebShell> {
     }
 
     return Scaffold(
-      backgroundColor: isDark ? AppTheme.darkBackground : AppTheme.backgroundGrey,
+      backgroundColor: AppTheme.backgroundGrey,
       body: Row(
         children: [
           // Sidebar
@@ -92,14 +91,16 @@ class _AdminWebShellState extends State<AdminWebShell> {
                 Expanded(
                   child: IndexedStack(
                     index: _selectedIndex,
-                    children: const [
-                      AdminDashboardPage(),
-                      UsersManagementPage(),
-                      IncidentsManagementPage(),
-                      CategoriesManagementPage(),
-                      CommunitiesManagementPage(),
-                      FlagsManagementPage(),
-                      AnalyticsPage(),
+                    children: [
+                      AdminDashboardPage(
+                        onNavigate: (index) => setState(() => _selectedIndex = index),
+                      ),
+                      const UsersManagementPage(),
+                      const IncidentsManagementPage(),
+                      const CategoriesManagementPage(),
+                      const CommunitiesManagementPage(),
+                      const FlagsManagementPage(),
+                      const AnalyticsPage(),
                     ],
                   ),
                 ),

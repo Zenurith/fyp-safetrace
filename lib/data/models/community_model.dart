@@ -12,6 +12,7 @@ class CommunityModel {
   final String address;
   final int memberCount;
   final bool isPublic;
+  final bool requiresApproval;
   final DateTime createdAt;
   final String? imageUrl;
 
@@ -26,6 +27,7 @@ class CommunityModel {
     required this.address,
     this.memberCount = 1,
     this.isPublic = true,
+    this.requiresApproval = false,
     required this.createdAt,
     this.imageUrl,
   });
@@ -72,6 +74,7 @@ class CommunityModel {
       'address': address,
       'memberCount': memberCount,
       'isPublic': isPublic,
+      'requiresApproval': requiresApproval,
       'createdAt': Timestamp.fromDate(createdAt),
       'imageUrl': imageUrl,
     };
@@ -89,6 +92,7 @@ class CommunityModel {
       address: map['address'] ?? '',
       memberCount: map['memberCount'] ?? 1,
       isPublic: map['isPublic'] ?? true,
+      requiresApproval: map['requiresApproval'] ?? false,
       createdAt: map['createdAt'] is Timestamp
           ? (map['createdAt'] as Timestamp).toDate()
           : DateTime.now(),
@@ -107,6 +111,7 @@ class CommunityModel {
     String? address,
     int? memberCount,
     bool? isPublic,
+    bool? requiresApproval,
     DateTime? createdAt,
     String? imageUrl,
   }) {
@@ -121,6 +126,7 @@ class CommunityModel {
       address: address ?? this.address,
       memberCount: memberCount ?? this.memberCount,
       isPublic: isPublic ?? this.isPublic,
+      requiresApproval: requiresApproval ?? this.requiresApproval,
       createdAt: createdAt ?? this.createdAt,
       imageUrl: imageUrl ?? this.imageUrl,
     );

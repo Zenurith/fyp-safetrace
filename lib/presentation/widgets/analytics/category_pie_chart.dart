@@ -36,8 +36,6 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     if (widget.data.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(16),
@@ -47,7 +45,7 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
           child: Text(
             'No data available',
             style: TextStyle(
-              color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+              color: AppTheme.textSecondary,
             ),
           ),
         ),
@@ -66,7 +64,7 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
               fontFamily: AppTheme.fontFamily,
               fontSize: 14,
               fontWeight: FontWeight.w700,
-              color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+              color: AppTheme.primaryDark,
             ),
           ),
           const SizedBox(height: 16),
@@ -122,9 +120,7 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
                             style: TextStyle(
                               fontFamily: AppTheme.fontFamily,
                               fontSize: 11,
-                              color: isDark
-                                  ? AppTheme.darkTextSecondary
-                                  : AppTheme.textSecondary,
+                              color: AppTheme.textSecondary,
                             ),
                           ),
                         ],

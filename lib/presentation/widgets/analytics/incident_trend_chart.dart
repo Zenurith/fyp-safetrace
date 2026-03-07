@@ -11,8 +11,6 @@ class IncidentTrendChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     if (data.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(16),
@@ -22,7 +20,7 @@ class IncidentTrendChart extends StatelessWidget {
           child: Text(
             'No data available',
             style: TextStyle(
-              color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+              color: AppTheme.textSecondary,
             ),
           ),
         ),
@@ -44,7 +42,7 @@ class IncidentTrendChart extends StatelessWidget {
               fontFamily: AppTheme.fontFamily,
               fontSize: 14,
               fontWeight: FontWeight.w700,
-              color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+              color: AppTheme.primaryDark,
             ),
           ),
           const SizedBox(height: 16),
@@ -58,7 +56,7 @@ class IncidentTrendChart extends StatelessWidget {
                   horizontalInterval: 1,
                   getDrawingHorizontalLine: (value) {
                     return FlLine(
-                      color: isDark ? AppTheme.darkCardBorder : AppTheme.cardBorder,
+                      color: AppTheme.cardBorder,
                       strokeWidth: 1,
                     );
                   },
@@ -85,7 +83,7 @@ class IncidentTrendChart extends StatelessWidget {
                             style: TextStyle(
                               fontFamily: AppTheme.fontFamily,
                               fontSize: 10,
-                              color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                              color: AppTheme.textSecondary,
                             ),
                           ),
                         );
@@ -104,7 +102,7 @@ class IncidentTrendChart extends StatelessWidget {
                             style: TextStyle(
                               fontFamily: AppTheme.fontFamily,
                               fontSize: 10,
-                              color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                              color: AppTheme.textSecondary,
                             ),
                           );
                         }

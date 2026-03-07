@@ -60,8 +60,6 @@ class _CommentsSectionState extends State<CommentsSection> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Consumer<CommentProvider>(
       builder: (context, provider, _) {
         final comments = provider.getComments(widget.incidentId);
@@ -79,7 +77,7 @@ class _CommentsSectionState extends State<CommentsSection> {
                     Icon(
                       Icons.comment_outlined,
                       size: 18,
-                      color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                      color: AppTheme.textSecondary,
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -87,7 +85,7 @@ class _CommentsSectionState extends State<CommentsSection> {
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                        color: AppTheme.primaryDark,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -109,7 +107,7 @@ class _CommentsSectionState extends State<CommentsSection> {
                     const Spacer(),
                     Icon(
                       _isExpanded ? Icons.expand_less : Icons.expand_more,
-                      color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                      color: AppTheme.textSecondary,
                     ),
                   ],
                 ),
@@ -137,7 +135,7 @@ class _CommentsSectionState extends State<CommentsSection> {
                     child: Text(
                       'No comments yet. Be the first to comment!',
                       style: TextStyle(
-                        color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                        color: AppTheme.textSecondary,
                         fontStyle: FontStyle.italic,
                       ),
                     ),
@@ -231,7 +229,6 @@ class _CommentInput extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<UserProvider>().currentUser;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -252,10 +249,10 @@ class _CommentInput extends StatelessWidget {
             decoration: InputDecoration(
               hintText: 'Add a comment...',
               hintStyle: TextStyle(
-                color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                color: AppTheme.textSecondary,
               ),
               filled: true,
-              fillColor: isDark ? AppTheme.darkSurface : AppTheme.backgroundGrey,
+              fillColor: AppTheme.backgroundGrey,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(20),
                 borderSide: BorderSide.none,
@@ -292,7 +289,6 @@ class _CommentTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final currentUser = context.watch<UserProvider>().currentUser;
     final isOwner = currentUser?.id == comment.authorId;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -316,7 +312,7 @@ class _CommentTile extends StatelessWidget {
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
-                      color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                      color: AppTheme.primaryDark,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -324,7 +320,7 @@ class _CommentTile extends StatelessWidget {
                     comment.timeAgo,
                     style: TextStyle(
                       fontSize: 11,
-                      color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                      color: AppTheme.textSecondary,
                     ),
                   ),
                 ],
@@ -334,7 +330,7 @@ class _CommentTile extends StatelessWidget {
                 comment.content,
                 style: TextStyle(
                   fontSize: 14,
-                  color: isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                  color: AppTheme.primaryDark,
                 ),
               ),
             ],
@@ -345,7 +341,7 @@ class _CommentTile extends StatelessWidget {
             icon: Icon(
               Icons.more_vert,
               size: 18,
-              color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+              color: AppTheme.textSecondary,
             ),
             onSelected: (value) {
               if (value == 'delete') {

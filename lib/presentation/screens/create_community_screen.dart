@@ -26,6 +26,7 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
   bool _loadingLocation = false;
   bool _isSubmitting = false;
   bool _isPublic = true;
+  bool _requiresApproval = false;
 
   @override
   void initState() {
@@ -87,6 +88,7 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
         radius: double.tryParse(_radiusController.text) ?? 2.0,
         address: _address,
         isPublic: _isPublic,
+        requiresApproval: _requiresApproval,
       );
 
       if (communityId != null && mounted) {
@@ -319,6 +321,50 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
                           value: _isPublic,
                           activeColor: AppTheme.successGreen,
                           onChanged: (v) => setState(() => _isPublic = v),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Requires Approval Toggle
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.cardBorder),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _requiresApproval ? Icons.admin_panel_settings : Icons.how_to_reg,
+                          color: _requiresApproval
+                              ? AppTheme.warningOrange
+                              : AppTheme.successGreen,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _requiresApproval ? 'Admin Approval Required' : 'Auto-Approve Members',
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              Text(
+                                _requiresApproval
+                                    ? 'New members need admin approval to join'
+                                    : 'Anyone can join instantly',
+                                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Switch(
+                          value: _requiresApproval,
+                          activeColor: AppTheme.warningOrange,
+                          onChanged: (v) => setState(() => _requiresApproval = v),
                         ),
                       ],
                     ),

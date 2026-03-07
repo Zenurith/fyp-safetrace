@@ -22,7 +22,9 @@
       "Bash(flutter test)",
       "Bash(flutter build:*)",
       "WebSearch",
-      "Bash(flutter devices:*)"
+      "Bash(flutter devices:*)",
+      "Bash(npm update:*)",
+      "Bash(flutter test:*)"
     ]
   }
 }
