@@ -191,12 +191,14 @@ class VoteRepository {
     final voteRef = _votesCollection.doc(voteDocId);
     final incidentRef = _incidentsCollection.doc(incidentId);
     final reporterRef = _usersCollection.doc(reporterId);
+    final voterRef = _usersCollection.doc(voterId);
 
     final result = await _firestore.runTransaction<VoteModel?>((transaction) async {
       // Read all documents first
       final existingVoteDoc = await transaction.get(voteRef);
       final incidentDoc = await transaction.get(incidentRef);
       final reporterDoc = await transaction.get(reporterRef);
+      final voterDoc = await transaction.get(voterRef);
 
       if (!existingVoteDoc.exists) {
         return null;
@@ -230,17 +232,20 @@ class VoteRepository {
         final currentDownvotes = incidentData['downvotes'] ?? 0;
         final currentStatus = IncidentStatus.values[incidentData['status'] ?? 0];
 
+        // Use voter's current weight so trusted users' vote changes are counted correctly
+        final weight = _getVoteWeight(voterDoc.exists ? voterDoc.data() : null);
+
         int newUpvotes;
         int newDownvotes;
 
         if (newType == VoteType.upvote) {
           // Changed from downvote to upvote
-          newUpvotes = currentUpvotes + 1;
-          newDownvotes = (currentDownvotes - 1).clamp(0, double.infinity).toInt();
+          newUpvotes = currentUpvotes + weight;
+          newDownvotes = (currentDownvotes - weight).clamp(0, double.infinity).toInt();
         } else {
           // Changed from upvote to downvote
-          newUpvotes = (currentUpvotes - 1).clamp(0, double.infinity).toInt();
-          newDownvotes = currentDownvotes + 1;
+          newUpvotes = (currentUpvotes - weight).clamp(0, double.infinity).toInt();
+          newDownvotes = currentDownvotes + weight;
         }
 
         // Calculate if status should auto-change
@@ -324,15 +329,18 @@ class VoteRepository {
         final currentDownvotes = incidentData['downvotes'] ?? 0;
         final currentStatus = IncidentStatus.values[incidentData['status'] ?? 0];
 
+        // Use voter's current weight to reverse their contribution
+        final weight = _getVoteWeight(voterDoc.exists ? voterDoc.data() : null);
+
         int newUpvotes;
         int newDownvotes;
 
         if (existingVote.type == VoteType.upvote) {
-          newUpvotes = (currentUpvotes - 1).clamp(0, double.infinity).toInt();
+          newUpvotes = (currentUpvotes - weight).clamp(0, double.infinity).toInt();
           newDownvotes = currentDownvotes;
         } else {
           newUpvotes = currentUpvotes;
-          newDownvotes = (currentDownvotes - 1).clamp(0, double.infinity).toInt();
+          newDownvotes = (currentDownvotes - weight).clamp(0, double.infinity).toInt();
         }
 
         // Calculate if status should auto-change (e.g., downgrade if upvotes removed)

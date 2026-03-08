@@ -2,26 +2,62 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Incident media - authenticated users can upload, anyone authenticated can view
+
+    // ─── Incident media ──────────────────────────────────────────────────────
+    // Path: incidents/{incidentId}/images/{fileName}
+    //       incidents/{incidentId}/videos/{fileName}
     match /incidents/{incidentId}/{folder}/{fileName} {
+      // Any authenticated user can view incident evidence
       allow read: if request.auth != null;
+
+      // Authenticated users can upload to valid sub-folders only
+      // Images: max 10 MB, must be an image MIME type
       allow write: if request.auth != null
-                   && request.resource.size < 10 * 1024 * 1024  // Max 10MB
-                   && (folder == 'images' || folder == 'videos');
+        && folder == 'images'
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+
+      // Videos: max 50 MB, must be a video MIME type
+      allow write: if request.auth != null
+        && folder == 'videos'
+        && request.resource.size < 50 * 1024 * 1024
+        && request.resource.contentType.matches('video/.*');
+
+      // Allow deletion (for cleanup when incident is removed)
+      allow delete: if request.auth != null;
     }
 
-    // Profile photos - users can manage their own
+    // ─── Profile photos ──────────────────────────────────────────────────────
+    // Path: profile_photos/{userId}/{fileName}
     match /profile_photos/{userId}/{fileName} {
+      // Anyone authenticated can view profile photos
       allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId
-                   && request.resource.size < 5 * 1024 * 1024;  // Max 5MB
+
+      // Only the user themselves can upload/replace their photo
+      // Max 5 MB, must be an image
+      allow write: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+
+      // User can delete their own photo
+      allow delete: if request.auth != null
+        && request.auth.uid == userId;
     }
 
-    // Community media
+    // ─── Community media ─────────────────────────────────────────────────────
+    // Path: communities/{communityId}/...
     match /communities/{communityId}/{allPaths=**} {
       allow read: if request.auth != null;
+
+      // Authenticated users can upload community media
+      // Max 10 MB, images and videos only
       allow write: if request.auth != null
-                   && request.resource.size < 10 * 1024 * 1024;
+        && request.resource.size < 10 * 1024 * 1024
+        && (request.resource.contentType.matches('image/.*')
+            || request.resource.contentType.matches('video/.*'));
+
+      allow delete: if request.auth != null;
     }
   }
 }

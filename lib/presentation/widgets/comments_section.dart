@@ -41,6 +41,16 @@ class _CommentsSectionState extends State<CommentsSection> {
     final user = context.read<UserProvider>().currentUser;
     if (user == null) return;
 
+    if (!user.canAccessApp) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Your account has been suspended or banned.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     final content = _commentController.text.trim();
     if (content.isEmpty) return;
 

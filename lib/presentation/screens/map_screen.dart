@@ -25,6 +25,7 @@ class _MapScreenState extends State<MapScreen> {
   bool _isCentering = false;
   bool _showHeatmap = false;
   final Map<IncidentCategory, BitmapDescriptor> _markerIconCache = {};
+  String? _lastCenteredIncidentId;
 
   @override
   void initState() {
@@ -215,7 +216,18 @@ class _MapScreenState extends State<MapScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => IncidentBottomSheet(incidentId: incident.id),
+      builder: (_) => IncidentBottomSheet(
+        incidentId: incident.id,
+        onViewOnMap: () {
+          Navigator.pop(context);
+          _mapController?.animateCamera(
+            CameraUpdate.newLatLngZoom(
+              LatLng(incident.latitude, incident.longitude),
+              16,
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -368,6 +380,22 @@ class _MapScreenState extends State<MapScreen> {
     return Consumer<IncidentProvider>(
       builder: (context, provider, _) {
         final incidents = provider.incidents;
+        // Center camera on a selected incident (set by "View on Map" from other screens)
+        final selectedIncident = provider.selectedIncident;
+        if (selectedIncident != null && selectedIncident.id != _lastCenteredIncidentId) {
+          _lastCenteredIncidentId = selectedIncident.id;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _mapController != null) {
+              _mapController!.animateCamera(
+                CameraUpdate.newLatLngZoom(
+                  LatLng(selectedIncident.latitude, selectedIncident.longitude),
+                  16,
+                ),
+              );
+              context.read<IncidentProvider>().selectIncident(null);
+            }
+          });
+        }
         return Stack(
           children: [
             GoogleMap(

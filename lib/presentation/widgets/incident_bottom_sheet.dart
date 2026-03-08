@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../data/models/incident_model.dart';
 import '../../utils/app_theme.dart';
 import '../providers/incident_provider.dart';
@@ -12,14 +13,17 @@ import 'vote_buttons.dart';
 
 class IncidentBottomSheet extends StatelessWidget {
   final String incidentId;
+  final VoidCallback? onViewOnMap;
 
-  const IncidentBottomSheet({super.key, required this.incidentId});
+  const IncidentBottomSheet({super.key, required this.incidentId, this.onViewOnMap});
 
   @override
   Widget build(BuildContext context) {
     // Watch the incident from the provider to get real-time updates
-    final incidents = context.watch<IncidentProvider>().incidents;
-    final incident = incidents.where((i) => i.id == incidentId).firstOrNull;
+    // Falls back to myReports so the profile post history can open older incidents
+    final provider = context.watch<IncidentProvider>();
+    final incident = provider.incidents.where((i) => i.id == incidentId).firstOrNull
+        ?? provider.myReports.where((i) => i.id == incidentId).firstOrNull;
 
     if (incident == null) {
       return Container(
@@ -275,7 +279,13 @@ class IncidentBottomSheet extends StatelessWidget {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () {
+                    if (onViewOnMap != null) {
+                      onViewOnMap!();
+                    } else {
+                      Navigator.pop(context);
+                    }
+                  },
                   icon: const Icon(Icons.map_outlined, size: 18),
                   label: const Text('View on Map'),
                   style: OutlinedButton.styleFrom(
@@ -287,7 +297,12 @@ class IncidentBottomSheet extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {},
+                  onPressed: () {
+                    Share.share(
+                      '${incident.categoryLabel}: ${incident.title}\n${incident.address}\n\n${incident.description}',
+                      subject: incident.title,
+                    );
+                  },
                   icon: const Icon(Icons.share_outlined, size: 18),
                   label: const Text('Share'),
                 ),

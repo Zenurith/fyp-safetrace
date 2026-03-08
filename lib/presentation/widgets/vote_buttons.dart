@@ -22,7 +22,7 @@ class VoteButtons extends StatelessWidget {
     final voteProvider = context.watch<VoteProvider>();
     final currentUser = userProvider.currentUser;
 
-    if (currentUser == null) {
+    if (currentUser == null || !currentUser.canAccessApp) {
       return const SizedBox.shrink();
     }
 

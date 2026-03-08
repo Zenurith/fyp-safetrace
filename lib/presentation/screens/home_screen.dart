@@ -124,7 +124,14 @@ class _HomeScreenState extends State<HomeScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => IncidentBottomSheet(incidentId: incident.id),
+      builder: (_) => IncidentBottomSheet(
+        incidentId: incident.id,
+        onViewOnMap: () {
+          Navigator.pop(context);
+          context.read<IncidentProvider>().selectIncident(incident);
+          setState(() => _currentIndex = 0);
+        },
+      ),
     );
   }
 
@@ -187,7 +194,9 @@ class _HomeScreenState extends State<HomeScreen> {
         currentScreen = const AlertSettingsScreen();
         break;
       case 4:
-        currentScreen = const ProfileScreen();
+        currentScreen = ProfileScreen(
+          onSwitchTab: (index) => setState(() => _currentIndex = index),
+        );
         break;
       default:
         currentScreen = const MapScreen();

@@ -84,7 +84,9 @@ class MediaUploadService {
     try {
       final ref = _storage.refFromURL(url);
       await ref.delete();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('deleteFile error (ignored): $e');
+    }
   }
 
   Future<void> deleteIncidentMedia(String incidentId) async {
@@ -101,7 +103,9 @@ class MediaUploadService {
       for (final item in videosList.items) {
         await item.delete();
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('deleteIncidentMedia error (ignored): $e');
+    }
   }
 
   Future<XFile?> pickProfilePhoto({ImageSource source = ImageSource.gallery}) async {

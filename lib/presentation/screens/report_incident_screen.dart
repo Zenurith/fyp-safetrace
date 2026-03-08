@@ -36,6 +36,9 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
 
   // Maximum allowed distance in meters (5 km)
   static const double _maxReportDistanceMeters = 5000;
+  static const int _maxDescriptionLength = 500;
+  static const int _maxAddressLength = 300;
+  static const int _maxMediaFiles = 5;
 
   IncidentCategory _selectedCategory = IncidentCategory.crime;
   SeverityLevel _selectedSeverity = SeverityLevel.high;
@@ -243,6 +246,14 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                 title: const Text('Take Photo'),
                 onTap: () async {
                   Navigator.pop(context);
+                  if (_selectedMedia.length >= _maxMediaFiles) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Maximum $_maxMediaFiles files allowed.')),
+                      );
+                    }
+                    return;
+                  }
                   final image = await _mediaService.pickImage(
                     source: ImageSource.camera,
                   );
@@ -263,6 +274,14 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                 title: const Text('Record Video'),
                 onTap: () async {
                   Navigator.pop(context);
+                  if (_selectedMedia.length >= _maxMediaFiles) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Maximum $_maxMediaFiles files allowed.')),
+                      );
+                    }
+                    return;
+                  }
                   final video = await _mediaService.pickVideo(
                     source: ImageSource.camera,
                   );
@@ -282,10 +301,24 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                 ),
                 title: const Text('Choose from Gallery'),
                 onTap: () async {
+                  final messenger = ScaffoldMessenger.of(context);
                   Navigator.pop(context);
                   final images = await _mediaService.pickMultipleImages();
-                  if (images.isNotEmpty && mounted) {
-                    setState(() => _selectedMedia.addAll(images));
+                  if (!mounted) return;
+                  if (images.isNotEmpty) {
+                    final remaining = _maxMediaFiles - _selectedMedia.length;
+                    final toAdd = images.take(remaining).toList();
+                    final truncated = images.length > remaining;
+                    setState(() => _selectedMedia.addAll(toAdd));
+                    if (truncated) {
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Only $remaining more file(s) added. Maximum $_maxMediaFiles files allowed.',
+                          ),
+                        ),
+                      );
+                    }
                   }
                 },
               ),
@@ -301,6 +334,30 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
   }
 
   Future<void> _submit() async {
+    // Block banned or suspended users
+    final currentUser = context.read<UserProvider>().currentUser;
+    if (currentUser == null || !currentUser.canAccessApp) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Your account has been suspended or banned.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Validate description length
+    final description = _descriptionController.text.trim();
+    if (description.length > _maxDescriptionLength) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Description is too long (max $_maxDescriptionLength characters).'),
+          backgroundColor: AppTheme.primaryRed,
+        ),
+      );
+      return;
+    }
+
     // Validate distance before submission
     if (_userCurrentLat != null && _userCurrentLng != null) {
       final distance = _calculateDistance();
@@ -326,6 +383,16 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     final addressToSubmit = _addressController.text.trim().isNotEmpty
         ? _addressController.text.trim()
         : _address;
+
+    if (addressToSubmit.length > _maxAddressLength) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Address is too long (max $_maxAddressLength characters).'),
+          backgroundColor: AppTheme.primaryRed,
+        ),
+      );
+      return;
+    }
 
     setState(() => _isSubmitting = true);
 
@@ -480,8 +547,8 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
       if (mounted) {
         setState(() => _isSubmitting = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
+          const SnackBar(
+            content: Text('Failed to submit report. Please try again.'),
             backgroundColor: Colors.red,
           ),
         );
@@ -880,6 +947,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                 TextField(
                   controller: _descriptionController,
                   maxLines: 4,
+                  maxLength: _maxDescriptionLength,
                   decoration: InputDecoration(
                     hintText: 'Describe what you observed...',
                     border: OutlineInputBorder(

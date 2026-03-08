@@ -96,7 +96,9 @@ class UserProvider extends ChangeNotifier {
     if (_currentUser == null) return;
     try {
       await _repository.updateUserLocation(_currentUser!.id, latitude, longitude);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('UserProvider: updateLocation failed: $e');
+    }
   }
 
   void clearUser() {

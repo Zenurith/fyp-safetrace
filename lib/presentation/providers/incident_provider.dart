@@ -299,12 +299,23 @@ class IncidentProvider extends ChangeNotifier {
   }
 
   Future<void> deleteIncident(String id) async {
+    // Optimistically remove from local lists for instant UI update
+    _myReports = _myReports.where((i) => i.id != id).toList();
+    _incidents = _incidents.where((i) => i.id != id).toList();
+    if (_selectedIncident?.id == id) _selectedIncident = null;
+    notifyListeners();
+
     try {
       await _repository.delete(id);
-      if (_selectedIncident?.id == id) {
-        _selectedIncident = null;
-      }
+    } catch (e) {
+      _error = e.toString();
       notifyListeners();
+    }
+  }
+
+  Future<void> updateIncident(IncidentModel incident) async {
+    try {
+      await _repository.update(incident);
     } catch (e) {
       _error = e.toString();
       notifyListeners();
