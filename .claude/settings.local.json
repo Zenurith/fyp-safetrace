@@ -27,7 +27,8 @@
       "Bash(flutter test:*)",
       "Bash(gh pr:*)",
       "Bash(wc:*)",
-      "Bash(echo EXIT: $?:*)"
+      "Bash(echo EXIT: $?:*)",
+      "Bash(flutter clean:*)"
     ]
   }
 }

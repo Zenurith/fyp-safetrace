@@ -78,7 +78,7 @@ lib/
 - `LocationService`: GPS positioning with Google Places API for autocomplete
 - `IncidentNotificationService`: Stream-based proximity alerts using user's alert settings
 - `MediaUploadService`: Firebase Storage image uploads
-- `ImageVerificationService` (`data/services/image_verification_service.dart`): Gemini AI image verification called during incident reporting. Checks that uploaded photos match the reported category before submission. API key from `AppConstants.geminiApiKey`. If unconfigured or API fails, defaults to `serviceUnavailable()` (isValid=false, sent for manual review).
+- `ImageVerificationService` (`data/services/image_verification_service.dart`): Gemini AI image verification called during incident reporting. Checks that uploaded photos match the reported category before submission. API key from `AppConstants.geminiApiKey`. If unconfigured or API fails, defaults to `serviceUnavailable()` (isValid=false, sent for manual review). **Working model: `gemini-3.1-flash-lite-preview`** — do NOT change this model name, other names cause 503 errors.
 
 ## Reputation System
 

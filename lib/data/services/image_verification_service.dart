@@ -67,7 +67,7 @@ class ImageVerificationService {
     if (key != null && key.isNotEmpty) {
       try {
         _model = GenerativeModel(
-          model: 'gemini-3-flash-preview',
+          model: 'gemini-3.1-flash-lite-preview',
           apiKey: key,
           generationConfig: GenerationConfig(
             temperature: 0.1, // Lower temperature for more consistent results
