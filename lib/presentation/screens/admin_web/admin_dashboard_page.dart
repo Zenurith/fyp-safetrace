@@ -123,7 +123,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 title: 'Total Users',
                 value: _loadingUsers ? '...' : '$_totalUsers',
                 icon: Icons.people_outline,
-                color: AppTheme.accentBlue,
+                color: AppTheme.primaryDark,
               ),
               StatsCard(
                 title: 'Pending Flags',
@@ -166,7 +166,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 icon: Icons.groups_outlined,
                 label: 'Communities',
                 count: communityProvider.communities.length,
-                color: AppTheme.accentBlue,
+                color: AppTheme.primaryDark,
                 onTap: () => widget.onNavigate?.call(4),
               ),
             ],

@@ -68,9 +68,11 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
 
     final provider = context.read<CommunityProvider>();
     final userId = context.read<UserProvider>().currentUser?.id;
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
 
     if (userId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(content: Text('You must be logged in to create a community')),
       );
       return;
@@ -93,14 +95,14 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
 
       if (communityId != null && mounted) {
         await provider.loadMyCommunities(userId);
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
+        navigator.pop();
+        messenger.showSnackBar(
           const SnackBar(content: Text('Community created successfully!')),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(content: Text('Error: ${e.toString()}')),
         );
       }
@@ -319,7 +321,7 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
                         ),
                         Switch(
                           value: _isPublic,
-                          activeColor: AppTheme.successGreen,
+                          activeTrackColor: AppTheme.successGreen,
                           onChanged: (v) => setState(() => _isPublic = v),
                         ),
                       ],
@@ -363,7 +365,7 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
                         ),
                         Switch(
                           value: _requiresApproval,
-                          activeColor: AppTheme.warningOrange,
+                          activeTrackColor: AppTheme.warningOrange,
                           onChanged: (v) => setState(() => _requiresApproval = v),
                         ),
                       ],

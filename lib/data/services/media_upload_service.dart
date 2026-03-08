@@ -131,8 +131,8 @@ class MediaUploadService {
       final snapshot = await uploadTask;
       return await snapshot.ref.getDownloadURL();
     } catch (e, stackTrace) {
-      print('Upload profile photo error: $e');
-      print('Stack trace: $stackTrace');
+      debugPrint('Upload profile photo error: $e');
+      debugPrint('Stack trace: $stackTrace');
       return null;
     }
   }
@@ -146,7 +146,7 @@ class MediaUploadService {
       }
     } catch (e) {
       // Ignore errors - folder may not exist yet for new users
-      print('deleteProfilePhoto (ignored): $e');
+      debugPrint('deleteProfilePhoto (ignored): $e');
     }
   }
 }

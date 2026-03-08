@@ -3,9 +3,10 @@ import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:http/http.dart' as http;
+import '../../config/app_constants.dart';
 
 class LocationService {
-  static const String _apiKey = 'AIzaSyAs0PNHYH4X3mwsJQZqdZ9q778eISZ4ifw';
+  static String get _apiKey => AppConstants.googleMapsApiKey;
   Future<Position?> getCurrentPosition({bool fast = false}) async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) return null;

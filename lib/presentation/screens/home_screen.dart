@@ -253,8 +253,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 GestureDetector(
                   onTap: _openReportScreen,
                   child: Container(
-                    width: 52,
-                    height: 52,
+                    width: 46,
+                    height: 46,
                     decoration: const BoxDecoration(
                       color: AppTheme.primaryRed,
                       shape: BoxShape.circle,

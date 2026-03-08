@@ -25,7 +25,9 @@
       "Bash(flutter devices:*)",
       "Bash(npm update:*)",
       "Bash(flutter test:*)",
-      "Bash(gh pr:*)"
+      "Bash(gh pr:*)",
+      "Bash(wc:*)",
+      "Bash(echo EXIT: $?:*)"
     ]
   }
 }

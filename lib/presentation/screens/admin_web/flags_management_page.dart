@@ -367,7 +367,7 @@ class _FlagCard extends StatelessWidget {
       case FlagTargetType.incident:
         return AppTheme.warningOrange;
       case FlagTargetType.comment:
-        return AppTheme.accentBlue;
+        return AppTheme.primaryDark;
       case FlagTargetType.user:
         return AppTheme.primaryRed;
     }
@@ -378,7 +378,7 @@ class _FlagCard extends StatelessWidget {
       case FlagStatus.pending:
         return AppTheme.warningOrange;
       case FlagStatus.reviewed:
-        return AppTheme.accentBlue;
+        return AppTheme.primaryDark;
       case FlagStatus.resolved:
         return AppTheme.successGreen;
       case FlagStatus.dismissed:
@@ -570,7 +570,7 @@ class _StatusChip extends StatelessWidget {
       case FlagStatus.pending:
         return AppTheme.warningOrange;
       case FlagStatus.reviewed:
-        return AppTheme.accentBlue;
+        return AppTheme.primaryDark;
       case FlagStatus.resolved:
         return AppTheme.successGreen;
       case FlagStatus.dismissed:

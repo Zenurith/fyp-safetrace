@@ -191,7 +191,7 @@ class _CommunityCardState extends State<_CommunityCard> {
                     width: 56,
                     height: 56,
                     decoration: BoxDecoration(
-                      color: AppTheme.accentBlue.withValues(alpha: 0.1),
+                      color: AppTheme.primaryDark.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                       image: widget.community.imageUrl != null
                           ? DecorationImage(
@@ -203,7 +203,7 @@ class _CommunityCardState extends State<_CommunityCard> {
                     child: widget.community.imageUrl == null
                         ? const Icon(
                             Icons.groups,
-                            color: AppTheme.accentBlue,
+                            color: AppTheme.primaryDark,
                             size: 28,
                           )
                         : null,

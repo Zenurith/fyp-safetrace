@@ -124,10 +124,13 @@ class _FlagDialogState extends State<FlagDialog> {
             ...(_reasons.map((reason) => RadioListTile<String>(
                   title: Text(reason),
                   value: reason,
+                  // ignore: deprecated_member_use
                   groupValue: _selectedReason,
+                  // ignore: deprecated_member_use
                   onChanged: (value) => setState(() => _selectedReason = value),
                   dense: true,
                   contentPadding: EdgeInsets.zero,
+                  // ignore: deprecated_member_use
                   activeColor: AppTheme.primaryRed,
                 ))),
             const SizedBox(height: 16),

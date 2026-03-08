@@ -535,7 +535,7 @@ class _UserInfoSection extends StatelessWidget {
                 child: Icon(
                   Icons.verified_rounded,
                   size: 16,
-                  color: AppTheme.accentBlue,
+                  color: AppTheme.successGreen,
                 ),
               ),
             ],
@@ -632,7 +632,7 @@ class _StatsSection extends StatelessWidget {
           icon: Icons.description_outlined,
           value: '${user.reports}',
           label: 'Reports',
-          color: AppTheme.accentBlue,
+          color: AppTheme.primaryDark,
 ),
         const SizedBox(width: 20),
         _StatItem(

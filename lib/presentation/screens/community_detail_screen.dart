@@ -47,11 +47,12 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
     if (userId == null) return;
 
     final provider = context.read<CommunityProvider>();
+    final messenger = ScaffoldMessenger.of(context);
     final success = await provider.requestToJoin(widget.communityId, userId);
 
     if (mounted) {
       if (success) await _loadCommunity();
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
           content: Text(success
               ? 'You have joined the community!'
@@ -65,6 +66,10 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
   Future<void> _leaveCommunity() async {
     final userId = context.read<UserProvider>().currentUser?.id;
     if (userId == null) return;
+
+    final provider = context.read<CommunityProvider>();
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -87,17 +92,16 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
 
     if (confirmed != true) return;
 
-    final provider = context.read<CommunityProvider>();
     final success = await provider.leaveCommunity(widget.communityId, userId);
 
     if (mounted) {
       if (success) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
+        navigator.pop();
+        messenger.showSnackBar(
           const SnackBar(content: Text('You have left the community')),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             content: Text(provider.error ?? 'Failed to leave community'),
             backgroundColor: AppTheme.primaryRed,

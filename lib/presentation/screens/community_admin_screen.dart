@@ -187,6 +187,9 @@ class _PendingRequestCardState extends State<_PendingRequestCard> {
   }
 
   Future<void> _reject() async {
+    final provider = context.read<CommunityProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -210,12 +213,11 @@ class _PendingRequestCardState extends State<_PendingRequestCard> {
 
     setState(() => _isProcessing = true);
 
-    final provider = context.read<CommunityProvider>();
     final success = await provider.rejectRequest(widget.request.id);
 
     if (mounted) {
       setState(() => _isProcessing = false);
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
           content: Text(success ? 'Request rejected' : 'Failed to reject'),
           backgroundColor: success ? AppTheme.warningOrange : AppTheme.primaryRed,
@@ -248,7 +250,7 @@ class _PendingRequestCardState extends State<_PendingRequestCard> {
                     photoUrl: _user?.profilePhotoUrl,
                     initials: _user?.initials ?? '?',
                     radius: 24,
-                    backgroundColor: AppTheme.accentBlue,
+                    backgroundColor: AppTheme.primaryDark,
                   ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -374,7 +376,7 @@ class _MembersTabState extends State<_MembersTab> {
       child: ListView.separated(
         padding: const EdgeInsets.all(16),
         itemCount: _members.length,
-        separatorBuilder: (_, __) => const Divider(height: 1),
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
           return _MemberListItem(member: _members[index]);
         },
@@ -431,7 +433,7 @@ class _MemberListItemState extends State<_MemberListItem> {
               initials: _user?.initials ?? '?',
               radius: 20,
               backgroundColor:
-                  widget.member.isAdmin ? AppTheme.primaryRed : AppTheme.accentBlue,
+                  widget.member.isAdmin ? AppTheme.primaryRed : AppTheme.primaryDark,
             ),
       title: Text(_user?.name ?? 'Loading...'),
       subtitle: Text(

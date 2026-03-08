@@ -130,9 +130,12 @@ class IncidentModel {
   bool get isActive =>
       status != IncidentStatus.resolved && status != IncidentStatus.dismissed;
 
-  /// Returns true if image verification flagged this report for review
-  bool get needsImageReview =>
-      imageVerified == false || (verificationScore != null && verificationScore! < 0.5);
+  /// Returns true if image verification flagged this report for review.
+  /// Returns false if no verification was attempted (both fields null = old record or no images).
+  bool get needsImageReview {
+    if (imageVerified == null && verificationScore == null) return false;
+    return imageVerified == false || (verificationScore != null && verificationScore! < 0.5);
+  }
 
   /// Returns verification confidence label
   String? get verificationLabel {

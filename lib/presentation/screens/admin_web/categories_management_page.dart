@@ -96,7 +96,7 @@ class CategoriesManagementPage extends StatelessWidget {
                           label: 'Custom',
                           value: '${categories.where((c) => !c.isDefault).length}',
                           icon: Icons.edit_outlined,
-                          color: AppTheme.accentBlue,
+                          color: AppTheme.primaryDark,
                         ),
                       ],
                     ),

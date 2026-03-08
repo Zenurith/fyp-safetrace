@@ -115,7 +115,7 @@ class CategoryModel {
           id: 'infrastructure',
           name: 'Infrastructure',
           iconName: 'construction',
-          colorHex: '#3182CE',
+          colorHex: '#2D3748',
           isDefault: true,
           sortOrder: 1,
         ),
@@ -123,7 +123,7 @@ class CategoryModel {
           id: 'suspicious',
           name: 'Suspicious',
           iconName: 'visibility',
-          colorHex: '#805AD5',
+          colorHex: '#718096',
           isDefault: true,
           sortOrder: 2,
         ),
@@ -178,9 +178,9 @@ class CategoryModel {
         '#38A169', // Green
         '#319795', // Teal
         '#3182CE', // Blue
-        '#5A67D8', // Indigo
-        '#805AD5', // Purple
+        '#2D3748', // Dark navy
         '#D53F8C', // Pink
         '#718096', // Gray
+        '#A0AEC0', // Light gray
       ];
 }

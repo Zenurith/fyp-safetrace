@@ -123,12 +123,12 @@ class UserProvider extends ChangeNotifier {
   }
 
   Future<bool> uploadProfilePhoto(XFile file) async {
-    print('uploadProfilePhoto called');
-    print('currentUser: $_currentUser');
-    print('currentUser id: ${_currentUser?.id}');
+    debugPrint('uploadProfilePhoto called');
+    debugPrint('currentUser: $_currentUser');
+    debugPrint('currentUser id: ${_currentUser?.id}');
 
     if (_currentUser == null) {
-      print('currentUser is null, returning false');
+      debugPrint('currentUser is null, returning false');
       return false;
     }
 
@@ -136,24 +136,24 @@ class UserProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      print('Calling mediaService.uploadProfilePhoto with userId: ${_currentUser!.id}');
+      debugPrint('Calling mediaService.uploadProfilePhoto with userId: ${_currentUser!.id}');
       final url = await _mediaService.uploadProfilePhoto(_currentUser!.id, file);
-      print('Upload result URL: $url');
+      debugPrint('Upload result URL: $url');
 
       if (url != null) {
-        print('Updating repository with photo URL');
+        debugPrint('Updating repository with photo URL');
         await _repository.updateProfilePhoto(_currentUser!.id, url);
         _currentUser = _currentUser!.copyWith(profilePhotoUrl: url);
         _isLoading = false;
         notifyListeners();
         return true;
       }
-      print('URL was null, upload failed');
+      debugPrint('URL was null, upload failed');
       _isLoading = false;
       notifyListeners();
       return false;
     } catch (e) {
-      print('Exception in uploadProfilePhoto: $e');
+      debugPrint('Exception in uploadProfilePhoto: $e');
       _error = e.toString();
       _isLoading = false;
       notifyListeners();

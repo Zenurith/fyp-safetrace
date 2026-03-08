@@ -43,11 +43,18 @@ class _MapScreenState extends State<MapScreen> {
     final color = _categoryColor(category);
     final iconData = _categoryIconData(category);
 
-    const double size = 80;
-    const double pinHeight = 100;
+    // Logical display size
+    const double size = 36;
+    const double pinHeight = 48;
+
+    // Render at 3× for crisp display on high-DPI screens
+    const double scale = 3.0;
+    const double scaledSize = size * scale;
+    const double scaledPinHeight = pinHeight * scale;
 
     final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, size, pinHeight));
+    final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, scaledSize, scaledPinHeight));
+    canvas.scale(scale, scale);
 
     final paint = Paint()..color = color;
 
@@ -66,7 +73,7 @@ class _MapScreenState extends State<MapScreen> {
     final borderPaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 4;
+      ..strokeWidth = 2.5;
     canvas.drawCircle(const Offset(size / 2, size / 2), size / 2 - 2, borderPaint);
 
     // Draw category icon
@@ -74,7 +81,7 @@ class _MapScreenState extends State<MapScreen> {
     iconPainter.text = TextSpan(
       text: String.fromCharCode(iconData.codePoint),
       style: TextStyle(
-        fontSize: 34,
+        fontSize: 16,
         fontFamily: iconData.fontFamily,
         package: iconData.fontPackage,
         color: Colors.white,
@@ -90,9 +97,10 @@ class _MapScreenState extends State<MapScreen> {
     );
 
     final picture = recorder.endRecording();
-    final img = await picture.toImage(size.toInt(), pinHeight.toInt());
+    final img = await picture.toImage(scaledSize.toInt(), scaledPinHeight.toInt());
     final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
-    return BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
+    // Pass logical width so the map renders it at the correct display size
+    return BitmapDescriptor.bytes(byteData!.buffer.asUint8List(), width: size);
   }
 
   Color _categoryColor(IncidentCategory category) {
