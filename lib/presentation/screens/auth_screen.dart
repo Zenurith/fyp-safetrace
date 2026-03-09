@@ -112,7 +112,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 Icon(
                   Icons.shield_outlined,
                   size: 64,
-                  color: AppTheme.profilePurple,
+                  color: AppTheme.primaryDark,
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -244,7 +244,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 ElevatedButton(
                   onPressed: _isSubmitting ? null : _submit,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.profilePurple,
+                    backgroundColor: AppTheme.primaryDark,
                   ),
                   child: _isSubmitting
                       ? const SizedBox(
@@ -272,7 +272,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     _isLogin
                         ? "Don't have an account? Sign Up"
                         : 'Already have an account? Log In',
-                    style: TextStyle(color: AppTheme.accentBlue),
+                    style: TextStyle(color: AppTheme.primaryDark),
                   ),
                 ),
               ],

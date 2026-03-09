@@ -52,7 +52,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 16),
             ListTile(
-              leading: const Icon(Icons.camera_alt, color: AppTheme.accentBlue),
+              leading: const Icon(Icons.camera_alt, color: AppTheme.primaryDark),
               title: const Text('Take Photo'),
               onTap: () async {
                 Navigator.pop(ctx);
@@ -60,7 +60,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library, color: AppTheme.accentBlue),
+              leading: const Icon(Icons.photo_library, color: AppTheme.primaryDark),
               title: const Text('Choose from Gallery'),
               onTap: () async {
                 Navigator.pop(ctx);
@@ -120,7 +120,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final nameController = TextEditingController(text: user.name);
     final handleController = TextEditingController(text: user.handle);
 
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Edit Profile'),
@@ -159,13 +159,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Navigator.pop(ctx);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.profilePurple,
+              backgroundColor: AppTheme.primaryDark,
             ),
             child: const Text('Save'),
           ),
         ],
       ),
-    );
+    ).then((_) {
+      nameController.dispose();
+      handleController.dispose();
+    });
   }
 
   @override
@@ -185,7 +188,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return Scaffold(
           appBar: AppBar(
             title: const Text('Profile'),
-            backgroundColor: AppTheme.profilePurple,
+            backgroundColor: AppTheme.primaryDark,
             actions: [
               IconButton(
                 icon: const Icon(Icons.refresh),
@@ -203,7 +206,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Container(
                   width: double.infinity,
                   decoration: const BoxDecoration(
-                    color: AppTheme.profilePurple,
+                    color: AppTheme.primaryDark,
                     borderRadius: BorderRadius.only(
                       bottomLeft: Radius.circular(24),
                       bottomRight: Radius.circular(24),
@@ -222,9 +225,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               photoUrl: user.profilePhotoUrl,
                               initials: user.initials,
                               radius: 44,
-                              backgroundColor: Colors.teal,
+                              backgroundColor: AppTheme.primaryDark,
                               borderWidth: 3,
-                              borderColor: Colors.amber,
+                              borderColor: Colors.white,
                             ),
                             Positioned(
                               bottom: 0,
@@ -232,7 +235,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               child: Container(
                                 padding: const EdgeInsets.all(6),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.accentBlue,
+                                  color: AppTheme.primaryDark,
                                   shape: BoxShape.circle,
                                   border: Border.all(color: Colors.white, width: 2),
                                 ),
@@ -335,8 +338,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: OutlinedButton(
                       onPressed: () => _showEditProfileDialog(context),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.accentBlue,
-                        side: const BorderSide(color: AppTheme.accentBlue),
+                        foregroundColor: AppTheme.primaryDark,
+                        side: const BorderSide(color: AppTheme.primaryDark),
                       ),
                       child: const Text('Edit Profile'),
                     ),
@@ -400,18 +403,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppTheme.cardBorder),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
+                    decoration: AppTheme.cardDecoration,
                     child: Column(
                       children: [
                         const Align(

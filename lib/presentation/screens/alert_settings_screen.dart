@@ -160,7 +160,7 @@ class AlertSettingsScreen extends StatelessWidget {
                     ),
                     Switch(
                       value: settings.activeHoursEnabled,
-                      activeColor: AppTheme.accentBlue,
+                      activeTrackColor: AppTheme.primaryDark,
                       onChanged: (v) => provider.toggleActiveHours(v),
                     ),
                   ],
@@ -231,10 +231,10 @@ class _SeverityCheckbox extends StatelessWidget {
               width: 24,
               height: 24,
               decoration: BoxDecoration(
-                color: checked ? AppTheme.accentBlue : Colors.transparent,
+                color: checked ? AppTheme.primaryDark : Colors.transparent,
                 borderRadius: BorderRadius.circular(4),
                 border: Border.all(
-                  color: checked ? AppTheme.accentBlue : Colors.grey[400]!,
+                  color: checked ? AppTheme.primaryDark : AppTheme.textSecondary,
                   width: 2,
                 ),
               ),

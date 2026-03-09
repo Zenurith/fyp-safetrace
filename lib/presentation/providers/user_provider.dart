@@ -92,12 +92,19 @@ class UserProvider extends ChangeNotifier {
     return await _repository.getCurrentUser(uid);
   }
 
+  Future<Map<String, UserModel?>> getUsersByIds(List<String> ids) async {
+    final results = await Future.wait(
+      ids.map((id) => _repository.getCurrentUser(id)),
+    );
+    return Map.fromIterables(ids, results);
+  }
+
   Future<void> updateLocation(double latitude, double longitude) async {
     if (_currentUser == null) return;
     try {
       await _repository.updateUserLocation(_currentUser!.id, latitude, longitude);
     } catch (e) {
-      debugPrint('UserProvider: updateLocation failed: $e');
+      if (kDebugMode) debugPrint('UserProvider: updateLocation failed: $e');
     }
   }
 
@@ -125,37 +132,26 @@ class UserProvider extends ChangeNotifier {
   }
 
   Future<bool> uploadProfilePhoto(XFile file) async {
-    debugPrint('uploadProfilePhoto called');
-    debugPrint('currentUser: $_currentUser');
-    debugPrint('currentUser id: ${_currentUser?.id}');
-
-    if (_currentUser == null) {
-      debugPrint('currentUser is null, returning false');
-      return false;
-    }
+    if (_currentUser == null) return false;
 
     _isLoading = true;
     notifyListeners();
 
     try {
-      debugPrint('Calling mediaService.uploadProfilePhoto with userId: ${_currentUser!.id}');
       final url = await _mediaService.uploadProfilePhoto(_currentUser!.id, file);
-      debugPrint('Upload result URL: $url');
 
       if (url != null) {
-        debugPrint('Updating repository with photo URL');
         await _repository.updateProfilePhoto(_currentUser!.id, url);
         _currentUser = _currentUser!.copyWith(profilePhotoUrl: url);
         _isLoading = false;
         notifyListeners();
         return true;
       }
-      debugPrint('URL was null, upload failed');
       _isLoading = false;
       notifyListeners();
       return false;
     } catch (e) {
-      debugPrint('Exception in uploadProfilePhoto: $e');
+      if (kDebugMode) debugPrint('uploadProfilePhoto: $e');
       _error = e.toString();
       _isLoading = false;
       notifyListeners();

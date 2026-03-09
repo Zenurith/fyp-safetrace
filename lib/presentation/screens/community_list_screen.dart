@@ -264,7 +264,7 @@ class _CommunityCard extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: 24,
-                    backgroundColor: AppTheme.accentBlue,
+                    backgroundColor: AppTheme.primaryDark,
                     backgroundImage: community.imageUrl != null
                         ? NetworkImage(community.imageUrl!)
                         : null,
