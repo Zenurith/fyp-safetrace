@@ -7,22 +7,26 @@ class CommentRepository {
   Stream<List<CommentModel>> watchByIncident(String incidentId) {
     return _collection
         .where('incidentId', isEqualTo: incidentId)
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => CommentModel.fromMap(doc.data(), doc.id))
-            .toList());
+        .map((snapshot) {
+      final comments = snapshot.docs
+          .map((doc) => CommentModel.fromMap(doc.data(), doc.id))
+          .toList();
+      comments.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return comments;
+    });
   }
 
   Future<List<CommentModel>> getByIncident(String incidentId) async {
     final snapshot = await _collection
         .where('incidentId', isEqualTo: incidentId)
-        .orderBy('createdAt', descending: true)
         .get();
 
-    return snapshot.docs
+    final comments = snapshot.docs
         .map((doc) => CommentModel.fromMap(doc.data(), doc.id))
         .toList();
+    comments.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return comments;
   }
 
   Future<String> add(CommentModel comment) async {

@@ -19,19 +19,28 @@ class _CommentsSectionState extends State<CommentsSection> {
   final _commentController = TextEditingController();
   final _focusNode = FocusNode();
   bool _isExpanded = false;
+  late CommentProvider _commentProvider;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _commentProvider = context.read<CommentProvider>();
+  }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<CommentProvider>().startListening(widget.incidentId);
+      if (mounted) {
+        _commentProvider.startListening(widget.incidentId);
+      }
     });
   }
 
   @override
   void dispose() {
-    // Stop listening to comments to prevent memory leak
-    context.read<CommentProvider>().stopListening(widget.incidentId);
+    // Use stored reference — context is unsafe to use in dispose()
+    _commentProvider.stopListening(widget.incidentId);
     _commentController.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -137,8 +146,20 @@ class _CommentsSectionState extends State<CommentsSection> {
               ),
               const SizedBox(height: 16),
 
+              // Error state
+              if (provider.error != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    'Failed to load comments.',
+                    style: TextStyle(
+                      color: AppTheme.primaryRed,
+                      fontSize: 13,
+                    ),
+                  ),
+                )
               // Comments list
-              if (comments.isEmpty)
+              else if (comments.isEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   child: Center(
@@ -165,7 +186,7 @@ class _CommentsSectionState extends State<CommentsSection> {
               // View all comments button
               if (comments.length > 5)
                 TextButton(
-                  onPressed: () => _showAllComments(context, comments),
+                  onPressed: () => _showAllComments(context),
                   child: Text('View all ${comments.length} comments'),
                 ),
             ],
@@ -175,7 +196,7 @@ class _CommentsSectionState extends State<CommentsSection> {
     );
   }
 
-  void _showAllComments(BuildContext context, List<CommentModel> comments) {
+  void _showAllComments(BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -187,36 +208,42 @@ class _CommentsSectionState extends State<CommentsSection> {
         minChildSize: 0.5,
         maxChildSize: 0.95,
         expand: false,
-        builder: (context, scrollController) => Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Text(
-                    'All Comments (${comments.length})',
-                    style: Theme.of(context).textTheme.headlineSmall,
+        builder: (sheetContext, scrollController) =>
+            Consumer<CommentProvider>(
+          builder: (context, provider, _) {
+            final comments = provider.getComments(widget.incidentId);
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Text(
+                        'All Comments (${comments.length})',
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(sheetContext),
+                      ),
+                    ],
                   ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
+                ),
+                Expanded(
+                  child: ListView.separated(
+                    controller: scrollController,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: comments.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      return _CommentTile(comment: comments[index]);
+                    },
                   ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: ListView.separated(
-                controller: scrollController,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: comments.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (context, index) {
-                  return _CommentTile(comment: comments[index]);
-                },
-              ),
-            ),
-          ],
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

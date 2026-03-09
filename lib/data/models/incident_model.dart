@@ -46,8 +46,8 @@ class IncidentModel {
   final double? verificationScore;
   final String? verificationNote;
 
-  // Community sharing (null = public)
-  final String? communityId;
+  // Community sharing (empty = public only)
+  final List<String> communityIds;
 
   IncidentModel({
     required this.id,
@@ -72,7 +72,7 @@ class IncidentModel {
     this.imageVerified,
     this.verificationScore,
     this.verificationNote,
-    this.communityId,
+    this.communityIds = const [],
   });
 
   int get voteScore => upvotes - downvotes;
@@ -169,7 +169,7 @@ class IncidentModel {
       'imageVerified': imageVerified,
       'verificationScore': verificationScore,
       'verificationNote': verificationNote,
-      'communityId': communityId,
+      'communityIds': communityIds,
     };
   }
 
@@ -204,7 +204,7 @@ class IncidentModel {
       imageVerified: map['imageVerified'],
       verificationScore: (map['verificationScore'] as num?)?.toDouble(),
       verificationNote: map['verificationNote'],
-      communityId: map['communityId'],
+      communityIds: List<String>.from(map['communityIds'] ?? []),
     );
   }
 
@@ -231,7 +231,7 @@ class IncidentModel {
     bool? imageVerified,
     double? verificationScore,
     String? verificationNote,
-    String? communityId,
+    List<String>? communityIds,
   }) {
     return IncidentModel(
       id: id ?? this.id,
@@ -256,7 +256,7 @@ class IncidentModel {
       imageVerified: imageVerified ?? this.imageVerified,
       verificationScore: verificationScore ?? this.verificationScore,
       verificationNote: verificationNote ?? this.verificationNote,
-      communityId: communityId ?? this.communityId,
+      communityIds: communityIds ?? this.communityIds,
     );
   }
 }

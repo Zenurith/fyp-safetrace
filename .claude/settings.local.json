@@ -29,7 +29,8 @@
       "Bash(wc:*)",
       "Bash(echo EXIT: $?:*)",
       "Bash(flutter clean:*)",
-      "Bash(firebase deploy:*)"
+      "Bash(firebase deploy:*)",
+      "Bash(xargs grep:*)"
     ]
   }
 }

@@ -16,6 +16,7 @@ import '../../utils/app_theme.dart';
 import '../providers/incident_provider.dart';
 import '../providers/user_provider.dart';
 import '../providers/category_provider.dart';
+import '../providers/community_provider.dart';
 
 class ReportIncidentScreen extends StatefulWidget {
   const ReportIncidentScreen({super.key});
@@ -56,6 +57,9 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
   double? _userCurrentLng;
   bool _locationTooFar = false;
 
+  // Community sharing
+  final Set<String> _selectedCommunityIds = {};
+
   // Address autocomplete state
   List<PlaceSuggestion> _suggestions = [];
   Timer? _debounceTimer;
@@ -72,6 +76,12 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     _addressController.addListener(_onAddressChanged);
     _addressFocusNode.addListener(_onAddressFocusChanged);
     _detectLocation();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final userId = context.read<UserProvider>().currentUser?.id;
+      if (userId != null) {
+        context.read<CommunityProvider>().loadMyCommunities(userId);
+      }
+    });
   }
 
   void _onAddressChanged() {
@@ -452,6 +462,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
         imageVerified: _verificationResult?.isValid,
         verificationScore: _verificationResult?.confidenceScore,
         verificationNote: _verificationResult?.explanation,
+        communityIds: _selectedCommunityIds.toList(),
       ).timeout(
         const Duration(seconds: 30),
         onTimeout: () {
@@ -1022,6 +1033,10 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                 ),
                 const SizedBox(height: 24),
 
+                // Community sharing section
+                _buildCommunitySelector(),
+                const SizedBox(height: 24),
+
                 // Buttons
                 Row(
                   children: [
@@ -1140,6 +1155,72 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
         ),
         child: const Icon(Icons.add, size: 32, color: Colors.grey),
       ),
+    );
+  }
+
+  Widget _buildCommunitySelector() {
+    final myCommunities = context.watch<CommunityProvider>().myCommunities;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text(
+              'Share to Communities',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '(optional)',
+              style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Leave unselected to post publicly only.',
+          style: AppTheme.caption,
+        ),
+        const SizedBox(height: 12),
+        if (myCommunities.isEmpty)
+          Text(
+            'You are not a member of any community.',
+            style: AppTheme.caption,
+          )
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: myCommunities.map((community) {
+              final selected = _selectedCommunityIds.contains(community.id);
+              return FilterChip(
+                label: Text(community.name),
+                selected: selected,
+                onSelected: (val) {
+                  setState(() {
+                    if (val) {
+                      _selectedCommunityIds.add(community.id);
+                    } else {
+                      _selectedCommunityIds.remove(community.id);
+                    }
+                  });
+                },
+                selectedColor: AppTheme.primaryRed.withValues(alpha: 0.15),
+                checkmarkColor: AppTheme.primaryRed,
+                labelStyle: TextStyle(
+                  color: selected ? AppTheme.primaryRed : AppTheme.primaryDark,
+                  fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                ),
+                side: BorderSide(
+                  color: selected ? AppTheme.primaryRed : AppTheme.cardBorder,
+                ),
+                backgroundColor: Colors.white,
+                showCheckmark: true,
+              );
+            }).toList(),
+          ),
+      ],
     );
   }
 

@@ -1,46 +1,159 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../data/models/incident_model.dart';
 import '../../utils/app_theme.dart';
 import '../providers/incident_provider.dart';
 import '../providers/user_provider.dart';
+import '../widgets/incident_bottom_sheet.dart';
 
 class MyReportsScreen extends StatefulWidget {
-  const MyReportsScreen({super.key});
+  final Function(int)? onSwitchTab;
+
+  const MyReportsScreen({super.key, this.onSwitchTab});
 
   @override
   State<MyReportsScreen> createState() => _MyReportsScreenState();
 }
 
 class _MyReportsScreenState extends State<MyReportsScreen> {
+  bool _reportsListening = false;
+
   @override
-  void initState() {
-    super.initState();
-    _loadReports();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_reportsListening) {
+      final userId = context.read<UserProvider>().currentUser?.id;
+      if (userId != null) {
+        context.read<IncidentProvider>().startListeningMyReports(userId);
+        _reportsListening = true;
+      }
+    }
   }
 
-  void _loadReports() {
-    final userId = context.read<UserProvider>().currentUser?.id;
-    if (userId != null) {
-      context.read<IncidentProvider>().startListeningMyReports(userId);
-    }
+  void _showDetail(BuildContext context, IncidentModel incident) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.4,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (ctx, scrollController) => SingleChildScrollView(
+          controller: scrollController,
+          child: IncidentBottomSheet(
+            incidentId: incident.id,
+            onViewOnMap: () {
+              Navigator.pop(context);
+              Navigator.pop(context); // pop MyReportsScreen
+              context.read<IncidentProvider>().selectIncident(incident);
+              widget.onSwitchTab?.call(0);
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _share(IncidentModel incident) {
+    Share.share(
+      '${incident.categoryLabel}: ${incident.title}\n${incident.address}\n\n${incident.description}',
+      subject: incident.title,
+    );
+  }
+
+  void _confirmDelete(BuildContext context, IncidentModel incident) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Report'),
+        content: Text('Delete "${incident.title}"? This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await context.read<IncidentProvider>().deleteIncident(incident.id);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Report deleted'),
+                    backgroundColor: AppTheme.primaryRed,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryRed,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditSheet(BuildContext context, IncidentModel incident) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => _EditIncidentSheet(
+        incident: incident,
+        onSave: (updated) async {
+          Navigator.pop(ctx);
+          await context.read<IncidentProvider>().updateIncident(updated);
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Report updated'),
+                backgroundColor: AppTheme.successGreen,
+              ),
+            );
+          }
+        },
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final reports = context.watch<IncidentProvider>().myReports;
-    final isLoading = context.watch<IncidentProvider>().isLoading;
 
     return Scaffold(
+      backgroundColor: AppTheme.backgroundGrey,
       appBar: AppBar(
-        title: const Text('My Reports'),
+        title: Text(
+          'My Reports',
+          style: AppTheme.headingMedium.copyWith(color: Colors.white),
+        ),
+        backgroundColor: AppTheme.primaryDark,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        actions: [
+          if (reports.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Center(
+                child: Text(
+                  '${reports.length} total',
+                  style: AppTheme.caption.copyWith(color: Colors.white70),
+                ),
+              ),
+            ),
+        ],
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : reports.isEmpty
-              ? _buildEmptyState()
-              : _buildReportsList(reports),
+      body: reports.isEmpty ? _buildEmptyState() : _buildList(reports),
     );
   }
 
@@ -49,599 +162,391 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.report_outlined,
-            size: 80,
-            color: Colors.grey[400],
-          ),
+          Icon(Icons.report_outlined, size: 64, color: Colors.grey[300]),
           const SizedBox(height: 16),
           Text(
             'No reports yet',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[600],
-            ),
+            style: AppTheme.headingSmall.copyWith(color: AppTheme.textSecondary),
           ),
           const SizedBox(height: 8),
           Text(
             'Your submitted incident reports\nwill appear here',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[500],
-            ),
+            style: AppTheme.caption,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildReportsList(List<IncidentModel> reports) {
-    return ListView.builder(
+  Widget _buildList(List<IncidentModel> reports) {
+    return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: reports.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
-        final report = reports[index];
+        final incident = reports[index];
         return _ReportCard(
-          report: report,
-          onTap: () => _showReportDetails(report),
+          incident: incident,
+          onTap: () => _showDetail(context, incident),
+          onEdit: () => _showEditSheet(context, incident),
+          onDelete: () => _confirmDelete(context, incident),
+          onShare: () => _share(incident),
         );
       },
     );
   }
-
-  void _showReportDetails(IncidentModel report) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => _ReportDetailsSheet(report: report),
-    );
-  }
 }
 
-class _ReportCard extends StatelessWidget {
-  final IncidentModel report;
-  final VoidCallback onTap;
+// ── Cards ─────────────────────────────────────────────────────────────────────
 
-  const _ReportCard({required this.report, required this.onTap});
+class _ReportCard extends StatelessWidget {
+  final IncidentModel incident;
+  final VoidCallback onTap;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final VoidCallback onShare;
+
+  const _ReportCard({
+    required this.incident,
+    required this.onTap,
+    required this.onEdit,
+    required this.onDelete,
+    required this.onShare,
+  });
+
+  Color get _statusColor {
+    switch (incident.status) {
+      case IncidentStatus.pending:
+        return AppTheme.warningOrange;
+      case IncidentStatus.underReview:
+        return AppTheme.primaryDark;
+      case IncidentStatus.verified:
+        return AppTheme.successGreen;
+      case IncidentStatus.resolved:
+        return AppTheme.successGreen;
+      case IncidentStatus.dismissed:
+        return AppTheme.textSecondary;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppTheme.categoryColor(report.categoryLabel)
-                          .withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
+    final categoryColor = AppTheme.categoryColor(incident.categoryLabel);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: AppTheme.cardDecoration,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Category color bar
+            Container(
+              width: 4,
+              height: 72,
+              decoration: BoxDecoration(
+                color: categoryColor,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(8),
+                  bottomLeft: Radius.circular(8),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Content
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      incident.title,
+                      style: AppTheme.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.primaryDark,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    child: Icon(
-                      _getCategoryIcon(report.category),
-                      color: AppTheme.categoryColor(report.categoryLabel),
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    const SizedBox(height: 6),
+                    Row(
                       children: [
-                        Text(
-                          report.categoryLabel,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          report.address,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey[600],
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        _Chip(label: incident.categoryLabel, color: categoryColor),
+                        const SizedBox(width: 6),
+                        _Chip(label: incident.statusLabel, color: _statusColor),
+                        const SizedBox(width: 6),
+                        Text(incident.timeAgo, style: AppTheme.caption),
                       ],
                     ),
-                  ),
-                  _StatusBadge(status: report.status),
-                ],
+                  ],
+                ),
               ),
-              if (report.description.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Text(
-                  report.description,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[700],
+            ),
+            // Actions menu
+            PopupMenuButton<_CardAction>(
+              icon: Icon(Icons.more_vert, color: Colors.grey[400], size: 20),
+              onSelected: (action) {
+                switch (action) {
+                  case _CardAction.edit:
+                    onEdit();
+                    break;
+                  case _CardAction.share:
+                    onShare();
+                    break;
+                  case _CardAction.delete:
+                    onDelete();
+                    break;
+                }
+              },
+              itemBuilder: (_) => [
+                const PopupMenuItem(
+                  value: _CardAction.edit,
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit_outlined, size: 18),
+                      SizedBox(width: 10),
+                      Text('Edit'),
+                    ],
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                ),
+                const PopupMenuItem(
+                  value: _CardAction.share,
+                  child: Row(
+                    children: [
+                      Icon(Icons.share_outlined, size: 18),
+                      SizedBox(width: 10),
+                      Text('Share'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: _CardAction.delete,
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete_outline, size: 18, color: AppTheme.primaryRed),
+                      const SizedBox(width: 10),
+                      Text('Delete', style: TextStyle(color: AppTheme.primaryRed)),
+                    ],
+                  ),
                 ),
               ],
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Icon(Icons.access_time, size: 14, color: Colors.grey[500]),
-                  const SizedBox(width: 4),
-                  Text(
-                    report.timeAgo,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[500],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Icon(Icons.arrow_upward, size: 14, color: AppTheme.successGreen),
-                  const SizedBox(width: 2),
-                  Text(
-                    '${report.upvotes}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(Icons.arrow_downward, size: 14, color: AppTheme.primaryRed),
-                  const SizedBox(width: 2),
-                  Text(
-                    '${report.downvotes}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  if (report.mediaUrls.isNotEmpty) ...[
-                    const SizedBox(width: 16),
-                    Icon(Icons.image_outlined,
-                        size: 14, color: Colors.grey[500]),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${report.mediaUrls.length} media',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[500],
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
-
-  IconData _getCategoryIcon(IncidentCategory category) {
-    switch (category) {
-      case IncidentCategory.crime:
-        return Icons.shield;
-      case IncidentCategory.infrastructure:
-        return Icons.construction;
-      case IncidentCategory.suspicious:
-        return Icons.visibility;
-      case IncidentCategory.traffic:
-        return Icons.directions_car;
-      case IncidentCategory.environmental:
-        return Icons.eco;
-      case IncidentCategory.emergency:
-        return Icons.local_hospital;
-    }
-  }
 }
 
-class _StatusBadge extends StatelessWidget {
-  final IncidentStatus status;
+enum _CardAction { edit, share, delete }
 
-  const _StatusBadge({required this.status});
+class _Chip extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _Chip({required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: _getStatusColor().withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _getStatusColor().withValues(alpha: 0.5)),
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
-        _getStatusLabel(),
+        label,
         style: TextStyle(
           fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: _getStatusColor(),
+          color: color,
+          fontFamily: AppTheme.fontFamily,
+          fontWeight: FontWeight.w500,
         ),
       ),
     );
   }
-
-  Color _getStatusColor() {
-    switch (status) {
-      case IncidentStatus.pending:
-        return Colors.orange;
-      case IncidentStatus.underReview:
-        return Colors.blue;
-      case IncidentStatus.verified:
-        return Colors.green;
-      case IncidentStatus.resolved:
-        return Colors.teal;
-      case IncidentStatus.dismissed:
-        return Colors.grey;
-    }
-  }
-
-  String _getStatusLabel() {
-    switch (status) {
-      case IncidentStatus.pending:
-        return 'Pending';
-      case IncidentStatus.underReview:
-        return 'Under Review';
-      case IncidentStatus.verified:
-        return 'Verified';
-      case IncidentStatus.resolved:
-        return 'Resolved';
-      case IncidentStatus.dismissed:
-        return 'Dismissed';
-    }
-  }
 }
 
-class _ReportDetailsSheet extends StatelessWidget {
-  final IncidentModel report;
+// ── Edit Sheet ────────────────────────────────────────────────────────────────
 
-  const _ReportDetailsSheet({required this.report});
+class _EditIncidentSheet extends StatefulWidget {
+  final IncidentModel incident;
+  final Future<void> Function(IncidentModel) onSave;
+
+  const _EditIncidentSheet({required this.incident, required this.onSave});
 
   @override
-  Widget build(BuildContext context) {
-    final dateFormat = DateFormat('MMM d, yyyy h:mm a');
-
-    return DraggableScrollableSheet(
-      initialChildSize: 0.6,
-      maxChildSize: 0.9,
-      minChildSize: 0.4,
-      expand: false,
-      builder: (context, scrollController) {
-        return SingleChildScrollView(
-          controller: scrollController,
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppTheme.categoryColor(report.categoryLabel)
-                          .withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      _getCategoryIcon(report.category),
-                      color: AppTheme.categoryColor(report.categoryLabel),
-                      size: 32,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          report.categoryLabel,
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        _StatusBadge(status: report.status),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              _DetailRow(
-                icon: Icons.location_on,
-                label: 'Location',
-                value: report.address,
-              ),
-              _DetailRow(
-                icon: Icons.calendar_today,
-                label: 'Reported',
-                value: dateFormat.format(report.reportedAt),
-              ),
-              _DetailRow(
-                icon: Icons.warning_amber,
-                label: 'Severity',
-                value: report.severityLabel,
-                valueColor: _getSeverityColor(report.severity),
-              ),
-              _DetailRow(
-                icon: Icons.thumb_up,
-                label: 'Upvotes',
-                value: '${report.upvotes}',
-              ),
-              _DetailRow(
-                icon: Icons.thumb_down,
-                label: 'Downvotes',
-                value: '${report.downvotes}',
-              ),
-              _DetailRow(
-                icon: Icons.score,
-                label: 'Vote Score',
-                value: '${report.voteScore}',
-                valueColor: report.voteScore > 0
-                    ? AppTheme.successGreen
-                    : report.voteScore < 0
-                        ? AppTheme.primaryRed
-                        : null,
-              ),
-              if (report.statusUpdatedAt != null)
-                _DetailRow(
-                  icon: Icons.update,
-                  label: 'Status Updated',
-                  value: dateFormat.format(report.statusUpdatedAt!),
-                ),
-              if (report.statusNote != null && report.statusNote!.isNotEmpty)
-                _DetailRow(
-                  icon: Icons.note,
-                  label: 'Status Note',
-                  value: report.statusNote!,
-                ),
-              const SizedBox(height: 16),
-              const Text(
-                'Description',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                report.description.isEmpty
-                    ? 'No description provided.'
-                    : report.description,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[700],
-                  height: 1.5,
-                ),
-              ),
-              if (report.mediaUrls.isNotEmpty) ...[
-                const SizedBox(height: 20),
-                const Text(
-                  'Media',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  height: 100,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: report.mediaUrls.length,
-                    itemBuilder: (context, index) {
-                      return Container(
-                        width: 100,
-                        height: 100,
-                        margin: const EdgeInsets.only(right: 8),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          image: DecorationImage(
-                            image: NetworkImage(report.mediaUrls[index]),
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-              const SizedBox(height: 20),
-              _buildStatusTimeline(),
-              const SizedBox(height: 20),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildStatusTimeline() {
-    final statuses = IncidentStatus.values
-        .where((s) => s != IncidentStatus.dismissed)
-        .toList();
-    final currentIndex = report.status == IncidentStatus.dismissed
-        ? -1
-        : statuses.indexOf(report.status);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Status Timeline',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 12),
-        ...statuses.asMap().entries.map((entry) {
-          final index = entry.key;
-          final status = entry.value;
-          final isCompleted = index <= currentIndex;
-          final isCurrent = index == currentIndex;
-
-          return Row(
-            children: [
-              Column(
-                children: [
-                  Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isCompleted
-                          ? AppTheme.successGreen
-                          : Colors.grey[300],
-                      border: isCurrent
-                          ? Border.all(color: AppTheme.successGreen, width: 3)
-                          : null,
-                    ),
-                    child: isCompleted
-                        ? const Icon(Icons.check, size: 14, color: Colors.white)
-                        : null,
-                  ),
-                  if (index < statuses.length - 1)
-                    Container(
-                      width: 2,
-                      height: 30,
-                      color: index < currentIndex
-                          ? AppTheme.successGreen
-                          : Colors.grey[300],
-                    ),
-                ],
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 20),
-                  child: Text(
-                    _getStatusLabel(status),
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                      color: isCompleted ? Colors.black : Colors.grey[500],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          );
-        }),
-      ],
-    );
-  }
-
-  String _getStatusLabel(IncidentStatus status) {
-    switch (status) {
-      case IncidentStatus.pending:
-        return 'Pending';
-      case IncidentStatus.underReview:
-        return 'Under Review';
-      case IncidentStatus.verified:
-        return 'Verified';
-      case IncidentStatus.resolved:
-        return 'Resolved';
-      case IncidentStatus.dismissed:
-        return 'Dismissed';
-    }
-  }
-
-  IconData _getCategoryIcon(IncidentCategory category) {
-    switch (category) {
-      case IncidentCategory.crime:
-        return Icons.shield;
-      case IncidentCategory.infrastructure:
-        return Icons.construction;
-      case IncidentCategory.suspicious:
-        return Icons.visibility;
-      case IncidentCategory.traffic:
-        return Icons.directions_car;
-      case IncidentCategory.environmental:
-        return Icons.eco;
-      case IncidentCategory.emergency:
-        return Icons.local_hospital;
-    }
-  }
-
-  Color _getSeverityColor(SeverityLevel severity) {
-    switch (severity) {
-      case SeverityLevel.low:
-        return AppTheme.severityLow;
-      case SeverityLevel.moderate:
-        return AppTheme.severityModerate;
-      case SeverityLevel.high:
-        return AppTheme.severityHigh;
-    }
-  }
+  State<_EditIncidentSheet> createState() => _EditIncidentSheetState();
 }
 
-class _DetailRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color? valueColor;
+class _EditIncidentSheetState extends State<_EditIncidentSheet> {
+  late final TextEditingController _titleController;
+  late final TextEditingController _descController;
+  late IncidentCategory _category;
+  late SeverityLevel _severity;
+  bool _saving = false;
 
-  const _DetailRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-    this.valueColor,
-  });
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.incident.title);
+    _descController = TextEditingController(text: widget.incident.description);
+    _category = widget.incident.category;
+    _severity = widget.incident.severity;
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_titleController.text.trim().isEmpty) return;
+    setState(() => _saving = true);
+    final updated = widget.incident.copyWith(
+      title: _titleController.text.trim(),
+      description: _descController.text.trim(),
+      category: _category,
+      severity: _severity,
+    );
+    await widget.onSave(updated);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: Colors.grey[600]),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[500],
-                ),
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
               ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: valueColor ?? Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text('Edit Report', style: AppTheme.headingSmall),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _titleController,
+            decoration: const InputDecoration(
+              labelText: 'Title',
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            ),
+            maxLength: 100,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _descController,
+            decoration: const InputDecoration(
+              labelText: 'Description',
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            ),
+            maxLines: 3,
+            maxLength: 500,
+          ),
+          const SizedBox(height: 12),
+          Text('Category', style: AppTheme.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: IncidentCategory.values.map((cat) {
+              final label = cat.name[0].toUpperCase() + cat.name.substring(1);
+              final isSelected = _category == cat;
+              return GestureDetector(
+                onTap: () => setState(() => _category = cat),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppTheme.primaryDark : Colors.transparent,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isSelected ? AppTheme.primaryDark : AppTheme.cardBorder,
+                    ),
+                  ),
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontFamily: AppTheme.fontFamily,
+                      fontSize: 13,
+                      color: isSelected ? Colors.white : AppTheme.primaryDark,
+                    ),
+                  ),
                 ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 12),
+          Text('Severity', style: AppTheme.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          Row(
+            children: SeverityLevel.values.map((sev) {
+              final label = sev.name[0].toUpperCase() + sev.name.substring(1);
+              final isSelected = _severity == sev;
+              final color = sev == SeverityLevel.high
+                  ? AppTheme.primaryRed
+                  : sev == SeverityLevel.moderate
+                      ? AppTheme.warningOrange
+                      : AppTheme.successGreen;
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: GestureDetector(
+                  onTap: () => setState(() => _severity = sev),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isSelected ? color : Colors.transparent,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: isSelected ? color : AppTheme.cardBorder),
+                    ),
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontFamily: AppTheme.fontFamily,
+                        fontSize: 13,
+                        color: isSelected ? Colors.white : AppTheme.primaryDark,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _saving ? null : _save,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryDark,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
               ),
-            ],
+              child: _saving
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Save Changes'),
+            ),
           ),
         ],
       ),

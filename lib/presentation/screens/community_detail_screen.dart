@@ -358,7 +358,7 @@ class _CommunitySharedIncidentsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final allIncidents = context.watch<IncidentProvider>().allIncidents;
     final shared = allIncidents
-        .where((i) => i.communityId == communityId)
+        .where((i) => i.communityIds.contains(communityId))
         .toList();
 
     return Padding(

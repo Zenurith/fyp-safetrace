@@ -158,6 +158,69 @@ lib/
 ### Communities Feature
 Communities are **location-based groups** (center point + radius). Membership eligibility uses the **Haversine formula**. Members can create posts/discussions within the community. Joining is currently **auto-approved** (no admin approval) for testing.
 
+### Security Issues (Open)
+- `admin_web_shell.dart` — verify whether admin check exists before rendering the web admin shell
+- `admin_auth_screen.dart` — verify whether `user.isAdmin` is checked after successful auth
+
+> **Note**: `admin_screen.dart` has no guard inside the screen itself, but access is controlled via `if (user.isAdmin)` in `profile_screen.dart` line 454 — the button is never shown to non-admins. This is acceptable but relies on UI-level gating rather than route-level protection.
+
+### Design Violations (Open — fix opportunistically)
+- `profile_screen.dart`: AppBar uses `AppTheme.profilePurple` → should be `AppTheme.primaryDark`
+- `profile_screen.dart`: Reputation card uses `BoxShadow` → replace with `AppTheme.cardDecoration`
+- `profile_screen.dart`: Uses `Colors.teal` and `Colors.amber` directly → use AppTheme constants
+- `community_list_screen.dart`: Uses `AppTheme.accentBlue` → replace with `AppTheme.primaryDark`
+- `community_detail_screen.dart`: Hardcoded colors in membership state UI → use AppTheme constants
+- `admin_auth_screen.dart`: Uses `BoxShadow` on login card → replace with `AppTheme.cardDecoration`
+- `admin_dashboard_page.dart`: Uses `Colors.teal` and `Colors.amber` in avatar UI
+
+### Logic Bugs (Open)
+- `community_list_screen.dart` Discover tab: filters out only *approved* members from discover list — pending members still see the community. Should exclude all non-null membership statuses.
+- `community_detail_screen.dart`: `_isAdmin` local state not cleared on pop — stale state on re-entry.
+
+### Performance Issues (Open)
+- `community_admin_screen.dart`: N+1 user queries — each member card loads user doc individually in `initState`. Batch-fetch instead.
+- `profile_screen.dart` lines 128–164: `debugPrint()` calls should be wrapped in `kDebugMode` or removed.
+- Edit profile dialog creates `TextEditingController` on every open without disposing on cancel (memory leak risk).
+
+---
+
+## Self-Improve Loop
+
+> **Purpose**: Before starting any task, consult this section. After finishing, update it with new findings.
+
+### How to Use This Loop
+
+1. **Before each task**: Scan the "Open Issues" lists above. If your task touches a file with known violations, fix them in the same PR unless it would significantly expand scope.
+2. **After each task**: If you discover a new bug, design violation, or anti-pattern not listed here, add it to the relevant section above.
+3. **After fixing an issue**: Remove it from the list above. Do not leave stale fixed items.
+4. **On each new screen/feature**: Run the checklist below before marking done.
+
+### Pre-Commit Checklist (run mentally before finishing any UI task)
+
+```
+[ ] No raw Colors.xxx used — all colors via AppTheme constants
+[ ] No BoxShadow on cards — AppTheme.cardDecoration used
+[ ] No AppTheme.profilePurple or AppTheme.accentBlue in new code
+[ ] AppBar background uses AppTheme.primaryDark (not profilePurple)
+[ ] All grey text uses AppTheme.textSecondary (not Colors.grey)
+[ ] Card borders consistent — use AppTheme.cardDecoration, not manual Border.all
+[ ] No debugPrint() left in production paths (wrap in kDebugMode)
+[ ] Admin screens guard entry with isAdmin check
+[ ] Async operations in UI wrapped in try-catch with error feedback
+[ ] No N+1 Firestore queries — batch or cache user lookups
+[ ] Provider state cleared in dispose() if screen-specific
+[ ] No hardcoded hex color values in widget trees
+```
+
+### Recurring Patterns to Watch
+
+- **Admin access control**: Every admin screen/page must check `user.isAdmin` at entry and redirect if false.
+- **Card styling**: Always `AppTheme.cardDecoration`. Never mix border + shadow.
+- **Color usage**: Only `AppTheme.*` constants. When adding a new semantic state, add to AppTheme first, then use it.
+- **Community filtering**: When filtering communities by membership, exclude ALL non-null statuses (approved, pending, rejected) — not just approved.
+- **Firestore reads in loops**: Never call `.get()` or `.load()` inside a `ListView.builder` or `initState` of a list item widget — batch-fetch at the provider level.
+- **Debug code**: Any `debugPrint` / `print` in production path must be wrapped: `if (kDebugMode) { debugPrint(...); }`
+
 ## Common Mistakes to Avoid
 
 ### Flutter API Changes
