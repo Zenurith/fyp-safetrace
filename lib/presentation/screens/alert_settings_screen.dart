@@ -6,8 +6,63 @@ import '../../utils/app_theme.dart';
 import '../providers/alert_settings_provider.dart';
 import '../providers/category_provider.dart';
 
-class AlertSettingsScreen extends StatelessWidget {
+class AlertSettingsScreen extends StatefulWidget {
   const AlertSettingsScreen({super.key});
+
+  @override
+  State<AlertSettingsScreen> createState() => _AlertSettingsScreenState();
+}
+
+class _AlertSettingsScreenState extends State<AlertSettingsScreen> {
+  /// Converts a "10:00 PM" formatted string to a [TimeOfDay].
+  TimeOfDay _parseTimeString(String timeStr) {
+    try {
+      final parts = timeStr.trim().split(' ');
+      final timeParts = parts[0].split(':');
+      int hour = int.parse(timeParts[0]);
+      final int minute = int.parse(timeParts[1]);
+      final String period = parts[1].toUpperCase();
+      if (period == 'PM' && hour != 12) hour += 12;
+      if (period == 'AM' && hour == 12) hour = 0;
+      return TimeOfDay(hour: hour, minute: minute);
+    } catch (_) {
+      return const TimeOfDay(hour: 22, minute: 0);
+    }
+  }
+
+  /// Formats a [TimeOfDay] to "10:00 PM" style string.
+  String _formatTimeOfDay(TimeOfDay time) {
+    final hour12 = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
+    final minute = time.minute.toString().padLeft(2, '0');
+    final period = time.period == DayPeriod.am ? 'AM' : 'PM';
+    return '$hour12:$minute $period';
+  }
+
+  Future<void> _pickQuietFrom(
+      BuildContext ctx, AlertSettingsProvider provider) async {
+    final initial = _parseTimeString(provider.settings.quietFrom);
+    final picked = await showTimePicker(
+      context: ctx,
+      initialTime: initial,
+      helpText: 'Select quiet hours start',
+    );
+    if (picked != null) {
+      provider.updateQuietFrom(_formatTimeOfDay(picked));
+    }
+  }
+
+  Future<void> _pickQuietTo(
+      BuildContext ctx, AlertSettingsProvider provider) async {
+    final initial = _parseTimeString(provider.settings.quietTo);
+    final picked = await showTimePicker(
+      context: ctx,
+      initialTime: initial,
+      helpText: 'Select quiet hours end',
+    );
+    if (picked != null) {
+      provider.updateQuietTo(_formatTimeOfDay(picked));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -179,6 +234,56 @@ class AlertSettingsScreen extends StatelessWidget {
                     ),
                   ),
                 ],
+                const Divider(height: 32),
+                // Quiet Hours (Do Not Disturb)
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Quiet Hours (Do Not Disturb)',
+                            style: TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            'Suppress alerts during selected hours',
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch.adaptive(
+                      value: settings.quietHoursEnabled,
+                      activeColor: AppTheme.primaryRed,
+                      onChanged: (v) => provider.toggleQuietHours(v),
+                    ),
+                  ],
+                ),
+                if (settings.quietHoursEnabled) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: AppTheme.cardDecoration,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _TimePickerRow(
+                          label: 'From',
+                          timeStr: settings.quietFrom,
+                          onTap: () => _pickQuietFrom(context, provider),
+                        ),
+                        const SizedBox(height: 8),
+                        _TimePickerRow(
+                          label: 'To',
+                          timeStr: settings.quietTo,
+                          onTap: () => _pickQuietTo(context, provider),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 32),
                 SizedBox(
                   width: double.infinity,
@@ -203,7 +308,62 @@ class AlertSettingsScreen extends StatelessWidget {
       ),
     );
   }
+}
 
+class _TimePickerRow extends StatelessWidget {
+  final String label;
+  final String timeStr;
+  final VoidCallback onTap;
+
+  const _TimePickerRow({
+    required this.label,
+    required this.timeStr,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+        child: Row(
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontFamily: AppTheme.fontFamily,
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+                color: AppTheme.textSecondary,
+              ),
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppTheme.backgroundGrey,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppTheme.cardBorder),
+              ),
+              child: Text(
+                timeStr,
+                style: const TextStyle(
+                  fontFamily: AppTheme.fontFamily,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.primaryDark,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right, size: 18, color: AppTheme.textSecondary),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _SeverityCheckbox extends StatelessWidget {

@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/models/incident_model.dart';
 import '../../data/models/image_verification_result.dart';
 import '../../data/services/location_service.dart';
@@ -26,6 +28,8 @@ class ReportIncidentScreen extends StatefulWidget {
 }
 
 class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _addressController = TextEditingController();
   final _addressFocusNode = FocusNode();
@@ -37,6 +41,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
 
   // Maximum allowed distance in meters (5 km)
   static const double _maxReportDistanceMeters = 5000;
+  static const int _maxTitleLength = 100;
   static const int _maxDescriptionLength = 500;
   static const int _maxAddressLength = 300;
   static const int _maxMediaFiles = 5;
@@ -51,6 +56,16 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
   bool _isSubmitting = false;
   bool _isVerifying = false;
   ImageVerificationResult? _verificationResult;
+
+  // Enhancement 1: Incident time
+  DateTime? _incidentTime;
+
+  // Enhancement 5: AI category suggestion
+  IncidentCategory? _suggestedCategory;
+  Timer? _suggestionDebounceTimer;
+
+  // Enhancement 6: Draft auto-save
+  Timer? _draftSaveTimer;
 
   // User's actual current position (for distance validation)
   double? _userCurrentLat;
@@ -75,14 +90,185 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     super.initState();
     _addressController.addListener(_onAddressChanged);
     _addressFocusNode.addListener(_onAddressFocusChanged);
+
+    // Enhancement 5: Listeners for AI category suggestion
+    _titleController.addListener(_onTextChangedForSuggestion);
+    _descriptionController.addListener(_onTextChangedForSuggestion);
+
+    // Enhancement 6: Listeners for draft auto-save
+    _titleController.addListener(_onTextChangedForDraft);
+    _descriptionController.addListener(_onTextChangedForDraft);
+
     _detectLocation();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final userId = context.read<UserProvider>().currentUser?.id;
       if (userId != null) {
         context.read<CommunityProvider>().loadMyCommunities(userId);
       }
+      _checkForDraft();
     });
   }
+
+  // ─── Enhancement 5: AI Category Suggestion ───────────────────────────────
+
+  void _onTextChangedForSuggestion() {
+    _suggestionDebounceTimer?.cancel();
+    _suggestionDebounceTimer = Timer(const Duration(milliseconds: 400), () {
+      _suggestCategory();
+    });
+  }
+
+  IncidentCategory? _matchCategoryFromText(String text) {
+    final t = text.toLowerCase();
+    const keywords = <IncidentCategory, List<String>>{
+      IncidentCategory.emergency: [
+        'fire', 'ambulance', 'medical', 'emergency', 'collapse', 'explosion',
+        'earthquake', 'flood', 'rescue', 'unconscious', 'critical', 'faint',
+        'injured', 'injure', 'hurt', 'bleeding', 'bleed', 'wound', 'fracture',
+        'broken bone', 'heart attack', 'stroke', 'overdose', 'choking',
+        'electrocuted', 'drowning', 'gas leak', 'trapped',
+      ],
+      IncidentCategory.crime: [
+        'robbery', 'theft', 'steal', 'stolen', 'murder', 'assault', 'rape',
+        'break in', 'break-in', 'vandalism', 'graffiti', 'shooting', 'stab',
+        'drug', 'criminal', 'crime', 'burglary', 'snatch', 'pickpocket',
+        'scam', 'fraud', 'kidnap', 'threaten', 'threat', 'weapon', 'gun',
+        'knife', 'parang', 'punch', 'beat up', 'molest', 'harass', 'victim',
+      ],
+      IncidentCategory.traffic: [
+        'accident', 'crash', 'collision', 'traffic', 'motorcycle', 'motorbike',
+        'lorry', 'truck', 'jam', 'congestion', 'roadblock', 'pothole',
+        'highway', 'vehicle', 'parking', 'car', 'bus', 'van', 'taxi',
+        'road', 'reckless', 'speeding', 'drunk driving', 'hit and run',
+      ],
+      IncidentCategory.infrastructure: [
+        'pipe', 'burst', 'electricity', 'power outage', 'blackout',
+        'sewage', 'drain', 'lamppost', 'streetlight', 'pavement', 'sidewalk',
+        'bridge', 'construction', 'infrastructure', 'broken', 'water supply',
+        'no water', 'leaking', 'sinkhole', 'landslide', 'building',
+      ],
+      IncidentCategory.environmental: [
+        'rubbish', 'garbage', 'litter', 'pollution', 'smoke', 'haze',
+        'fallen tree', 'tree fell', 'environmental', 'dumping', 'illegal dump',
+        'dead animal', 'pest', 'dengue', 'mosquito', 'rat', 'dirty',
+        'stench', 'smell', 'river', 'toxic',
+      ],
+      IncidentCategory.suspicious: [
+        'suspicious', 'stranger', 'loitering', 'following', 'watching',
+        'unknown', 'weird', 'odd', 'lurking', 'stalking', 'spy', 'peeping',
+        'abandoned', 'unattended', 'bag left', 'package',
+      ],
+    };
+
+    for (final entry in keywords.entries) {
+      for (final kw in entry.value) {
+        if (t.contains(kw)) return entry.key;
+      }
+    }
+    return null;
+  }
+
+  void _suggestCategory() {
+    final text =
+        '${_titleController.text.trim()} ${_descriptionController.text.trim()}';
+    if (text.trim().length < 5) {
+      if (mounted && _suggestedCategory != null) {
+        setState(() => _suggestedCategory = null);
+      }
+      return;
+    }
+    final cat = _matchCategoryFromText(text);
+    if (mounted) setState(() => _suggestedCategory = cat);
+  }
+
+  // ─── Enhancement 6: Draft Auto-Save ──────────────────────────────────────
+
+  void _onTextChangedForDraft() {
+    _draftSaveTimer?.cancel();
+    _draftSaveTimer = Timer(const Duration(seconds: 1), () {
+      _saveDraft();
+    });
+  }
+
+  Future<void> _saveDraft() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('report_draft_title', _titleController.text);
+    await prefs.setString('report_draft_description', _descriptionController.text);
+    await prefs.setInt('report_draft_category', _selectedCategory.index);
+    await prefs.setInt('report_draft_severity', _selectedSeverity.index);
+    await prefs.setString('report_draft_address', _address);
+    await prefs.setDouble('report_draft_lat', _latitude);
+    await prefs.setDouble('report_draft_lng', _longitude);
+  }
+
+  Future<void> _clearDraft() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('report_draft_title');
+    await prefs.remove('report_draft_description');
+    await prefs.remove('report_draft_category');
+    await prefs.remove('report_draft_severity');
+    await prefs.remove('report_draft_address');
+    await prefs.remove('report_draft_lat');
+    await prefs.remove('report_draft_lng');
+  }
+
+  Future<bool> _loadDraft() async {
+    final prefs = await SharedPreferences.getInstance();
+    final title = prefs.getString('report_draft_title');
+    if (title == null || title.isEmpty) return false;
+    return true;
+  }
+
+  Future<void> _checkForDraft() async {
+    final hasDraft = await _loadDraft();
+    if (!hasDraft || !mounted) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final draftTitle = prefs.getString('report_draft_title') ?? '';
+    final draftDescription = prefs.getString('report_draft_description') ?? '';
+    final draftCategoryIdx = prefs.getInt('report_draft_category');
+    final draftSeverityIdx = prefs.getInt('report_draft_severity');
+    final draftAddress = prefs.getString('report_draft_address') ?? '';
+    final draftLat = prefs.getDouble('report_draft_lat');
+    final draftLng = prefs.getDouble('report_draft_lng');
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('You have an unsaved draft.'),
+        duration: const Duration(seconds: 6),
+        action: SnackBarAction(
+          label: 'Restore',
+          onPressed: () {
+            if (!mounted) return;
+            setState(() {
+              _titleController.text = draftTitle;
+              _descriptionController.text = draftDescription;
+              if (draftCategoryIdx != null &&
+                  draftCategoryIdx < IncidentCategory.values.length) {
+                _selectedCategory = IncidentCategory.values[draftCategoryIdx];
+              }
+              if (draftSeverityIdx != null &&
+                  draftSeverityIdx < SeverityLevel.values.length) {
+                _selectedSeverity = SeverityLevel.values[draftSeverityIdx];
+              }
+              if (draftAddress.isNotEmpty) {
+                _address = draftAddress;
+                _addressController.text = draftAddress;
+              }
+              if (draftLat != null && draftLng != null) {
+                _latitude = draftLat;
+                _longitude = draftLng;
+              }
+            });
+          },
+        ),
+      ),
+    );
+  }
+
+  // ─── Address Autocomplete ─────────────────────────────────────────────────
 
   void _onAddressChanged() {
     if (!_addressFocusNode.hasFocus) return;
@@ -134,18 +320,17 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     _address = suggestion.description;
     _addressFocusNode.unfocus();
 
-    final coords = await _locationService.getCoordinatesFromPlaceId(suggestion.placeId);
+    final coords =
+        await _locationService.getCoordinatesFromPlaceId(suggestion.placeId);
     if (coords != null && mounted) {
       setState(() {
         _latitude = coords.latitude;
         _longitude = coords.longitude;
         _loadingLocation = false;
       });
-      // Animate map to selected location
       _mapController?.animateCamera(
         CameraUpdate.newLatLng(LatLng(coords.latitude, coords.longitude)),
       );
-      // Validate distance after selecting address
       _validateDistance();
     } else {
       setState(() => _loadingLocation = false);
@@ -164,17 +349,14 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
           _longitude = pos.longitude;
           _address = addr;
           _addressController.text = addr;
-          // Store user's actual current position for distance validation
           _userCurrentLat = pos.latitude;
           _userCurrentLng = pos.longitude;
           _locationTooFar = false;
         });
-        // Animate map to new location
         _mapController?.animateCamera(
           CameraUpdate.newLatLng(LatLng(pos.latitude, pos.longitude)),
         );
       } else if (mounted) {
-        // Location returned null - could be permissions issue
         debugPrint('Location detection returned null - check permissions');
       }
     } catch (e) {
@@ -182,7 +364,8 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Could not detect your location. Please enter address manually.'),
+            content: Text(
+                'Could not detect your location. Please enter address manually.'),
             backgroundColor: Colors.orange,
           ),
         );
@@ -191,7 +374,6 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     if (mounted) setState(() => _loadingLocation = false);
   }
 
-  /// Calculate distance between user's current location and selected incident location
   double _calculateDistance() {
     if (_userCurrentLat == null || _userCurrentLng == null) {
       return 0;
@@ -204,17 +386,14 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     );
   }
 
-  /// Check if the selected location is within allowed radius
   void _validateDistance() {
     if (_userCurrentLat == null || _userCurrentLng == null) return;
-
     final distance = _calculateDistance();
     setState(() {
       _locationTooFar = distance > _maxReportDistanceMeters;
     });
   }
 
-  /// Format distance for display
   String _formatDistance(double meters) {
     if (meters < 1000) {
       return '${meters.round()} m';
@@ -225,12 +404,48 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
   @override
   void dispose() {
     _debounceTimer?.cancel();
+    _suggestionDebounceTimer?.cancel();
+    _draftSaveTimer?.cancel();
+    _titleController.dispose();
     _descriptionController.dispose();
     _addressController.dispose();
     _addressFocusNode.dispose();
     _mapController?.dispose();
     super.dispose();
   }
+
+  // ─── Enhancement 1: Incident Time Picker ─────────────────────────────────
+
+  Future<void> _pickIncidentTime() async {
+    final now = DateTime.now();
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: _incidentTime ?? now,
+      firstDate: DateTime(now.year - 1),
+      lastDate: now,
+    );
+    if (pickedDate == null || !mounted) return;
+
+    final pickedTime = await showTimePicker(
+      context: context,
+      initialTime: _incidentTime != null
+          ? TimeOfDay.fromDateTime(_incidentTime!)
+          : TimeOfDay.fromDateTime(now),
+    );
+    if (pickedTime == null || !mounted) return;
+
+    setState(() {
+      _incidentTime = DateTime(
+        pickedDate.year,
+        pickedDate.month,
+        pickedDate.day,
+        pickedTime.hour,
+        pickedTime.minute,
+      );
+    });
+  }
+
+  // ─── Media Picker ─────────────────────────────────────────────────────────
 
   Future<void> _pickMedia() async {
     showModalBottomSheet(
@@ -259,7 +474,9 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                   if (_selectedMedia.length >= _maxMediaFiles) {
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Maximum $_maxMediaFiles files allowed.')),
+                        SnackBar(
+                            content:
+                                Text('Maximum $_maxMediaFiles files allowed.')),
                       );
                     }
                     return;
@@ -279,7 +496,8 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                     color: AppTheme.accentBlue.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.videocam, color: AppTheme.accentBlue),
+                  child:
+                      const Icon(Icons.videocam, color: AppTheme.accentBlue),
                 ),
                 title: const Text('Record Video'),
                 onTap: () async {
@@ -287,7 +505,9 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                   if (_selectedMedia.length >= _maxMediaFiles) {
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Maximum $_maxMediaFiles files allowed.')),
+                        SnackBar(
+                            content:
+                                Text('Maximum $_maxMediaFiles files allowed.')),
                       );
                     }
                     return;
@@ -307,7 +527,8 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                     color: AppTheme.accentBlue.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.photo_library, color: AppTheme.accentBlue),
+                  child: const Icon(Icons.photo_library,
+                      color: AppTheme.accentBlue),
                 ),
                 title: const Text('Choose from Gallery'),
                 onTap: () async {
@@ -343,7 +564,209 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     setState(() => _selectedMedia.removeAt(index));
   }
 
+  // ─── Enhancement 3 & 4: Submit Flow ──────────────────────────────────────
+
+  /// New _submit() entry point: validates form, then shows confirm dialog.
   Future<void> _submit() async {
+    // Enhancement 3: Inline form validation first
+    final isValid = _formKey.currentState!.validate();
+    if (!isValid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please fix the errors above.'),
+          backgroundColor: AppTheme.primaryRed,
+        ),
+      );
+      return;
+    }
+
+    // Enhancement 4: Show confirmation dialog before submitting
+    await _showConfirmDialog();
+  }
+
+  /// Enhancement 4: Show bottom sheet summary before submitting.
+  Future<void> _showConfirmDialog() async {
+    final addressToShow = _addressController.text.trim().isNotEmpty
+        ? _addressController.text.trim()
+        : _address;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const Text(
+                  'Confirm Report',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: AppTheme.fontFamily,
+                    color: AppTheme.primaryDark,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Title
+                Text(
+                  _titleController.text.trim(),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: AppTheme.fontFamily,
+                    color: AppTheme.primaryDark,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Category chip
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    Chip(
+                      label: Text(
+                        _categoryLabel(_selectedCategory),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontFamily: AppTheme.fontFamily,
+                        ),
+                      ),
+                      backgroundColor:
+                          AppTheme.categoryColor(_categoryLabel(_selectedCategory)),
+                      padding: EdgeInsets.zero,
+                    ),
+                    Chip(
+                      label: Text(
+                        _severityLabel(_selectedSeverity),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontFamily: AppTheme.fontFamily,
+                        ),
+                      ),
+                      backgroundColor: _severityColor(_selectedSeverity),
+                      padding: EdgeInsets.zero,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                // Location
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.location_on_outlined,
+                        size: 16, color: AppTheme.textSecondary),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        addressToShow,
+                        style: AppTheme.caption,
+                      ),
+                    ),
+                  ],
+                ),
+                // Incident time
+                if (_incidentTime != null) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(Icons.schedule,
+                          size: 16, color: AppTheme.textSecondary),
+                      const SizedBox(width: 4),
+                      Text(
+                        'When: ${DateFormat('dd MMM yyyy, h:mm a').format(_incidentTime!)}',
+                        style: AppTheme.caption,
+                      ),
+                    ],
+                  ),
+                ],
+                // Media count
+                if (_selectedMedia.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(Icons.photo_library_outlined,
+                          size: 16, color: AppTheme.textSecondary),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${_selectedMedia.length} media file(s) attached',
+                        style: AppTheme.caption,
+                      ),
+                    ],
+                  ),
+                ],
+                // Anonymous
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Icon(
+                      _isAnonymous
+                          ? Icons.visibility_off_outlined
+                          : Icons.person_outline,
+                      size: 16,
+                      color: AppTheme.textSecondary,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _isAnonymous ? 'Submitted anonymously' : 'Submitted with your name',
+                      style: AppTheme.caption,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                // Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(sheetContext),
+                        child: const Text('Edit'),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(sheetContext);
+                          _submitFinal();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryRed,
+                        ),
+                        child: const Text('Submit'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Enhancement 2 & 4: The actual submit logic (renamed from _submit).
+  Future<void> _submitFinal() async {
     // Block banned or suspended users
     final currentUser = context.read<UserProvider>().currentUser;
     if (currentUser == null || !currentUser.canAccessApp) {
@@ -356,12 +779,34 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
       return;
     }
 
+    // Validate title
+    final title = _titleController.text.trim();
+    if (title.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a title for the incident.'),
+          backgroundColor: AppTheme.primaryRed,
+        ),
+      );
+      return;
+    }
+    if (title.length > _maxTitleLength) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Title is too long (max $_maxTitleLength characters).'),
+          backgroundColor: AppTheme.primaryRed,
+        ),
+      );
+      return;
+    }
+
     // Validate description length
     final description = _descriptionController.text.trim();
     if (description.length > _maxDescriptionLength) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Description is too long (max $_maxDescriptionLength characters).'),
+          content: Text(
+              'Description is too long (max $_maxDescriptionLength characters).'),
           backgroundColor: AppTheme.primaryRed,
         ),
       );
@@ -387,9 +832,9 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     }
 
     final provider = context.read<IncidentProvider>();
-    final userId = context.read<UserProvider>().currentUser?.id ?? 'anonymous';
+    final userId =
+        context.read<UserProvider>().currentUser?.id ?? 'anonymous';
 
-    // Use address from controller if available, otherwise use detected address
     final addressToSubmit = _addressController.text.trim().isNotEmpty
         ? _addressController.text.trim()
         : _address;
@@ -397,7 +842,8 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     if (addressToSubmit.length > _maxAddressLength) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Address is too long (max $_maxAddressLength characters).'),
+          content: Text(
+              'Address is too long (max $_maxAddressLength characters).'),
           backgroundColor: AppTheme.primaryRed,
         ),
       );
@@ -406,35 +852,54 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
 
     setState(() => _isSubmitting = true);
 
-    // Verify images if any are selected
-    debugPrint('Report: Media count=${_selectedMedia.length}, isConfigured=${_verificationService.isConfigured}');
+    // Enhancement 2: Verify ALL selected images
+    debugPrint(
+        'Report: Media count=${_selectedMedia.length}, isConfigured=${_verificationService.isConfigured}');
     if (_selectedMedia.isNotEmpty && _verificationService.isConfigured) {
-      debugPrint('Report: Starting image verification...');
+      debugPrint('Report: Starting image verification for all images...');
       setState(() => _isVerifying = true);
 
       try {
-        final imageBytes = await _selectedMedia.first.readAsBytes();
-        debugPrint('Report: Read ${imageBytes.length} bytes from image');
-        final result = await _verificationService.verifyImage(
-          imageBytes: imageBytes,
-          categoryName: _categoryLabel(_selectedCategory),
-          description: _descriptionController.text.trim(),
-        );
+        ImageVerificationResult? worstResult;
 
-        setState(() {
-          _verificationResult = result;
-          _isVerifying = false;
-        });
+        for (final media in _selectedMedia) {
+          final ext = media.path.split('.').last.toLowerCase();
+          final isVideo = ['mp4', 'mov', 'avi', 'mkv'].contains(ext);
+          if (isVideo) continue; // Skip videos
 
-        // If verification failed with low confidence, warn the user
-        if (!result.isValid || result.isLowConfidence) {
-          if (mounted) {
-            final shouldContinue = await _showVerificationWarningDialog(result);
-            if (!shouldContinue) {
-              setState(() => _isSubmitting = false);
-              return;
+          final imageBytes = await media.readAsBytes();
+          debugPrint('Report: Read ${imageBytes.length} bytes from image');
+          final result = await _verificationService.verifyImage(
+            imageBytes: imageBytes,
+            categoryName: _categoryLabel(_selectedCategory),
+            description: _descriptionController.text.trim(),
+          );
+
+          // Keep the worst (lowest confidence) result
+          if (worstResult == null ||
+              result.confidenceScore < worstResult.confidenceScore) {
+            worstResult = result;
+          }
+        }
+
+        if (worstResult != null) {
+          setState(() {
+            _verificationResult = worstResult;
+            _isVerifying = false;
+          });
+
+          if (!worstResult.isValid || worstResult.isLowConfidence) {
+            if (mounted) {
+              final shouldContinue =
+                  await _showVerificationWarningDialog(worstResult);
+              if (!shouldContinue) {
+                setState(() => _isSubmitting = false);
+                return;
+              }
             }
           }
+        } else {
+          setState(() => _isVerifying = false);
         }
       } catch (e) {
         debugPrint('Image verification error: $e');
@@ -448,7 +913,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     try {
       // Create incident first to get the ID (with timeout)
       incidentId = await provider.reportIncident(
-        title: _selectedCategory.name,
+        title: _titleController.text.trim(),
         category: _selectedCategory,
         severity: _selectedSeverity,
         description: _descriptionController.text.trim().isEmpty
@@ -463,6 +928,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
         verificationScore: _verificationResult?.confidenceScore,
         verificationNote: _verificationResult?.explanation,
         communityIds: _selectedCommunityIds.toList(),
+        incidentTime: _incidentTime,
       ).timeout(
         const Duration(seconds: 30),
         onTimeout: () {
@@ -471,7 +937,6 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
         },
       );
 
-      // Check if incident was created successfully
       if (incidentId == null) {
         if (mounted) {
           setState(() => _isSubmitting = false);
@@ -487,7 +952,8 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
 
       // Upload media if any
       if (_selectedMedia.isNotEmpty) {
-        debugPrint('Report: Starting media upload for ${_selectedMedia.length} files');
+        debugPrint(
+            'Report: Starting media upload for ${_selectedMedia.length} files');
         try {
           final mediaUrls = await _mediaService.uploadMultipleFiles(
             _selectedMedia,
@@ -500,33 +966,31 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
             await provider.updateIncidentMedia(incidentId, mediaUrls);
             debugPrint('Report: Media URLs updated successfully');
           } else {
-            debugPrint('Report: WARNING - No media URLs returned, skipping update');
+            debugPrint(
+                'Report: WARNING - No media URLs returned, skipping update');
           }
         } catch (mediaError) {
-          // Media upload failed, but incident was created - still consider it a success
           debugPrint('Report: Media upload failed: $mediaError');
         }
       } else {
         debugPrint('Report: No media selected, skipping upload');
       }
 
-      // Success - pop the screen
+      // Enhancement 6: Clear draft on successful submit
+      await _clearDraft();
+
       if (!mounted) return;
 
-      // Check if auto-approved
       final wasAutoApproved = _verificationResult != null &&
           _verificationResult!.isValid &&
           _verificationResult!.isHighConfidence;
 
-      // First disable loading, then pop
       setState(() => _isSubmitting = false);
 
-      // Small delay to ensure state is updated
       await Future.delayed(const Duration(milliseconds: 100));
 
       if (!mounted) return;
 
-      // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -546,13 +1010,14 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
               ),
             ],
           ),
-          backgroundColor: wasAutoApproved ? AppTheme.successGreen : AppTheme.warningOrange,
+          backgroundColor: wasAutoApproved
+              ? AppTheme.successGreen
+              : AppTheme.warningOrange,
           duration: const Duration(seconds: 3),
         ),
       );
 
-      Navigator.of(context).pop(true); // Pass true to indicate success
-
+      Navigator.of(context).pop(true);
     } catch (e) {
       debugPrint('Submit error: $e');
       if (mounted) {
@@ -567,96 +1032,104 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     }
   }
 
-  Future<bool> _showVerificationWarningDialog(ImageVerificationResult result) async {
+  Future<bool> _showVerificationWarningDialog(
+      ImageVerificationResult result) async {
     return await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(
-              result.isValid ? Icons.warning_amber : Icons.error_outline,
-              color: result.isValid ? AppTheme.warningOrange : AppTheme.primaryRed,
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(
+                  result.isValid ? Icons.warning_amber : Icons.error_outline,
+                  color: result.isValid
+                      ? AppTheme.warningOrange
+                      : AppTheme.primaryRed,
+                ),
+                const SizedBox(width: 8),
+                const Text('Image Verification'),
+              ],
             ),
-            const SizedBox(width: 8),
-            const Text('Image Verification'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              result.explanation,
-              style: const TextStyle(fontSize: 14),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  const Text('Confidence: '),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: _getConfidenceColor(result.confidenceScore),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      '${(result.confidenceScore * 100).toInt()}% (${result.confidenceLabel})',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  result.explanation,
+                  style: const TextStyle(fontSize: 14),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(8),
                   ),
+                  child: Row(
+                    children: [
+                      const Text('Confidence: '),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: _getConfidenceColor(result.confidenceScore),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '${(result.confidenceScore * 100).toInt()}% (${result.confidenceLabel})',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (result.concerns.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Concerns:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  ...result.concerns.map((c) => Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child:
+                            Text('• $c', style: const TextStyle(fontSize: 13)),
+                      )),
                 ],
-              ),
+                const SizedBox(height: 16),
+                Text(
+                  result.isValid
+                      ? 'The image may not clearly match your report. Do you want to submit anyway?'
+                      : 'The image does not appear to match your selected category. Please review your submission.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey[700],
+                  ),
+                ),
+              ],
             ),
-            if (result.concerns.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              const Text(
-                'Concerns:',
-                style: TextStyle(fontWeight: FontWeight.bold),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Go Back'),
               ),
-              const SizedBox(height: 4),
-              ...result.concerns.map((c) => Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: Text('• $c', style: const TextStyle(fontSize: 13)),
-              )),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: result.isValid
+                      ? AppTheme.warningOrange
+                      : AppTheme.primaryRed,
+                ),
+                child: const Text('Submit Anyway'),
+              ),
             ],
-            const SizedBox(height: 16),
-            Text(
-              result.isValid
-                  ? 'The image may not clearly match your report. Do you want to submit anyway?'
-                  : 'The image does not appear to match your selected category. Please review your submission.',
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey[700],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Go Back'),
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: result.isValid ? AppTheme.warningOrange : AppTheme.primaryRed,
-            ),
-            child: const Text('Submit Anyway'),
-          ),
-        ],
-      ),
-    ) ?? false;
+        ) ??
+        false;
   }
 
   Color _getConfidenceColor(double score) {
@@ -664,6 +1137,8 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     if (score >= 0.4) return AppTheme.warningOrange;
     return AppTheme.primaryRed;
   }
+
+  // ─── Build ────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -675,402 +1150,589 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
         children: [
           SingleChildScrollView(
             padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Location section
-                const Text(
-                  'Location',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.primaryRed,
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Location section ──────────────────────────────────
+                  const Text(
+                    'Location',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primaryRed,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 180,
-                    child: Stack(
-                      children: [
-                        GoogleMap(
-                          initialCameraPosition: CameraPosition(
-                            target: LatLng(_latitude, _longitude),
-                            zoom: 15,
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 180,
+                      child: Stack(
+                        children: [
+                          GoogleMap(
+                            initialCameraPosition: CameraPosition(
+                              target: LatLng(_latitude, _longitude),
+                              zoom: 15,
+                            ),
+                            onMapCreated: (controller) {
+                              _mapController = controller;
+                            },
+                            markers: {
+                              Marker(
+                                markerId: const MarkerId('incident_location'),
+                                position: LatLng(_latitude, _longitude),
+                                icon: BitmapDescriptor.defaultMarkerWithHue(
+                                  BitmapDescriptor.hueRed,
+                                ),
+                              ),
+                            },
+                            onTap: (latLng) {
+                              setState(() {
+                                _latitude = latLng.latitude;
+                                _longitude = latLng.longitude;
+                              });
+                              _locationService
+                                  .getAddressFromCoordinates(
+                                      latLng.latitude, latLng.longitude)
+                                  .then((addr) {
+                                if (mounted) {
+                                  setState(() {
+                                    _address = addr;
+                                    _addressController.text = addr;
+                                  });
+                                  _validateDistance();
+                                }
+                              });
+                            },
+                            zoomControlsEnabled: false,
+                            myLocationEnabled: true,
+                            myLocationButtonEnabled: false,
                           ),
-                          onMapCreated: (controller) {
-                            _mapController = controller;
-                          },
-                          markers: {
-                            Marker(
-                              markerId: const MarkerId('incident_location'),
-                              position: LatLng(_latitude, _longitude),
-                              icon: BitmapDescriptor.defaultMarkerWithHue(
-                                BitmapDescriptor.hueRed,
+                          if (_loadingLocation)
+                            Container(
+                              color: Colors.white.withValues(alpha: 0.7),
+                              child: const Center(
+                                child: CircularProgressIndicator(),
                               ),
                             ),
-                          },
-                          onTap: (latLng) {
-                            setState(() {
-                              _latitude = latLng.latitude;
-                              _longitude = latLng.longitude;
-                            });
-                            // Reverse geocode to get address
-                            _locationService
-                                .getAddressFromCoordinates(latLng.latitude, latLng.longitude)
-                                .then((addr) {
-                              if (mounted) {
-                                setState(() {
-                                  _address = addr;
-                                  _addressController.text = addr;
-                                });
-                                _validateDistance();
-                              }
-                            });
-                          },
-                          zoomControlsEnabled: false,
-                          myLocationEnabled: true,
-                          myLocationButtonEnabled: false,
-                        ),
-                        if (_loadingLocation)
-                          Container(
-                            color: Colors.white.withValues(alpha: 0.7),
-                            child: const Center(
-                              child: CircularProgressIndicator(),
+                          Positioned(
+                            bottom: 8,
+                            left: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.6),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'Tap map to adjust location',
+                                style: TextStyle(
+                                    color: Colors.white, fontSize: 11),
+                              ),
                             ),
                           ),
-                        // Tap hint
-                        Positioned(
-                          bottom: 8,
-                          left: 8,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.6),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text(
-                              'Tap map to adjust location',
-                              style: TextStyle(color: Colors.white, fontSize: 11),
-                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Address input with autocomplete
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextField(
+                        controller: _addressController,
+                        focusNode: _addressFocusNode,
+                        decoration: InputDecoration(
+                          labelText: 'Address',
+                          hintText: 'Type to search address...',
+                          prefixIcon: const Icon(Icons.search),
+                          suffixIcon: _addressController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear),
+                                  onPressed: () {
+                                    _addressController.clear();
+                                    setState(() {
+                                      _suggestions = [];
+                                      _showSuggestions = false;
+                                    });
+                                  },
+                                )
+                              : null,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onSubmitted: (value) {
+                          if (value.isNotEmpty) {
+                            _address = value;
+                            setState(() => _showSuggestions = false);
+                          }
+                        },
+                      ),
+                      if (_showSuggestions && _suggestions.isNotEmpty)
+                        Container(
+                          margin: const EdgeInsets.only(top: 4),
+                          constraints: const BoxConstraints(maxHeight: 200),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.1),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: _suggestions.length,
+                            itemBuilder: (context, index) {
+                              final suggestion = _suggestions[index];
+                              return ListTile(
+                                leading: const Icon(
+                                    Icons.location_on_outlined,
+                                    color: AppTheme.primaryRed),
+                                title: Text(
+                                  suggestion.description,
+                                  style: const TextStyle(fontSize: 14),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                onTap: () => _selectSuggestion(suggestion),
+                              );
+                            },
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed:
+                            _loadingLocation ? null : _detectLocation,
+                        icon: const Icon(Icons.my_location, size: 16),
+                        label: const Text('Use Current Location'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                        ),
+                      ),
+                      if (_userCurrentLat != null &&
+                          !_locationTooFar &&
+                          !_loadingLocation) ...[
+                        const SizedBox(width: 8),
+                        Text(
+                          _formatDistance(_calculateDistance()),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
                           ),
                         ),
                       ],
-                    ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 12),
-                // Address input with autocomplete
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextField(
-                      controller: _addressController,
-                      focusNode: _addressFocusNode,
-                      decoration: InputDecoration(
-                        labelText: 'Address',
-                        hintText: 'Type to search address...',
-                        prefixIcon: const Icon(Icons.search),
-                        suffixIcon: _addressController.text.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(Icons.clear),
-                                onPressed: () {
-                                  _addressController.clear();
-                                  setState(() {
-                                    _suggestions = [];
-                                    _showSuggestions = false;
-                                  });
-                                },
-                              )
-                            : null,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                  if (_locationTooFar)
+                    Container(
+                      margin: const EdgeInsets.only(top: 8),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryRed.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color:
+                                AppTheme.primaryRed.withValues(alpha: 0.3)),
                       ),
-                      onSubmitted: (value) {
-                        if (value.isNotEmpty) {
-                          _address = value;
-                          setState(() => _showSuggestions = false);
-                        }
-                      },
+                      child: Row(
+                        children: [
+                          const Icon(Icons.warning_amber_rounded,
+                              color: AppTheme.primaryRed, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Location is ${_formatDistance(_calculateDistance())} away. '
+                              'You can only report incidents within ${_formatDistance(_maxReportDistanceMeters)} of your current location.',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.primaryRed,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    if (_showSuggestions && _suggestions.isNotEmpty)
-                      Container(
-                        margin: const EdgeInsets.only(top: 4),
-                        constraints: const BoxConstraints(maxHeight: 200),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+                  const SizedBox(height: 24),
+
+                  // ── Category section ──────────────────────────────────
+                  const Text(
+                    'Category',
+                    style: TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildCategoryGrid(),
+                  const SizedBox(height: 24),
+
+                  // ── Severity section ──────────────────────────────────
+                  const Text(
+                    'Severity Level',
+                    style: TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: SeverityLevel.values.map((level) {
+                      final selected = _selectedSeverity == level;
+                      final color = _severityColor(level);
+                      return GestureDetector(
+                        onTap: () =>
+                            setState(() => _selectedSeverity = level),
+                        child: Column(
+                          children: [
+                            Container(
+                              width: selected ? 56 : 44,
+                              height: selected ? 56 : 44,
+                              decoration: BoxDecoration(
+                                color: color,
+                                shape: BoxShape.circle,
+                                border: selected
+                                    ? Border.all(
+                                        color: Colors.white, width: 3)
+                                    : null,
+                                boxShadow: selected
+                                    ? [
+                                        BoxShadow(
+                                          color:
+                                              color.withValues(alpha: 0.5),
+                                          blurRadius: 8,
+                                          spreadRadius: 2,
+                                        )
+                                      ]
+                                    : null,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _severityLabel(level),
+                              style: TextStyle(
+                                fontWeight: selected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                                color: selected
+                                    ? AppTheme.primaryDark
+                                    : Colors.grey,
+                              ),
                             ),
                           ],
                         ),
-                        child: ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: _suggestions.length,
-                          itemBuilder: (context, index) {
-                            final suggestion = _suggestions[index];
-                            return ListTile(
-                              leading: const Icon(Icons.location_on_outlined,
-                                  color: AppTheme.primaryRed),
-                              title: Text(
-                                suggestion.description,
-                                style: const TextStyle(fontSize: 14),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              onTap: () => _selectSuggestion(suggestion),
-                            );
-                          },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // ── Enhancement 1: When did this happen ───────────────
+                  const Text(
+                    'When did this happen?',
+                    style: TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  InkWell(
+                    onTap: _pickIncidentTime,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppTheme.cardBorder),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.schedule,
+                              color: AppTheme.primaryRed, size: 20),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _incidentTime == null
+                                      ? 'Just now'
+                                      : DateFormat('dd MMM yyyy, h:mm a')
+                                          .format(_incidentTime!),
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    color: _incidentTime == null
+                                        ? AppTheme.textSecondary
+                                        : AppTheme.primaryDark,
+                                    fontFamily: AppTheme.fontFamily,
+                                  ),
+                                ),
+                                if (_incidentTime != null)
+                                  Text(
+                                    'Tap to change',
+                                    style: AppTheme.caption,
+                                  ),
+                              ],
+                            ),
+                          ),
+                          if (_incidentTime != null)
+                            IconButton(
+                              icon: const Icon(Icons.close, size: 18),
+                              color: AppTheme.textSecondary,
+                              onPressed: () =>
+                                  setState(() => _incidentTime = null),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // ── Title ─────────────────────────────────────────────
+                  const Text(
+                    'Title',
+                    style: TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _titleController,
+                    maxLength: _maxTitleLength,
+                    decoration: InputDecoration(
+                      hintText: 'Brief title for the incident...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Please enter a title for the incident.';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 8),
+
+                  // ── AI Suggestion Banner ───────────────────────────────
+                  if (_suggestedCategory != null)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: _suggestedCategory == _selectedCategory
+                            ? AppTheme.successGreen.withValues(alpha: 0.1)
+                            : AppTheme.warningOrange.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: _suggestedCategory == _selectedCategory
+                              ? AppTheme.successGreen.withValues(alpha: 0.4)
+                              : AppTheme.warningOrange.withValues(alpha: 0.4),
                         ),
                       ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: _loadingLocation ? null : _detectLocation,
-                      icon: const Icon(Icons.my_location, size: 16),
-                      label: const Text('Use Current Location'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _suggestedCategory == _selectedCategory
+                                ? Icons.check_circle_outline
+                                : Icons.lightbulb_outline,
+                            color: _suggestedCategory == _selectedCategory
+                                ? AppTheme.successGreen
+                                : AppTheme.warningOrange,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _suggestedCategory == _selectedCategory
+                                  ? 'Category looks correct: ${_categoryLabel(_suggestedCategory!)}'
+                                  : 'Suggested: ${_categoryLabel(_suggestedCategory!)}',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: AppTheme.primaryDark,
+                                fontFamily: AppTheme.fontFamily,
+                              ),
+                            ),
+                          ),
+                          if (_suggestedCategory != _selectedCategory)
+                            TextButton(
+                              onPressed: () => setState(() {
+                                _selectedCategory = _suggestedCategory!;
+                                _suggestedCategory = null;
+                              }),
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppTheme.warningOrange,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 4),
+                                minimumSize: Size.zero,
+                                tapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: const Text('Apply',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold)),
+                            ),
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 16),
+                            color: AppTheme.textSecondary,
+                            onPressed: () =>
+                                setState(() => _suggestedCategory = null),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  const SizedBox(height: 8),
+
+                  // ── Description ───────────────────────────────────────
+                  const Text(
+                    'Description (Optional)',
+                    style: TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _descriptionController,
+                    maxLines: 4,
+                    maxLength: _maxDescriptionLength,
+                    decoration: InputDecoration(
+                      hintText: 'Describe what you observed...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ── Media section ─────────────────────────────────────
+                  const Text(
+                    'Photo/Video Evidence',
+                    style: TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  if (_selectedMedia.isNotEmpty) ...[
+                    SizedBox(
+                      height: 100,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _selectedMedia.length + 1,
+                        itemBuilder: (context, index) {
+                          if (index == _selectedMedia.length) {
+                            return _buildAddMediaButton();
+                          }
+                          return _buildMediaPreview(index);
+                        },
+                      ),
+                    ),
+                  ] else ...[
+                    GestureDetector(
+                      onTap: _pickMedia,
+                      child: Container(
+                        width: double.infinity,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey[300]!),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.add_a_photo,
+                                size: 32, color: Colors.grey[600]),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Add Photo/Video',
+                              style: TextStyle(color: Colors.grey[600]),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                    if (_userCurrentLat != null && !_locationTooFar && !_loadingLocation) ...[
-                      const SizedBox(width: 8),
-                      Text(
-                        _formatDistance(_calculateDistance()),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
+                  ],
+                  const SizedBox(height: 16),
+
+                  // ── Anonymous toggle ──────────────────────────────────
+                  Row(
+                    children: [
+                      const Text(
+                        'Report anonymously',
+                        style: TextStyle(fontSize: 15),
+                      ),
+                      const Spacer(),
+                      Switch(
+                        value: _isAnonymous,
+                        activeColor: AppTheme.primaryRed,
+                        onChanged: (v) =>
+                            setState(() => _isAnonymous = v),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // ── Community sharing section ──────────────────────────
+                  _buildCommunitySelector(),
+                  const SizedBox(height: 24),
+
+                  // ── Buttons ───────────────────────────────────────────
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _isSubmitting
+                              ? null
+                              : () => Navigator.pop(context),
+                          child: const Text('Cancel'),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed:
+                              (_isSubmitting || _locationTooFar)
+                                  ? null
+                                  : _submit,
+                          style: _locationTooFar
+                              ? ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.grey,
+                                )
+                              : null,
+                          child: _isSubmitting
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Text(_locationTooFar
+                                  ? 'Location Too Far'
+                                  : 'Submit Report'),
                         ),
                       ),
                     ],
-                  ],
-                ),
-                // Warning if location is too far
-                if (_locationTooFar)
-                  Container(
-                    margin: const EdgeInsets.only(top: 8),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryRed.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppTheme.primaryRed.withValues(alpha: 0.3)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.warning_amber_rounded,
-                            color: AppTheme.primaryRed, size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Location is ${_formatDistance(_calculateDistance())} away. '
-                            'You can only report incidents within ${_formatDistance(_maxReportDistanceMeters)} of your current location.',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.primaryRed,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
-                const SizedBox(height: 24),
-
-                // Category section
-                const Text(
-                  'Category',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
-                _buildCategoryGrid(),
-                const SizedBox(height: 24),
-
-                // Severity section
-                const Text(
-                  'Severity Level',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: SeverityLevel.values.map((level) {
-                    final selected = _selectedSeverity == level;
-                    final color = _severityColor(level);
-                    return GestureDetector(
-                      onTap: () => setState(() => _selectedSeverity = level),
-                      child: Column(
-                        children: [
-                          Container(
-                            width: selected ? 56 : 44,
-                            height: selected ? 56 : 44,
-                            decoration: BoxDecoration(
-                              color: color,
-                              shape: BoxShape.circle,
-                              border: selected
-                                  ? Border.all(color: Colors.white, width: 3)
-                                  : null,
-                              boxShadow: selected
-                                  ? [
-                                      BoxShadow(
-                                        color: color.withValues(alpha: 0.5),
-                                        blurRadius: 8,
-                                        spreadRadius: 2,
-                                      )
-                                    ]
-                                  : null,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _severityLabel(level),
-                            style: TextStyle(
-                              fontWeight: selected
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                              color: selected ? AppTheme.primaryDark : Colors.grey,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 24),
-
-                // Description
-                const Text(
-                  'Description (Optional)',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _descriptionController,
-                  maxLines: 4,
-                  maxLength: _maxDescriptionLength,
-                  decoration: InputDecoration(
-                    hintText: 'Describe what you observed...',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Media section
-                const Text(
-                  'Photo/Video Evidence',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                if (_selectedMedia.isNotEmpty) ...[
-                  SizedBox(
-                    height: 100,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _selectedMedia.length + 1,
-                      itemBuilder: (context, index) {
-                        if (index == _selectedMedia.length) {
-                          return _buildAddMediaButton();
-                        }
-                        return _buildMediaPreview(index);
-                      },
-                    ),
-                  ),
-                ] else ...[
-                  GestureDetector(
-                    onTap: _pickMedia,
-                    child: Container(
-                      width: double.infinity,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey[300]!),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.add_a_photo,
-                              size: 32, color: Colors.grey[600]),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Add Photo/Video',
-                            style: TextStyle(color: Colors.grey[600]),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                  const SizedBox(height: 20),
                 ],
-                const SizedBox(height: 16),
-
-                // Anonymous toggle
-                Row(
-                  children: [
-                    const Text(
-                      'Report anonymously',
-                      style: TextStyle(fontSize: 15),
-                    ),
-                    const Spacer(),
-                    Switch(
-                      value: _isAnonymous,
-                      activeColor: AppTheme.primaryRed,
-                      onChanged: (v) => setState(() => _isAnonymous = v),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // Community sharing section
-                _buildCommunitySelector(),
-                const SizedBox(height: 24),
-
-                // Buttons
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: _isSubmitting ? null : () => Navigator.pop(context),
-                        child: const Text('Cancel'),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: (_isSubmitting || _locationTooFar) ? null : _submit,
-                        style: _locationTooFar
-                            ? ElevatedButton.styleFrom(
-                                backgroundColor: Colors.grey,
-                              )
-                            : null,
-                        child: _isSubmitting
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : Text(_locationTooFar ? 'Location Too Far' : 'Submit Report'),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-              ],
+              ),
             ),
           ),
           if (_isSubmitting)
@@ -1085,7 +1747,9 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                       children: [
                         const CircularProgressIndicator(),
                         const SizedBox(height: 16),
-                        Text(_isVerifying ? 'Verifying image...' : 'Submitting report...'),
+                        Text(_isVerifying
+                            ? 'Verifying image...'
+                            : 'Submitting report...'),
                       ],
                     ),
                   ),
@@ -1210,7 +1874,8 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                 checkmarkColor: AppTheme.primaryRed,
                 labelStyle: TextStyle(
                   color: selected ? AppTheme.primaryRed : AppTheme.primaryDark,
-                  fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                  fontWeight:
+                      selected ? FontWeight.bold : FontWeight.normal,
                 ),
                 side: BorderSide(
                   color: selected ? AppTheme.primaryRed : AppTheme.cardBorder,
@@ -1228,12 +1893,10 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     final categoryProvider = context.watch<CategoryProvider>();
     final enabledCategories = categoryProvider.enabledCategories;
 
-    // Filter to only show categories that have a matching IncidentCategory enum
     final availableCategories = enabledCategories.where((cat) {
       return _getIncidentCategoryFromName(cat.name) != null;
     }).toList();
 
-    // If no enabled categories from provider, fall back to all enum values
     if (availableCategories.isEmpty) {
       return GridView.count(
         shrinkWrap: true,
@@ -1309,7 +1972,8 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
               label,
               style: TextStyle(
                 fontSize: 12,
-                fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                fontWeight:
+                    selected ? FontWeight.bold : FontWeight.normal,
                 color: selected ? AppTheme.primaryDark : Colors.grey[600],
               ),
               textAlign: TextAlign.center,

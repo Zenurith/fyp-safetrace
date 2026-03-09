@@ -125,33 +125,51 @@ class _IncidentNotificationOverlayState
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'New ${widget.incident.categoryLabel} Alert',
+                        widget.incident.title.isNotEmpty
+                            ? widget.incident.title
+                            : 'New ${widget.incident.categoryLabel} Alert',
                         style: const TextStyle(
                           fontFamily: AppTheme.fontFamily,
                           fontWeight: FontWeight.w700,
                           fontSize: 16,
                           color: Colors.white,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          widget.incident.categoryLabel.toLowerCase(),
-                          style: const TextStyle(
-                            fontFamily: AppTheme.fontFamily,
-                            fontWeight: FontWeight.w400,
-                            fontSize: 12,
-                            color: Colors.white,
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              widget.incident.categoryLabel.toLowerCase(),
+                              style: const TextStyle(
+                                fontFamily: AppTheme.fontFamily,
+                                fontWeight: FontWeight.w400,
+                                fontSize: 12,
+                                color: Colors.white,
+                              ),
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${widget.distance.toStringAsFixed(1)} km away',
+                            style: const TextStyle(
+                              fontFamily: AppTheme.fontFamily,
+                              fontWeight: FontWeight.w400,
+                              fontSize: 12,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),

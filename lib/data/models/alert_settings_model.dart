@@ -7,6 +7,9 @@ class AlertSettingsModel {
   final bool activeHoursEnabled;
   final String activeFrom;
   final String activeTo;
+  final bool quietHoursEnabled;
+  final String quietFrom;
+  final String quietTo;
 
   AlertSettingsModel({
     this.radiusKm = 2.0,
@@ -15,6 +18,9 @@ class AlertSettingsModel {
     this.activeHoursEnabled = true,
     this.activeFrom = '07:00 AM',
     this.activeTo = '11:00 PM',
+    this.quietHoursEnabled = false,
+    this.quietFrom = '10:00 PM',
+    this.quietTo = '07:00 AM',
   })  : severityFilters = severityFilters ??
             {SeverityLevel.high, SeverityLevel.moderate},
         categoryFilters = categoryFilters ??
@@ -32,6 +38,9 @@ class AlertSettingsModel {
       'activeHoursEnabled': activeHoursEnabled,
       'activeFrom': activeFrom,
       'activeTo': activeTo,
+      'quietHoursEnabled': quietHoursEnabled,
+      'quietFrom': quietFrom,
+      'quietTo': quietTo,
     };
   }
 
@@ -47,6 +56,9 @@ class AlertSettingsModel {
       activeHoursEnabled: map['activeHoursEnabled'] ?? true,
       activeFrom: map['activeFrom'] ?? '07:00 AM',
       activeTo: map['activeTo'] ?? '11:00 PM',
+      quietHoursEnabled: map['quietHoursEnabled'] ?? false,
+      quietFrom: map['quietFrom'] ?? '10:00 PM',
+      quietTo: map['quietTo'] ?? '07:00 AM',
     );
   }
 
@@ -57,6 +69,9 @@ class AlertSettingsModel {
     bool? activeHoursEnabled,
     String? activeFrom,
     String? activeTo,
+    bool? quietHoursEnabled,
+    String? quietFrom,
+    String? quietTo,
   }) {
     return AlertSettingsModel(
       radiusKm: radiusKm ?? this.radiusKm,
@@ -65,6 +80,9 @@ class AlertSettingsModel {
       activeHoursEnabled: activeHoursEnabled ?? this.activeHoursEnabled,
       activeFrom: activeFrom ?? this.activeFrom,
       activeTo: activeTo ?? this.activeTo,
+      quietHoursEnabled: quietHoursEnabled ?? this.quietHoursEnabled,
+      quietFrom: quietFrom ?? this.quietFrom,
+      quietTo: quietTo ?? this.quietTo,
     );
   }
 }

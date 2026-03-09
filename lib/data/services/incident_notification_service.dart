@@ -20,6 +20,9 @@ class IncidentNotificationService {
   // Track already notified incidents to avoid duplicates
   final Set<String> _notifiedIncidentIds = {};
 
+  // Queue of pending notifications
+  final List<IncidentNotification> _notificationQueue = [];
+
   void updateUserLocation(double latitude, double longitude) {
     _userLatitude = latitude;
     _userLongitude = longitude;
@@ -31,6 +34,11 @@ class IncidentNotificationService {
     String? currentUserId,
   }) {
     if (_userLatitude == null || _userLongitude == null) return;
+
+    // Quiet hours check
+    if (settings.quietHoursEnabled && _isInQuietHours(settings.quietFrom, settings.quietTo)) {
+      return;
+    }
 
     for (final incident in incidents) {
       // Skip if already notified
@@ -59,13 +67,59 @@ class IncidentNotificationService {
       // Check if within radius
       if (distance <= settings.radiusKm) {
         _notifiedIncidentIds.add(incident.id);
-        _notificationController.add(IncidentNotification(
+        _notificationQueue.add(IncidentNotification(
           incident: incident,
           distance: distance,
         ));
-        // Only show one notification at a time
-        break;
       }
+    }
+
+    // Emit the first queued notification if the queue was just populated
+    if (_notificationQueue.isNotEmpty) {
+      final next = _notificationQueue.removeAt(0);
+      _notificationController.add(next);
+    }
+  }
+
+  /// Removes and returns the next notification from the queue, or null if empty.
+  IncidentNotification? dequeueNext() {
+    if (_notificationQueue.isEmpty) return null;
+    return _notificationQueue.removeAt(0);
+  }
+
+  bool _isInQuietHours(String quietFrom, String quietTo) {
+    final now = DateTime.now();
+    final fromTime = _parseTime(quietFrom);
+    final toTime = _parseTime(quietTo);
+    if (fromTime == null || toTime == null) return false;
+
+    final nowMinutes = now.hour * 60 + now.minute;
+    final fromMinutes = fromTime.hour * 60 + fromTime.minute;
+    final toMinutes = toTime.hour * 60 + toTime.minute;
+
+    // Handle overnight ranges (e.g. 10 PM to 7 AM)
+    if (fromMinutes > toMinutes) {
+      return nowMinutes >= fromMinutes || nowMinutes < toMinutes;
+    } else {
+      return nowMinutes >= fromMinutes && nowMinutes < toMinutes;
+    }
+  }
+
+  DateTime? _parseTime(String timeStr) {
+    try {
+      // Expected format: "10:00 PM" or "07:00 AM"
+      final parts = timeStr.trim().split(' ');
+      if (parts.length != 2) return null;
+      final timeParts = parts[0].split(':');
+      if (timeParts.length != 2) return null;
+      int hour = int.parse(timeParts[0]);
+      final int minute = int.parse(timeParts[1]);
+      final String period = parts[1].toUpperCase();
+      if (period == 'PM' && hour != 12) hour += 12;
+      if (period == 'AM' && hour == 12) hour = 0;
+      return DateTime(0, 1, 1, hour, minute);
+    } catch (_) {
+      return null;
     }
   }
 

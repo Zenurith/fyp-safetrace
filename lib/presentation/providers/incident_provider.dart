@@ -232,6 +232,7 @@ class IncidentProvider extends ChangeNotifier {
     double? verificationScore,
     String? verificationNote,
     List<String> communityIds = const [],
+    DateTime? incidentTime,
   }) async {
     _isLoading = true;
     notifyListeners();
@@ -260,6 +261,7 @@ class IncidentProvider extends ChangeNotifier {
         verificationScore: verificationScore,
         verificationNote: verificationNote,
         communityIds: communityIds,
+        incidentTime: incidentTime,
       );
       final id = await _repository.add(incident);
 

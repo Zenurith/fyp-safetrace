@@ -52,6 +52,24 @@ class AlertSettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void toggleQuietHours(bool enabled) {
+    _repository.saveSettings(settings.copyWith(quietHoursEnabled: enabled));
+    _syncToFirestore();
+    notifyListeners();
+  }
+
+  void updateQuietFrom(String time) {
+    _repository.saveSettings(settings.copyWith(quietFrom: time));
+    _syncToFirestore();
+    notifyListeners();
+  }
+
+  void updateQuietTo(String time) {
+    _repository.saveSettings(settings.copyWith(quietTo: time));
+    _syncToFirestore();
+    notifyListeners();
+  }
+
   void saveSettings() {
     _syncToFirestore();
     notifyListeners();

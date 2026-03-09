@@ -49,6 +49,9 @@ class IncidentModel {
   // Community sharing (empty = public only)
   final List<String> communityIds;
 
+  // When the incident actually happened (separate from when it was reported)
+  final DateTime? incidentTime;
+
   IncidentModel({
     required this.id,
     required this.title,
@@ -73,6 +76,7 @@ class IncidentModel {
     this.verificationScore,
     this.verificationNote,
     this.communityIds = const [],
+    this.incidentTime,
   });
 
   int get voteScore => upvotes - downvotes;
@@ -170,6 +174,8 @@ class IncidentModel {
       'verificationScore': verificationScore,
       'verificationNote': verificationNote,
       'communityIds': communityIds,
+      if (incidentTime != null)
+        'incidentTime': Timestamp.fromDate(incidentTime!),
     };
   }
 
@@ -205,6 +211,9 @@ class IncidentModel {
       verificationScore: (map['verificationScore'] as num?)?.toDouble(),
       verificationNote: map['verificationNote'],
       communityIds: List<String>.from(map['communityIds'] ?? []),
+      incidentTime: map['incidentTime'] is Timestamp
+          ? (map['incidentTime'] as Timestamp).toDate()
+          : null,
     );
   }
 
@@ -232,6 +241,7 @@ class IncidentModel {
     double? verificationScore,
     String? verificationNote,
     List<String>? communityIds,
+    DateTime? incidentTime,
   }) {
     return IncidentModel(
       id: id ?? this.id,
@@ -257,6 +267,7 @@ class IncidentModel {
       verificationScore: verificationScore ?? this.verificationScore,
       verificationNote: verificationNote ?? this.verificationNote,
       communityIds: communityIds ?? this.communityIds,
+      incidentTime: incidentTime ?? this.incidentTime,
     );
   }
 }

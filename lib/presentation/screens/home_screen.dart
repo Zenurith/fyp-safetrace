@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/models/incident_model.dart';
 import '../../data/services/incident_notification_service.dart';
 import '../../data/services/location_service.dart';
@@ -16,6 +18,7 @@ import 'alert_settings_screen.dart';
 import 'profile_screen.dart';
 import 'community_list_screen.dart';
 import 'report_incident_screen.dart';
+import 'notification_history_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -55,6 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _notificationSubscription =
         _notificationService.notificationStream.listen((notification) {
       if (mounted) {
+        _saveToHistory(notification);
         setState(() {
           _currentNotification = notification;
         });
@@ -117,6 +121,40 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// Saves a notification to SharedPreferences history.
+  Future<void> _saveToHistory(IncidentNotification n) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final existing = prefs.getStringList('notification_history') ?? [];
+      final entry = jsonEncode({
+        'incidentId': n.incident.id,
+        'title': n.incident.title,
+        'category': n.incident.categoryLabel,
+        'distance': n.distance,
+        'timestamp': DateTime.now().toIso8601String(),
+      });
+      existing.add(entry);
+      // Keep at most 100 entries
+      final trimmed = existing.length > 100
+          ? existing.sublist(existing.length - 100)
+          : existing;
+      await prefs.setStringList('notification_history', trimmed);
+    } catch (e) {
+      debugPrint('Failed to save notification history: $e');
+    }
+  }
+
+  /// Dequeues the next notification from the service and shows it.
+  void _dequeueNextNotification() {
+    final next = _notificationService.dequeueNext();
+    if (next != null && mounted) {
+      _saveToHistory(next);
+      setState(() {
+        _currentNotification = next;
+      });
+    }
+  }
+
   void _showIncidentDetails(IncidentModel incident) {
     showModalBottomSheet(
       context: context,
@@ -150,6 +188,15 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     }
+  }
+
+  void _openNotificationHistory() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const NotificationHistoryScreen(),
+      ),
+    );
   }
 
   @override
@@ -203,6 +250,29 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Scaffold(
+      appBar: _currentIndex == 0
+          ? AppBar(
+              backgroundColor: AppTheme.primaryDark,
+              foregroundColor: Colors.white,
+              title: const Text(
+                'SafeTrace',
+                style: TextStyle(
+                  fontFamily: AppTheme.fontFamily,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 20,
+                  color: Colors.white,
+                ),
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.notifications_none_outlined,
+                      color: Colors.white),
+                  tooltip: 'Notification History',
+                  onPressed: _openNotificationHistory,
+                ),
+              ],
+            )
+          : null,
       body: Stack(
         children: [
           // Main content
@@ -221,10 +291,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   onTap: () {
                     final incident = _currentNotification!.incident;
                     setState(() => _currentNotification = null);
+                    _dequeueNextNotification();
                     _showIncidentDetails(incident);
                   },
                   onDismiss: () {
                     setState(() => _currentNotification = null);
+                    _dequeueNextNotification();
                   },
                 ),
               ),

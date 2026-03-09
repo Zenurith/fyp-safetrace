@@ -185,8 +185,8 @@ class PushNotificationService {
     required double distanceKm,
   }) async {
     await _showLocalNotification(
-      title: '$category Alert',
-      body: '$title - ${distanceKm.toStringAsFixed(1)}km away',
+      title: title.isNotEmpty ? title : '$category Alert',
+      body: '$category • ${distanceKm.toStringAsFixed(1)}km away',
       payload: incidentId,
     );
   }
