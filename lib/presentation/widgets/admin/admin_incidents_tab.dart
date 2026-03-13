@@ -24,6 +24,12 @@ class _AdminIncidentsTabState extends State<AdminIncidentsTab> {
     });
   }
 
+  @override
+  void dispose() {
+    context.read<IncidentProvider>().startListening();
+    super.dispose();
+  }
+
   List<IncidentModel> _filterIncidents(List<IncidentModel> incidents) {
     return incidents.where((incident) {
       if (_searchQuery.isNotEmpty) {

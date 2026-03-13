@@ -125,6 +125,17 @@ class CommunityRepository {
     return communities;
   }
 
+  /// Returns ALL community IDs where the user has any membership record
+  /// (approved, pending, or rejected) — used to filter the Discover tab.
+  Future<Set<String>> getUserMembershipCommunityIds(String userId) async {
+    final snapshot = await _membersCollection
+        .where('userId', isEqualTo: userId)
+        .get();
+    return snapshot.docs
+        .map((doc) => doc.data()['communityId'] as String)
+        .toSet();
+  }
+
   // ==================== Membership Management ====================
 
   /// Request to join a community.

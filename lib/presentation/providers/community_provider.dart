@@ -11,6 +11,7 @@ class CommunityProvider extends ChangeNotifier {
   List<CommunityModel> _myCommunities = [];
   List<CommunityModel> _nearbyCommunities = [];
   List<CommunityMemberModel> _pendingRequests = [];
+  Set<String> _myMembershipCommunityIds = {};
   CommunityModel? _selectedCommunity;
   CommunityMemberModel? _currentMembership;
   bool _isLoading = false;
@@ -21,6 +22,7 @@ class CommunityProvider extends ChangeNotifier {
   List<CommunityModel> get myCommunities => _myCommunities;
   List<CommunityModel> get nearbyCommunities => _nearbyCommunities;
   List<CommunityMemberModel> get pendingRequests => _pendingRequests;
+  Set<String> get myMembershipCommunityIds => _myMembershipCommunityIds;
   CommunityModel? get selectedCommunity => _selectedCommunity;
   CommunityMemberModel? get currentMembership => _currentMembership;
   bool get isLoading => _isLoading;
@@ -53,6 +55,8 @@ class CommunityProvider extends ChangeNotifier {
 
     try {
       _myCommunities = await _repository.getUserCommunities(userId);
+      _myMembershipCommunityIds =
+          await _repository.getUserMembershipCommunityIds(userId);
       _error = null;
     } catch (e) {
       _error = e.toString();

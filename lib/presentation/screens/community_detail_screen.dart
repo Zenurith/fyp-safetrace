@@ -30,6 +30,8 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
   }
 
   Future<void> _loadCommunity() async {
+    if (mounted) setState(() { _isLoading = true; _isAdmin = false; });
+
     final userId = context.read<UserProvider>().currentUser?.id;
     if (userId == null) return;
 
