@@ -30,7 +30,9 @@
       "Bash(echo EXIT: $?:*)",
       "Bash(flutter clean:*)",
       "Bash(firebase deploy:*)",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(gsutil cors:*)",
+      "Bash(gcloud auth:*)"
     ]
   }
 }
