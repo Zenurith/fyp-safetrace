@@ -38,7 +38,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey[300],
+                color: AppTheme.cardBorder,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -316,14 +316,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Container(
                         width: 1,
                         height: 40,
-                        color: Colors.grey[300],
-                      ),
+                        color: AppTheme.cardBorder,
+),
                       _StatItem(value: '${user.votes}', label: 'Votes'),
                       Container(
                         width: 1,
                         height: 40,
-                        color: Colors.grey[300],
-                      ),
+                        color: AppTheme.cardBorder,
+),
                       _StatItem(value: '${user.points}', label: 'Points'),
                     ],
                   ),
@@ -436,9 +436,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         const SizedBox(height: 4),
                         Text(
                           '${user.pointsToNextLevel} points to Level ${user.level + 1}',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 12,
-                            color: Colors.grey[500],
+                            color: AppTheme.textSecondary,
                           ),
                         ),
                         const SizedBox(height: 10),
@@ -447,7 +447,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: LinearProgressIndicator(
                             value: user.levelProgress,
                             minHeight: 10,
-                            backgroundColor: Colors.grey[200],
+                            backgroundColor: AppTheme.cardBorder,
                             valueColor: const AlwaysStoppedAnimation(
                                 AppTheme.successGreen),
                           ),
@@ -507,9 +507,9 @@ class _StatItem extends StatelessWidget {
         ),
         Text(
           label,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 13,
-            color: Colors.grey[500],
+            color: AppTheme.textSecondary,
           ),
         ),
       ],

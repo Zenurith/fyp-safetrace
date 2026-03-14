@@ -34,7 +34,8 @@
       "Bash(cmd:*)",
       "Bash(powershell:*)",
       "Bash(gsutil cors:*)",
-      "Bash(gcloud auth:*)"
+      "Bash(gcloud auth:*)",
+      "Bash(git check-ignore:*)"
     ]
   }
 }

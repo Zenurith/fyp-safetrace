@@ -52,6 +52,14 @@ class _AdminAuthScreenState extends State<AdminAuthScreen> {
         );
       }
       await userProvider.loadUser(user.uid);
+      if (userProvider.currentUser?.isAdmin != true) {
+        await auth.signOut();
+        if (mounted) {
+          setState(() {
+            _errorMessage = 'Access denied. Admin privileges required.';
+          });
+        }
+      }
     } on FirebaseAuthException catch (e) {
       setState(() {
         _errorMessage = e.message ?? 'Authentication failed.';

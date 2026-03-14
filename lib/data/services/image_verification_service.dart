@@ -74,13 +74,13 @@ class ImageVerificationService {
             maxOutputTokens: 1024,
           ),
         );
-        debugPrint('ImageVerificationService: Initialized with Gemini model');
+        if (kDebugMode) debugPrint('ImageVerificationService: Initialized with Gemini model');
       } catch (e) {
-        debugPrint('ImageVerificationService: Failed to initialize model: $e');
+        if (kDebugMode) debugPrint('ImageVerificationService: Failed to initialize model: $e');
         _model = null;
       }
     } else {
-      debugPrint('ImageVerificationService: No API key provided');
+      if (kDebugMode) debugPrint('ImageVerificationService: No API key provided');
     }
   }
 
@@ -94,14 +94,16 @@ class ImageVerificationService {
     String? mimeType,
   }) async {
     if (_model == null) {
-      debugPrint('ImageVerificationService: Model not configured, skipping verification');
+      if (kDebugMode) debugPrint('ImageVerificationService: Model not configured, skipping verification');
       return ImageVerificationResult.serviceUnavailable();
     }
 
-    debugPrint('ImageVerificationService: Starting verification');
-    debugPrint('  Category: $categoryName');
-    debugPrint('  Description: ${description.isNotEmpty ? description : "(empty)"}');
-    debugPrint('  Image size: ${imageBytes.length} bytes');
+    if (kDebugMode) {
+      debugPrint('ImageVerificationService: Starting verification');
+      debugPrint('  Category: $categoryName');
+      debugPrint('  Description: ${description.isNotEmpty ? description : "(empty)"}');
+      debugPrint('  Image size: ${imageBytes.length} bytes');
+    }
 
     try {
       final guidelines = _categoryGuidelines[categoryName] ?? [];
@@ -155,22 +157,22 @@ DEFAULT TO isValid: false IF UNCERTAIN. Return ONLY the JSON object.''';
       ]);
 
       final responseText = response.text;
-      debugPrint('ImageVerificationService: Raw response: $responseText');
+      if (kDebugMode) debugPrint('ImageVerificationService: Raw response: $responseText');
 
       if (responseText == null || responseText.isEmpty) {
-        debugPrint('ImageVerificationService: Empty response from API');
+        if (kDebugMode) debugPrint('ImageVerificationService: Empty response from API');
         return ImageVerificationResult.failed('Empty response from verification service');
       }
 
       // Parse the JSON response
       final result = _parseResponse(responseText);
-      debugPrint('ImageVerificationService: Parsed result - isValid: ${result.isValid}, score: ${result.confidenceScore}');
+      if (kDebugMode) debugPrint('ImageVerificationService: Parsed result - isValid: ${result.isValid}, score: ${result.confidenceScore}');
       return result;
     } on GenerativeAIException catch (e) {
-      debugPrint('ImageVerificationService: Gemini API error: ${e.message}');
+      if (kDebugMode) debugPrint('ImageVerificationService: Gemini API error: ${e.message}');
       return ImageVerificationResult.failed('Verification service error: ${e.message}');
     } catch (e) {
-      debugPrint('ImageVerificationService: Unexpected error: $e');
+      if (kDebugMode) debugPrint('ImageVerificationService: Unexpected error: $e');
       return ImageVerificationResult.failed('Verification failed: $e');
     }
   }
@@ -199,7 +201,7 @@ DEFAULT TO isValid: false IF UNCERTAIN. Return ONLY the JSON object.''';
       final jsonEnd = cleanedResponse.lastIndexOf('}');
 
       if (jsonStart == -1 || jsonEnd == -1 || jsonEnd <= jsonStart) {
-        debugPrint('ImageVerificationService: Could not find JSON in response');
+        if (kDebugMode) debugPrint('ImageVerificationService: Could not find JSON in response');
         return _createFallbackResult(responseText);
       }
 
@@ -208,7 +210,7 @@ DEFAULT TO isValid: false IF UNCERTAIN. Return ONLY the JSON object.''';
 
       return ImageVerificationResult.fromJson(json);
     } catch (e) {
-      debugPrint('ImageVerificationService: JSON parse error: $e');
+      if (kDebugMode) debugPrint('ImageVerificationService: JSON parse error: $e');
       return _createFallbackResult(responseText);
     }
   }

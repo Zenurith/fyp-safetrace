@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:flutter/foundation.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../utils/share_utils.dart';
 import '../../data/models/incident_model.dart';
 import '../../utils/app_theme.dart';
 import '../providers/incident_provider.dart';
@@ -304,18 +306,34 @@ class IncidentBottomSheet extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {
-                    Share.share(
-                      '${incident.categoryLabel}: ${incident.title}\n${incident.address}\n\n${incident.description}',
-                      subject: incident.title,
-                    );
-                  },
+                  onPressed: () => showShareOptions(context, incident),
                   icon: const Icon(Icons.share_outlined, size: 18),
                   label: const Text('Share'),
                 ),
               ),
             ],
           ),
+          // SOS button — only for high severity incidents
+          if (incident.severity == SeverityLevel.high) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _triggerSOS(context),
+                icon: const Icon(Icons.phone_in_talk_outlined, size: 18),
+                label: const Text('SOS — Call Emergency (999)'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryRed,
+                  foregroundColor: Colors.white,
+                  textStyle: const TextStyle(
+                    fontFamily: AppTheme.fontFamily,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
         ],
       ),
@@ -323,6 +341,40 @@ class IncidentBottomSheet extends StatelessWidget {
     );
   }
 
+}
+
+void _triggerSOS(BuildContext context) {
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Call Emergency Services?'),
+      content: const Text('This will call 999.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () async {
+            Navigator.pop(ctx);
+            if (kDebugMode) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('[DEBUG] SOS — would call 999 in release'),
+                ),
+              );
+            } else {
+              await launchUrl(Uri.parse('tel:999'));
+            }
+          },
+          child: const Text(
+            'Call 999',
+            style: TextStyle(color: AppTheme.primaryRed),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _VotingSection extends StatelessWidget {

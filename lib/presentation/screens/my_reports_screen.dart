@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
+import '../../utils/share_utils.dart';
 import '../../data/models/incident_model.dart';
 import '../../utils/app_theme.dart';
 import '../providers/incident_provider.dart';
@@ -59,11 +59,8 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
     );
   }
 
-  void _share(IncidentModel incident) {
-    Share.share(
-      '${incident.categoryLabel}: ${incident.title}\n${incident.address}\n\n${incident.description}',
-      subject: incident.title,
-    );
+  void _share(BuildContext context, IncidentModel incident) {
+    showShareOptions(context, incident);
   }
 
   void _confirmDelete(BuildContext context, IncidentModel incident) {
@@ -162,7 +159,7 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.report_outlined, size: 64, color: Colors.grey[300]),
+          const Icon(Icons.report_outlined, size: 64, color: AppTheme.cardBorder),
           const SizedBox(height: 16),
           Text(
             'No reports yet',
@@ -191,7 +188,7 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
           onTap: () => _showDetail(context, incident),
           onEdit: () => _showEditSheet(context, incident),
           onDelete: () => _confirmDelete(context, incident),
-          onShare: () => _share(incident),
+          onShare: () => _share(context, incident),
         );
       },
     );
@@ -285,7 +282,7 @@ class _ReportCard extends StatelessWidget {
             ),
             // Actions menu
             PopupMenuButton<_CardAction>(
-              icon: Icon(Icons.more_vert, color: Colors.grey[400], size: 20),
+              icon: const Icon(Icons.more_vert, color: AppTheme.textSecondary, size: 20),
               onSelected: (action) {
                 switch (action) {
                   case _CardAction.edit:
@@ -433,7 +430,7 @@ class _EditIncidentSheetState extends State<_EditIncidentSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey[300],
+                color: AppTheme.cardBorder,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),

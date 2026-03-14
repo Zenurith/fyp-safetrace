@@ -4,6 +4,7 @@ import '../../../utils/app_theme.dart';
 import '../../providers/flag_provider.dart';
 import '../../providers/incident_provider.dart';
 import '../../providers/community_provider.dart';
+import '../../providers/user_provider.dart';
 import '../../widgets/admin_web/admin_sidebar.dart';
 import '../../widgets/admin_web/admin_header.dart';
 import '../../widgets/admin_web/responsive_layout.dart';
@@ -53,6 +54,18 @@ class _AdminWebShellState extends State<AdminWebShell> {
 
   @override
   Widget build(BuildContext context) {
+    final user = context.watch<UserProvider>().currentUser;
+    if (user == null || !user.isAdmin) {
+      return const Scaffold(
+        body: Center(
+          child: Text(
+            'Access denied.',
+            style: TextStyle(fontFamily: AppTheme.fontFamily),
+          ),
+        ),
+      );
+    }
+
     final isMobile = ResponsiveLayout.isMobile(context);
 
     // Auto-collapse sidebar on mobile
