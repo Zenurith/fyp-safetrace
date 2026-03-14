@@ -374,6 +374,35 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     if (mounted) setState(() => _loadingLocation = false);
   }
 
+  Future<void> _openFullScreenMap() async {
+    final result = await Navigator.push<LatLng>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _FullScreenMapPicker(
+          initialPosition: LatLng(_latitude, _longitude),
+        ),
+      ),
+    );
+    if (result != null && mounted) {
+      setState(() {
+        _latitude = result.latitude;
+        _longitude = result.longitude;
+      });
+      _mapController?.animateCamera(
+        CameraUpdate.newLatLng(result),
+      );
+      final addr = await _locationService.getAddressFromCoordinates(
+          result.latitude, result.longitude);
+      if (mounted) {
+        setState(() {
+          _address = addr;
+          _addressController.text = addr;
+        });
+        _validateDistance();
+      }
+    }
+  }
+
   double _calculateDistance() {
     if (_userCurrentLat == null || _userCurrentLng == null) {
       return 0;
@@ -401,11 +430,20 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     return '${(meters / 1000).toStringAsFixed(1)} km';
   }
 
+  ScaffoldMessengerState? _scaffoldMessenger;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _scaffoldMessenger = ScaffoldMessenger.of(context);
+  }
+
   @override
   void dispose() {
     _debounceTimer?.cancel();
     _suggestionDebounceTimer?.cancel();
     _draftSaveTimer?.cancel();
+    _scaffoldMessenger?.clearSnackBars();
     _titleController.dispose();
     _descriptionController.dispose();
     _addressController.dispose();
@@ -1235,6 +1273,25 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                               ),
                             ),
                           ),
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: GestureDetector(
+                              onTap: _openFullScreenMap,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.6),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Icon(
+                                  Icons.fullscreen,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -2057,5 +2114,153 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
       case SeverityLevel.high:
         return AppTheme.severityHigh;
     }
+  }
+}
+
+// ─── Full-Screen Map Picker ───────────────────────────────────────────────────
+
+class _FullScreenMapPicker extends StatefulWidget {
+  final LatLng initialPosition;
+
+  const _FullScreenMapPicker({required this.initialPosition});
+
+  @override
+  State<_FullScreenMapPicker> createState() => _FullScreenMapPickerState();
+}
+
+class _FullScreenMapPickerState extends State<_FullScreenMapPicker> {
+  late LatLng _selected;
+  GoogleMapController? _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = widget.initialPosition;
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: Container(
+            margin: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.6),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.close, color: Colors.white, size: 20),
+          ),
+        ),
+        title: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: const Text(
+            'Tap to set location',
+            style: TextStyle(color: Colors.white, fontSize: 13),
+          ),
+        ),
+        centerTitle: true,
+      ),
+      body: Stack(
+        children: [
+          GoogleMap(
+            initialCameraPosition: CameraPosition(
+              target: _selected,
+              zoom: 16,
+            ),
+            onMapCreated: (c) => _controller = c,
+            markers: {
+              Marker(
+                markerId: const MarkerId('pick'),
+                position: _selected,
+                icon: BitmapDescriptor.defaultMarkerWithHue(
+                  BitmapDescriptor.hueRed,
+                ),
+              ),
+            },
+            onTap: (latLng) => setState(() => _selected = latLng),
+            myLocationEnabled: true,
+            myLocationButtonEnabled: true,
+            zoomControlsEnabled: true,
+          ),
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(20)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 12,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on,
+                          color: AppTheme.primaryRed, size: 16),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${_selected.latitude.toStringAsFixed(5)}, '
+                        '${_selected.longitude.toStringAsFixed(5)}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textSecondary,
+                          fontFamily: AppTheme.fontFamily,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context, _selected),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryRed,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Confirm Location',
+                      style: TextStyle(
+                        fontFamily: AppTheme.fontFamily,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
