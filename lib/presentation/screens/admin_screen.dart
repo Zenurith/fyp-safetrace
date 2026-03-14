@@ -1,13 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../utils/app_theme.dart';
+import '../providers/user_provider.dart';
 import '../widgets/admin/admin_users_tab.dart';
 import '../widgets/admin/admin_incidents_tab.dart';
 import '../widgets/admin/admin_categories_tab.dart';
 import '../widgets/admin/admin_analytics_tab.dart';
 import '../widgets/export_dialog.dart';
 
-class AdminScreen extends StatelessWidget {
+class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
+
+  @override
+  State<AdminScreen> createState() => _AdminScreenState();
+}
+
+class _AdminScreenState extends State<AdminScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = context.read<UserProvider>().currentUser;
+      if (user == null || !user.isAdmin) {
+        Navigator.of(context).pop();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,3 +84,4 @@ class AdminScreen extends StatelessWidget {
     );
   }
 }
+

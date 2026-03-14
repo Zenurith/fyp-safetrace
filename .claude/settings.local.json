@@ -32,7 +32,9 @@
       "Bash(firebase deploy:*)",
       "Bash(xargs grep:*)",
       "Bash(cmd:*)",
-      "Bash(powershell:*)"
+      "Bash(powershell:*)",
+      "Bash(gsutil cors:*)",
+      "Bash(gcloud auth:*)"
     ]
   }
 }

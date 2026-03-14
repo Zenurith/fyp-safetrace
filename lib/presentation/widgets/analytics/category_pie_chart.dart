@@ -24,11 +24,11 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
       case 'emergency':
         return const Color(0xFFE53E3E);
       case 'infrastructure':
-        return AppTheme.accentBlue;
+        return AppTheme.primaryDark;
       case 'environmental':
         return AppTheme.successGreen;
       case 'suspicious':
-        return AppTheme.profilePurple;
+        return AppTheme.textSecondary;
       default:
         return AppTheme.textSecondary;
     }

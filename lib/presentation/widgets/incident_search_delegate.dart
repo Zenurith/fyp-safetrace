@@ -296,11 +296,11 @@ class _IncidentSearchTile extends StatelessWidget {
       case IncidentCategory.emergency:
         return AppTheme.primaryRed;
       case IncidentCategory.infrastructure:
-        return AppTheme.accentBlue;
+        return AppTheme.primaryDark;
       case IncidentCategory.environmental:
         return AppTheme.successGreen;
       case IncidentCategory.suspicious:
-        return AppTheme.profilePurple;
+        return AppTheme.textSecondary;
     }
   }
 

@@ -501,10 +501,10 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                 leading: Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: AppTheme.accentBlue.withValues(alpha: 0.1),
+                    color: AppTheme.primaryDark.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.camera_alt, color: AppTheme.accentBlue),
+                  child: const Icon(Icons.camera_alt, color: AppTheme.primaryDark),
                 ),
                 title: const Text('Take Photo'),
                 onTap: () async {
@@ -531,11 +531,10 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                 leading: Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: AppTheme.accentBlue.withValues(alpha: 0.1),
+                    color: AppTheme.primaryDark.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
-                  child:
-                      const Icon(Icons.videocam, color: AppTheme.accentBlue),
+                  child: const Icon(Icons.videocam, color: AppTheme.primaryDark),
                 ),
                 title: const Text('Record Video'),
                 onTap: () async {
@@ -562,11 +561,10 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                 leading: Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: AppTheme.accentBlue.withValues(alpha: 0.1),
+                    color: AppTheme.primaryDark.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.photo_library,
-                      color: AppTheme.accentBlue),
+                  child: const Icon(Icons.photo_library, color: AppTheme.primaryDark),
                 ),
                 title: const Text('Choose from Gallery'),
                 onTap: () async {

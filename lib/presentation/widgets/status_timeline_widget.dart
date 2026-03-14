@@ -255,7 +255,7 @@ class _TimelineEntry extends StatelessWidget {
       case IncidentStatus.pending:
         return AppTheme.warningOrange;
       case IncidentStatus.underReview:
-        return AppTheme.accentBlue;
+        return AppTheme.primaryDark;
       case IncidentStatus.verified:
         return AppTheme.successGreen;
       case IncidentStatus.resolved:

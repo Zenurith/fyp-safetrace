@@ -280,12 +280,9 @@ class IncidentProvider extends ChangeNotifier {
   }
 
   Future<void> updateIncidentMedia(String id, List<String> mediaUrls) async {
-    debugPrint('IncidentProvider: Updating media for incident $id with ${mediaUrls.length} URLs');
     try {
       await _repository.updateMediaUrls(id, mediaUrls);
-      debugPrint('IncidentProvider: Media URLs updated successfully');
     } catch (e) {
-      debugPrint('IncidentProvider: Failed to update media URLs: $e');
       _error = e.toString();
       notifyListeners();
     }

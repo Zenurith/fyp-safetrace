@@ -164,11 +164,11 @@ class _DiscoverCommunities extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = context.watch<CommunityProvider>();
     final communities = provider.nearbyCommunities;
-    final myCommunityIds = provider.myCommunities.map((c) => c.id).toSet();
 
-    // Filter out communities user is already a member of
-    final discoverCommunities =
-        communities.where((c) => !myCommunityIds.contains(c.id)).toList();
+    // Exclude all communities where user has any membership (approved, pending, or rejected)
+    final discoverCommunities = communities
+        .where((c) => !provider.myMembershipCommunityIds.contains(c.id))
+        .toList();
 
     if (loadingLocation || (provider.isLoading && communities.isEmpty)) {
       return Center(
@@ -264,7 +264,7 @@ class _CommunityCard extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: 24,
-                    backgroundColor: AppTheme.accentBlue,
+                    backgroundColor: AppTheme.primaryDark,
                     backgroundImage: community.imageUrl != null
                         ? NetworkImage(community.imageUrl!)
                         : null,

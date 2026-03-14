@@ -70,7 +70,9 @@ class _CommunityAdminScreenState extends State<CommunityAdminScreen>
   }
 }
 
-class _PendingRequestsTab extends StatelessWidget {
+// ── Pending Requests Tab ────────────────────────────────────────────────────
+
+class _PendingRequestsTab extends StatefulWidget {
   final String communityId;
   final Future<void> Function() onRefresh;
 
@@ -80,9 +82,39 @@ class _PendingRequestsTab extends StatelessWidget {
   });
 
   @override
+  State<_PendingRequestsTab> createState() => _PendingRequestsTabState();
+}
+
+class _PendingRequestsTabState extends State<_PendingRequestsTab> {
+  final Set<String> _requestedIds = {};
+  final Map<String, UserModel?> _users = {};
+
+  /// Batch-fetches any user IDs not yet loaded.
+  void _loadMissingUsers(List<CommunityMemberModel> requests) {
+    final missing = requests
+        .map((r) => r.userId)
+        .where((id) => !_requestedIds.contains(id))
+        .toList();
+    if (missing.isEmpty) return;
+    for (final id in missing) {
+      _requestedIds.add(id);
+    }
+    context.read<UserProvider>().getUsersByIds(missing).then((fetched) {
+      if (mounted) setState(() => _users.addAll(fetched));
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final provider = context.watch<CommunityProvider>();
     final requests = provider.pendingRequests;
+
+    // Batch-load users after the current frame to avoid calling async in build.
+    if (requests.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _loadMissingUsers(requests);
+      });
+    }
 
     if (provider.isLoading && requests.isEmpty) {
       return const Center(child: CircularProgressIndicator());
@@ -93,19 +125,19 @@ class _PendingRequestsTab extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.inbox, size: 64, color: Colors.grey[400]),
+            Icon(Icons.inbox, size: 64, color: AppTheme.textSecondary),
             const SizedBox(height: 16),
             Text(
               'No pending requests',
               style: TextStyle(
                 fontSize: 18,
-                color: Colors.grey[600],
+                color: AppTheme.textSecondary,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'All join requests have been processed',
-              style: TextStyle(color: Colors.grey[500]),
+              style: TextStyle(color: AppTheme.textSecondary),
             ),
           ],
         ),
@@ -113,14 +145,22 @@ class _PendingRequestsTab extends StatelessWidget {
     }
 
     return RefreshIndicator(
-      onRefresh: onRefresh,
+      onRefresh: () async {
+        setState(() {
+          _users.clear();
+          _requestedIds.clear();
+        });
+        await widget.onRefresh();
+      },
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: requests.length,
         itemBuilder: (context, index) {
+          final request = requests[index];
           return _PendingRequestCard(
-            request: requests[index],
-            communityId: communityId,
+            request: request,
+            user: _users[request.userId],
+            communityId: widget.communityId,
           );
         },
       ),
@@ -131,10 +171,12 @@ class _PendingRequestsTab extends StatelessWidget {
 class _PendingRequestCard extends StatefulWidget {
   final CommunityMemberModel request;
   final String communityId;
+  final UserModel? user;
 
   const _PendingRequestCard({
     required this.request,
     required this.communityId,
+    required this.user,
   });
 
   @override
@@ -143,30 +185,6 @@ class _PendingRequestCard extends StatefulWidget {
 
 class _PendingRequestCardState extends State<_PendingRequestCard> {
   bool _isProcessing = false;
-  UserModel? _user;
-  bool _loadingUser = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadUser();
-  }
-
-  Future<void> _loadUser() async {
-    try {
-      final user = await context
-          .read<UserProvider>()
-          .getUserById(widget.request.userId);
-      if (mounted) {
-        setState(() {
-          _user = user;
-          _loadingUser = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _loadingUser = false);
-    }
-  }
 
   Future<void> _approve() async {
     setState(() => _isProcessing = true);
@@ -228,6 +246,7 @@ class _PendingRequestCardState extends State<_PendingRequestCard> {
 
   @override
   Widget build(BuildContext context) {
+    final user = widget.user;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
@@ -240,36 +259,30 @@ class _PendingRequestCardState extends State<_PendingRequestCard> {
           children: [
             Row(
               children: [
-                if (_loadingUser)
-                  const CircleAvatar(
-                    radius: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                else
-                  UserAvatar(
-                    photoUrl: _user?.profilePhotoUrl,
-                    initials: _user?.initials ?? '?',
-                    radius: 24,
-                    backgroundColor: AppTheme.primaryDark,
-                  ),
+                UserAvatar(
+                  photoUrl: user?.profilePhotoUrl,
+                  initials: user?.initials ?? '?',
+                  radius: 24,
+                  backgroundColor: AppTheme.primaryDark,
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _user?.name ?? 'Loading...',
+                        user?.name ?? '...',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      if (_user != null)
+                      if (user != null)
                         Text(
-                          _user!.handle,
+                          user.handle,
                           style: TextStyle(
                             fontSize: 13,
-                            color: Colors.grey[600],
+                            color: AppTheme.textSecondary,
                           ),
                         ),
                     ],
@@ -279,7 +292,7 @@ class _PendingRequestCardState extends State<_PendingRequestCard> {
                   widget.request.timeAgo,
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey[500],
+                    color: AppTheme.textSecondary,
                   ),
                 ),
               ],
@@ -331,6 +344,8 @@ class _PendingRequestCardState extends State<_PendingRequestCard> {
   }
 }
 
+// ── Members Tab ─────────────────────────────────────────────────────────────
+
 class _MembersTab extends StatefulWidget {
   final String communityId;
 
@@ -343,6 +358,7 @@ class _MembersTab extends StatefulWidget {
 class _MembersTabState extends State<_MembersTab> {
   List<CommunityMemberModel> _members = [];
   bool _isLoading = true;
+  final Map<String, UserModel?> _users = {};
 
   @override
   void initState() {
@@ -353,10 +369,16 @@ class _MembersTabState extends State<_MembersTab> {
   Future<void> _loadMembers() async {
     final provider = context.read<CommunityProvider>();
     final members = await provider.getCommunityMembers(widget.communityId);
-    if (mounted) {
-      setState(() {
-        _members = members;
-        _isLoading = false;
+    if (!mounted) return;
+    setState(() {
+      _members = members;
+      _isLoading = false;
+    });
+    // Batch-fetch all member user docs in one go.
+    if (members.isNotEmpty) {
+      final ids = members.map((m) => m.userId).toList();
+      context.read<UserProvider>().getUsersByIds(ids).then((fetched) {
+        if (mounted) setState(() => _users.addAll(fetched));
       });
     }
   }
@@ -372,81 +394,56 @@ class _MembersTabState extends State<_MembersTab> {
     }
 
     return RefreshIndicator(
-      onRefresh: _loadMembers,
+      onRefresh: () async {
+        setState(() {
+          _isLoading = true;
+          _users.clear();
+        });
+        await _loadMembers();
+      },
       child: ListView.separated(
         padding: const EdgeInsets.all(16),
         itemCount: _members.length,
         separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
-          return _MemberListItem(member: _members[index]);
+          final member = _members[index];
+          return _MemberListItem(
+            member: member,
+            user: _users[member.userId],
+          );
         },
       ),
     );
   }
 }
 
-class _MemberListItem extends StatefulWidget {
+class _MemberListItem extends StatelessWidget {
   final CommunityMemberModel member;
+  final UserModel? user;
 
-  const _MemberListItem({required this.member});
-
-  @override
-  State<_MemberListItem> createState() => _MemberListItemState();
-}
-
-class _MemberListItemState extends State<_MemberListItem> {
-  UserModel? _user;
-  bool _loadingUser = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadUser();
-  }
-
-  Future<void> _loadUser() async {
-    try {
-      final user =
-          await context.read<UserProvider>().getUserById(widget.member.userId);
-      if (mounted) {
-        setState(() {
-          _user = user;
-          _loadingUser = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _loadingUser = false);
-    }
-  }
+  const _MemberListItem({required this.member, required this.user});
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(vertical: 4),
-      leading: _loadingUser
-          ? const CircleAvatar(
-              radius: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : UserAvatar(
-              photoUrl: _user?.profilePhotoUrl,
-              initials: _user?.initials ?? '?',
-              radius: 20,
-              backgroundColor:
-                  widget.member.isAdmin ? AppTheme.primaryRed : AppTheme.primaryDark,
-            ),
-      title: Text(_user?.name ?? 'Loading...'),
+      leading: UserAvatar(
+        photoUrl: user?.profilePhotoUrl,
+        initials: user?.initials ?? '?',
+        radius: 20,
+        backgroundColor:
+            member.isAdmin ? AppTheme.primaryRed : AppTheme.primaryDark,
+      ),
+      title: Text(user?.name ?? '...'),
       subtitle: Text(
-        widget.member.isAdmin ? 'Admin' : 'Member',
+        member.isAdmin ? 'Admin' : 'Member',
         style: TextStyle(
-          color: widget.member.isAdmin
-              ? AppTheme.primaryRed
-              : Colors.grey[600],
+          color: member.isAdmin ? AppTheme.primaryRed : AppTheme.textSecondary,
           fontWeight:
-              widget.member.isAdmin ? FontWeight.w500 : FontWeight.normal,
+              member.isAdmin ? FontWeight.w500 : FontWeight.normal,
         ),
       ),
-      trailing: widget.member.isAdmin
+      trailing: member.isAdmin
           ? Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
