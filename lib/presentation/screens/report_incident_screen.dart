@@ -234,36 +234,48 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
 
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('You have an unsaved draft.'),
-        duration: const Duration(seconds: 6),
-        action: SnackBarAction(
-          label: 'Restore',
-          onPressed: () {
-            if (!mounted) return;
-            setState(() {
-              _titleController.text = draftTitle;
-              _descriptionController.text = draftDescription;
-              if (draftCategoryIdx != null &&
-                  draftCategoryIdx < IncidentCategory.values.length) {
-                _selectedCategory = IncidentCategory.values[draftCategoryIdx];
-              }
-              if (draftSeverityIdx != null &&
-                  draftSeverityIdx < SeverityLevel.values.length) {
-                _selectedSeverity = SeverityLevel.values[draftSeverityIdx];
-              }
-              if (draftAddress.isNotEmpty) {
-                _address = draftAddress;
-                _addressController.text = draftAddress;
-              }
-              if (draftLat != null && draftLng != null) {
-                _latitude = draftLat;
-                _longitude = draftLng;
-              }
-            });
-          },
-        ),
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Restore Draft?'),
+        content: const Text('You have an unsaved draft. Would you like to restore it?'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _clearDraft();
+            },
+            child: const Text('Discard'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              if (!mounted) return;
+              setState(() {
+                _titleController.text = draftTitle;
+                _descriptionController.text = draftDescription;
+                if (draftCategoryIdx != null &&
+                    draftCategoryIdx < IncidentCategory.values.length) {
+                  _selectedCategory = IncidentCategory.values[draftCategoryIdx];
+                }
+                if (draftSeverityIdx != null &&
+                    draftSeverityIdx < SeverityLevel.values.length) {
+                  _selectedSeverity = SeverityLevel.values[draftSeverityIdx];
+                }
+                if (draftAddress.isNotEmpty) {
+                  _address = draftAddress;
+                  _addressController.text = draftAddress;
+                }
+                if (draftLat != null && draftLng != null) {
+                  _latitude = draftLat;
+                  _longitude = draftLng;
+                }
+              });
+            },
+            style: TextButton.styleFrom(foregroundColor: AppTheme.primaryRed),
+            child: const Text('Restore'),
+          ),
+        ],
       ),
     );
   }
