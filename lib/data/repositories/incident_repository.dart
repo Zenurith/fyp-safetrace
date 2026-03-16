@@ -147,10 +147,10 @@ class IncidentRepository {
   }
 
   Future<void> updateMediaUrls(String id, List<String> mediaUrls) async {
-    debugPrint('IncidentRepository: Updating mediaUrls for $id: $mediaUrls');
+    if (kDebugMode) debugPrint('IncidentRepository: Updating mediaUrls for $id: $mediaUrls');
     await _incidentsCollection.doc(id).update({
       'mediaUrls': mediaUrls,
     });
-    debugPrint('IncidentRepository: Firestore update complete');
+    if (kDebugMode) debugPrint('IncidentRepository: Firestore update complete');
   }
 }

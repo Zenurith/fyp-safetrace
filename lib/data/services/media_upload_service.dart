@@ -34,8 +34,8 @@ class MediaUploadService {
 
   Future<String?> uploadFile(XFile file, String incidentId) async {
     try {
-      debugPrint('MediaUpload: Starting upload for incident $incidentId');
-      debugPrint('MediaUpload: File path: ${file.path}');
+      if (kDebugMode) debugPrint('MediaUpload: Starting upload for incident $incidentId');
+      if (kDebugMode) debugPrint('MediaUpload: File path: ${file.path}');
 
       final extension = file.path.split('.').last.toLowerCase();
       final isVideo = ['mp4', 'mov', 'avi', 'mkv'].contains(extension);
@@ -45,7 +45,7 @@ class MediaUploadService {
 
       // Use readAsBytes() and putData() for cross-platform compatibility
       final bytes = await file.readAsBytes();
-      debugPrint('MediaUpload: Read ${bytes.length} bytes, uploading...');
+      if (kDebugMode) debugPrint('MediaUpload: Read ${bytes.length} bytes, uploading...');
 
       final uploadTask = ref.putData(
         bytes,
@@ -56,27 +56,27 @@ class MediaUploadService {
 
       final snapshot = await uploadTask;
       final url = await snapshot.ref.getDownloadURL();
-      debugPrint('MediaUpload: Success! URL: $url');
+      if (kDebugMode) debugPrint('MediaUpload: Success! URL: $url');
       return url;
     } catch (e, stackTrace) {
-      debugPrint('MediaUpload: FAILED - $e');
-      debugPrint('MediaUpload: Stack trace - $stackTrace');
+      if (kDebugMode) debugPrint('MediaUpload: FAILED - $e');
+      if (kDebugMode) debugPrint('MediaUpload: Stack trace - $stackTrace');
       return null;
     }
   }
 
   Future<List<String>> uploadMultipleFiles(
       List<XFile> files, String incidentId) async {
-    debugPrint('MediaUpload: Uploading ${files.length} files for incident $incidentId');
+    if (kDebugMode) debugPrint('MediaUpload: Uploading ${files.length} files for incident $incidentId');
     final urls = <String>[];
     for (int i = 0; i < files.length; i++) {
-      debugPrint('MediaUpload: Uploading file ${i + 1}/${files.length}');
+      if (kDebugMode) debugPrint('MediaUpload: Uploading file ${i + 1}/${files.length}');
       final url = await uploadFile(files[i], incidentId);
       if (url != null) {
         urls.add(url);
       }
     }
-    debugPrint('MediaUpload: Completed. ${urls.length}/${files.length} successful');
+    if (kDebugMode) debugPrint('MediaUpload: Completed. ${urls.length}/${files.length} successful');
     return urls;
   }
 
@@ -85,7 +85,7 @@ class MediaUploadService {
       final ref = _storage.refFromURL(url);
       await ref.delete();
     } catch (e) {
-      debugPrint('deleteFile error (ignored): $e');
+      if (kDebugMode) debugPrint('deleteFile error (ignored): $e');
     }
   }
 
@@ -104,7 +104,7 @@ class MediaUploadService {
         await item.delete();
       }
     } catch (e) {
-      debugPrint('deleteIncidentMedia error (ignored): $e');
+      if (kDebugMode) debugPrint('deleteIncidentMedia error (ignored): $e');
     }
   }
 
@@ -135,8 +135,8 @@ class MediaUploadService {
       final snapshot = await uploadTask;
       return await snapshot.ref.getDownloadURL();
     } catch (e, stackTrace) {
-      debugPrint('Upload profile photo error: $e');
-      debugPrint('Stack trace: $stackTrace');
+      if (kDebugMode) debugPrint('Upload profile photo error: $e');
+      if (kDebugMode) debugPrint('Stack trace: $stackTrace');
       return null;
     }
   }
@@ -150,7 +150,7 @@ class MediaUploadService {
       }
     } catch (e) {
       // Ignore errors - folder may not exist yet for new users
-      debugPrint('deleteProfilePhoto (ignored): $e');
+      if (kDebugMode) debugPrint('deleteProfilePhoto (ignored): $e');
     }
   }
 }

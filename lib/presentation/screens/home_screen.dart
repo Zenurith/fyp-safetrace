@@ -202,6 +202,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _notificationSubscription?.cancel();
+    _notificationService.dispose();
     super.dispose();
   }
 

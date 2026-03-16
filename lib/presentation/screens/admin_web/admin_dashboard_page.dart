@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../utils/app_theme.dart';
+import '../../../data/models/incident_model.dart';
 import '../../../data/services/analytics_service.dart';
 import '../../providers/incident_provider.dart';
 import '../../providers/user_provider.dart';
@@ -47,7 +48,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final columns = ResponsiveLayout.getGridColumns(context);
     final pendingFlags = flagProvider.pendingCount;
     final pendingIncidents =
-        incidents.where((i) => i.status.index == 0).length;
+        incidents.where((i) => i.status == IncidentStatus.pending).length;
     final communityCount = communityProvider.communities.length;
 
     return SingleChildScrollView(

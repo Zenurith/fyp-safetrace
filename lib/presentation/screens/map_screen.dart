@@ -406,7 +406,10 @@ class _MapScreenState extends State<MapScreen> {
                 ),
                 zoom: AppConstants.defaultZoom,
               ),
-              onMapCreated: (controller) => _mapController = controller,
+              onMapCreated: (controller) {
+                _mapController = controller;
+                _centerOnUserLocation();
+              },
               markers: _buildMarkers(incidents),
               circles: _buildHeatmapCircles(incidents),
               myLocationEnabled: true,

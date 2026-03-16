@@ -238,10 +238,15 @@ class IncidentProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Auto-approve if image verification passed with high confidence (70%+)
-      final autoApprove = imageVerified == true &&
-          verificationScore != null &&
-          verificationScore >= 0.7;
+      // Determine initial status based on AI verification result
+      IncidentStatus initialStatus;
+      if (imageVerified == true && verificationScore != null && verificationScore >= 0.7) {
+        initialStatus = IncidentStatus.verified;    // High confidence pass
+      } else if (imageVerified == true) {
+        initialStatus = IncidentStatus.underReview; // Low confidence pass — skip pending
+      } else {
+        initialStatus = IncidentStatus.pending;     // Failed or unavailable
+      }
 
       final incident = IncidentModel(
         id: '',
@@ -256,7 +261,7 @@ class IncidentProvider extends ChangeNotifier {
         reporterId: reporterId,
         isAnonymous: isAnonymous,
         mediaUrls: mediaUrls,
-        status: autoApprove ? IncidentStatus.verified : IncidentStatus.pending,
+        status: initialStatus,
         imageVerified: imageVerified,
         verificationScore: verificationScore,
         verificationNote: verificationNote,

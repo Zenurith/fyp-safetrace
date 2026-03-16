@@ -86,7 +86,7 @@ class _AlertSettingsScreenState extends State<AlertSettingsScreen> {
                 const SizedBox(height: 4),
                 Text(
                   'Receive alerts for incidents within:',
-                  style: TextStyle(color: Colors.grey[600]),
+                  style: TextStyle(color: AppTheme.textSecondary),
                 ),
                 const SizedBox(height: 16),
                 Center(
@@ -94,7 +94,7 @@ class _AlertSettingsScreenState extends State<AlertSettingsScreen> {
                     width: 200,
                     height: 140,
                     decoration: BoxDecoration(
-                      color: Colors.grey[100],
+                      color: AppTheme.backgroundGrey,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Center(
@@ -126,9 +126,9 @@ class _AlertSettingsScreenState extends State<AlertSettingsScreen> {
                             bottom: 10,
                             child: Text(
                               '${settings.radiusKm.toInt()} km radius',
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 12,
-                                color: Colors.grey[600],
+                                color: AppTheme.textSecondary,
                               ),
                             ),
                           ),
@@ -156,7 +156,7 @@ class _AlertSettingsScreenState extends State<AlertSettingsScreen> {
                 const SizedBox(height: 4),
                 Text(
                   'Notify me about:',
-                  style: TextStyle(color: Colors.grey[600]),
+                  style: TextStyle(color: AppTheme.textSecondary),
                 ),
                 const SizedBox(height: 8),
                 _SeverityCheckbox(
@@ -208,7 +208,7 @@ class _AlertSettingsScreenState extends State<AlertSettingsScreen> {
                           ),
                           Text(
                             'Custom notification hours',
-                            style: TextStyle(color: Colors.grey[600]),
+                            style: TextStyle(color: AppTheme.textSecondary),
                           ),
                         ],
                       ),
@@ -225,8 +225,9 @@ class _AlertSettingsScreenState extends State<AlertSettingsScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.grey[100],
+                      color: AppTheme.backgroundGrey,
                       borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppTheme.cardBorder),
                     ),
                     child: Text(
                       'From ${settings.activeFrom} to ${settings.activeTo}',
@@ -249,7 +250,7 @@ class _AlertSettingsScreenState extends State<AlertSettingsScreen> {
                           ),
                           Text(
                             'Suppress alerts during selected hours',
-                            style: TextStyle(color: Colors.grey[600]),
+                            style: TextStyle(color: AppTheme.textSecondary),
                           ),
                         ],
                       ),
@@ -508,13 +509,13 @@ class _CategoryFilterGrid extends StatelessWidget {
           color: selected ? color.withValues(alpha: 0.1) : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? color : Colors.grey[300]!,
+            color: selected ? color : AppTheme.cardBorder,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? color : Colors.grey[600],
+            color: selected ? color : AppTheme.textSecondary,
             fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
           ),
         ),

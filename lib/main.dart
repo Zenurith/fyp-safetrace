@@ -1,3 +1,4 @@
+import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -115,10 +116,42 @@ class _UserLoader extends StatefulWidget {
 }
 
 class _UserLoaderState extends State<_UserLoader> {
+  final _appLinks = AppLinks();
+
   @override
   void initState() {
     super.initState();
     _loadUser();
+    _initDeepLinks();
+  }
+
+  void _initDeepLinks() {
+    // Handle deep links while app is running
+    _appLinks.uriLinkStream.listen((uri) {
+      _handleDeepLink(uri);
+    });
+    // Handle deep link that launched the app
+    _appLinks.getInitialLink().then((uri) {
+      if (uri != null) _handleDeepLink(uri);
+    });
+  }
+
+  void _handleDeepLink(Uri uri) {
+    if (uri.scheme == 'safetrace' && uri.host == 'incident') {
+      final incidentId = uri.queryParameters['id'];
+      if (incidentId != null && mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (_) => IncidentBottomSheet(incidentId: incidentId),
+            );
+          }
+        });
+      }
+    }
   }
 
   void _loadUser() async {

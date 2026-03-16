@@ -479,15 +479,15 @@ class _StatusBadge extends StatelessWidget {
   Color _getStatusColor() {
     switch (status) {
       case IncidentStatus.pending:
-        return Colors.orange;
+        return AppTheme.warningOrange;
       case IncidentStatus.underReview:
-        return Colors.blue;
+        return AppTheme.accentBlue;
       case IncidentStatus.verified:
-        return Colors.green;
+        return AppTheme.successGreen;
       case IncidentStatus.resolved:
-        return Colors.teal;
+        return AppTheme.primaryDark;
       case IncidentStatus.dismissed:
-        return Colors.grey;
+        return AppTheme.textSecondary;
     }
   }
 

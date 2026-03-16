@@ -12,10 +12,13 @@ import 'app_theme.dart';
 Future<String> _generateWhatsAppMessage(IncidentModel incident) async {
   final mapsUrl =
       'https://maps.google.com/?q=${incident.latitude},${incident.longitude}';
+  final appLink =
+      'safetrace://incident?id=${incident.id}';
 
   final fixedHeader = '🚨 ${incident.categoryLabel}: ${incident.title}\n'
       '📍 ${incident.address}\n'
-      '🗺 $mapsUrl\n\n'
+      '🗺 $mapsUrl\n'
+      '📲 View in SafeTrace: $appLink\n\n'
       '${incident.description}';
 
   const fallbackFooter = '\n\n— Reported via SafeTrace';

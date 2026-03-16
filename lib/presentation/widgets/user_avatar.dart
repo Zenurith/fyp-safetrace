@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/app_theme.dart';
 
 class UserAvatar extends StatefulWidget {
   final String? photoUrl;
@@ -46,7 +47,7 @@ class _UserAvatarState extends State<UserAvatar> {
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = widget.backgroundColor ?? Colors.teal;
+    final bgColor = widget.backgroundColor ?? AppTheme.primaryDark;
     final fgColor = widget.foregroundColor ?? Colors.white;
     final size = widget.radius * 2;
 
@@ -123,7 +124,7 @@ class _UserAvatarState extends State<UserAvatar> {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           border: Border.all(
-            color: widget.borderColor ?? Colors.amber,
+            color: widget.borderColor ?? AppTheme.cardBorder,
             width: widget.borderWidth!,
           ),
         ),

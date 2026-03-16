@@ -1,6 +1,7 @@
 // ignore_for_file: deprecated_member_use
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -369,10 +370,10 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
           CameraUpdate.newLatLng(LatLng(pos.latitude, pos.longitude)),
         );
       } else if (mounted) {
-        debugPrint('Location detection returned null - check permissions');
+        if (kDebugMode) debugPrint('Location detection returned null - check permissions');
       }
     } catch (e) {
-      debugPrint('Error detecting location: $e');
+      if (kDebugMode) debugPrint('Error detecting location: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -901,10 +902,9 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     setState(() => _isSubmitting = true);
 
     // Enhancement 2: Verify ALL selected images
-    debugPrint(
-        'Report: Media count=${_selectedMedia.length}, isConfigured=${_verificationService.isConfigured}');
+    if (kDebugMode) debugPrint('Report: Media count=${_selectedMedia.length}, isConfigured=${_verificationService.isConfigured}');
     if (_selectedMedia.isNotEmpty && _verificationService.isConfigured) {
-      debugPrint('Report: Starting image verification for all images...');
+      if (kDebugMode) debugPrint('Report: Starting image verification for all images...');
       setState(() => _isVerifying = true);
 
       try {
@@ -916,7 +916,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
           if (isVideo) continue; // Skip videos
 
           final imageBytes = await media.readAsBytes();
-          debugPrint('Report: Read ${imageBytes.length} bytes from image');
+          if (kDebugMode) debugPrint('Report: Read ${imageBytes.length} bytes from image');
           final result = await _verificationService.verifyImage(
             imageBytes: imageBytes,
             categoryName: _categoryLabel(_selectedCategory),
@@ -950,7 +950,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
           setState(() => _isVerifying = false);
         }
       } catch (e) {
-        debugPrint('Image verification error: $e');
+        if (kDebugMode) debugPrint('Image verification error: $e');
         setState(() => _isVerifying = false);
         // Continue with submission even if verification fails
       }
@@ -980,7 +980,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
       ).timeout(
         const Duration(seconds: 30),
         onTimeout: () {
-          debugPrint('Incident report timed out');
+          if (kDebugMode) debugPrint('Incident report timed out');
           return null;
         },
       );
@@ -1000,28 +1000,26 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
 
       // Upload media if any
       if (_selectedMedia.isNotEmpty) {
-        debugPrint(
-            'Report: Starting media upload for ${_selectedMedia.length} files');
+        if (kDebugMode) debugPrint('Report: Starting media upload for ${_selectedMedia.length} files');
         try {
           final mediaUrls = await _mediaService.uploadMultipleFiles(
             _selectedMedia,
             incidentId,
           );
 
-          debugPrint('Report: Got ${mediaUrls.length} URLs back');
+          if (kDebugMode) debugPrint('Report: Got ${mediaUrls.length} URLs back');
           if (mediaUrls.isNotEmpty) {
-            debugPrint('Report: Updating incident with media URLs');
+            if (kDebugMode) debugPrint('Report: Updating incident with media URLs');
             await provider.updateIncidentMedia(incidentId, mediaUrls);
-            debugPrint('Report: Media URLs updated successfully');
+            if (kDebugMode) debugPrint('Report: Media URLs updated successfully');
           } else {
-            debugPrint(
-                'Report: WARNING - No media URLs returned, skipping update');
+            if (kDebugMode) debugPrint('Report: WARNING - No media URLs returned, skipping update');
           }
         } catch (mediaError) {
-          debugPrint('Report: Media upload failed: $mediaError');
+          if (kDebugMode) debugPrint('Report: Media upload failed: $mediaError');
         }
       } else {
-        debugPrint('Report: No media selected, skipping upload');
+        if (kDebugMode) debugPrint('Report: No media selected, skipping upload');
       }
 
       // Enhancement 6: Clear draft on successful submit
@@ -1067,7 +1065,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
 
       Navigator.of(context).pop(true);
     } catch (e) {
-      debugPrint('Submit error: $e');
+      if (kDebugMode) debugPrint('Submit error: $e');
       if (mounted) {
         setState(() => _isSubmitting = false);
         ScaffoldMessenger.of(context).showSnackBar(
