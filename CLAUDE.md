@@ -159,28 +159,22 @@ lib/
 Communities are **location-based groups** (center point + radius). Membership eligibility uses the **Haversine formula**. Members can create posts/discussions within the community. Joining is currently **auto-approved** (no admin approval) for testing.
 
 ### Security Issues (Open)
-- `admin_web_shell.dart` — verify whether admin check exists before rendering the web admin shell
-- `admin_auth_screen.dart` — verify whether `user.isAdmin` is checked after successful auth
+- `lib/config/secrets.dart` — API keys committed to repo (geminiApiKey, googleMapsApiKey). Rotate keys and move to environment variables or Firebase Remote Config.
 
-> **Note**: `admin_screen.dart` has no guard inside the screen itself, but access is controlled via `if (user.isAdmin)` in `profile_screen.dart` line 454 — the button is never shown to non-admins. This is acceptable but relies on UI-level gating rather than route-level protection.
+> **Note**: `admin_screen.dart` has no guard inside the screen itself, but access is controlled via `if (user.isAdmin)` in `profile_screen.dart` line 454. `admin_web_shell.dart` and `admin_auth_screen.dart` both **verified** to check `user.isAdmin` — secure.
 
 ### Design Violations (Open — fix opportunistically)
-- `profile_screen.dart`: AppBar uses `AppTheme.profilePurple` → should be `AppTheme.primaryDark`
-- `profile_screen.dart`: Reputation card uses `BoxShadow` → replace with `AppTheme.cardDecoration`
-- `profile_screen.dart`: Uses `Colors.teal` and `Colors.amber` directly → use AppTheme constants
-- `community_list_screen.dart`: Uses `AppTheme.accentBlue` → replace with `AppTheme.primaryDark`
 - `community_detail_screen.dart`: Hardcoded colors in membership state UI → use AppTheme constants
 - `admin_auth_screen.dart`: Uses `BoxShadow` on login card → replace with `AppTheme.cardDecoration`
 - `admin_dashboard_page.dart`: Uses `Colors.teal` and `Colors.amber` in avatar UI
 
 ### Logic Bugs (Open)
-- `community_list_screen.dart` Discover tab: filters out only *approved* members from discover list — pending members still see the community. Should exclude all non-null membership statuses.
-- `community_detail_screen.dart`: `_isAdmin` local state not cleared on pop — stale state on re-entry.
+- `community_detail_screen.dart`: `_isAdmin` local state not cleared on pop — stale state on re-entry. Reset `_isAdmin = false` at start of `_loadCommunity()` before async check.
+- Enum serialization: All models store enums as `.index` (integer). If enum order ever changes, Firestore data will deserialize to wrong values. Migrate to `.name` (string) for forward compatibility.
 
 ### Performance Issues (Open)
-- `community_admin_screen.dart`: N+1 user queries — each member card loads user doc individually in `initState`. Batch-fetch instead.
-- `profile_screen.dart` lines 128–164: `debugPrint()` calls should be wrapped in `kDebugMode` or removed.
-- Edit profile dialog creates `TextEditingController` on every open without disposing on cancel (memory leak risk).
+- `community_repository.dart`: `getNearbyCommunities()` is O(n) client-side — fetches all communities then filters. Will degrade at scale; consider GeoFlutterFire or geohashing.
+- Edit profile dialog (`profile_screen.dart`): `TextEditingController`s created on every open, not disposed if dismissed via back gesture (memory leak risk).
 
 ---
 
