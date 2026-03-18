@@ -385,7 +385,7 @@ class _InfoSection extends StatelessWidget {
           _DetailRow(
             icon: Icons.calendar_today,
             label: 'Created',
-            value: community.timeAgo,
+            value: community.createdFormatted,
           ),
           const SizedBox(height: 16),
         ],

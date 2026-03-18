@@ -63,6 +63,12 @@ class CommunityModel {
     return '${diff.inDays} days ago';
   }
 
+  String get createdFormatted {
+    final d = createdAt.day.toString().padLeft(2, '0');
+    final m = createdAt.month.toString().padLeft(2, '0');
+    return '$d-$m-${createdAt.year}';
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'name': name,

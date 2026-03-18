@@ -34,9 +34,13 @@ class IncidentBottomSheet extends StatelessWidget {
       );
     }
 
-    return ConstrainedBox(
+    return Container(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.9,
+      ),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(
