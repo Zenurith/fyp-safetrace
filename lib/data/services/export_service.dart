@@ -1,11 +1,10 @@
-import 'dart:io';
+import 'dart:convert';
 import 'package:csv/csv.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import '../models/incident_model.dart';
+import 'export_file_saver.dart';
 
 class ExportService {
   static Future<String?> exportToCsv(List<IncidentModel> incidents) async {
@@ -55,15 +54,8 @@ class ExportService {
 
     final csv = const ListToCsvConverter().convert(rows);
 
-    try {
-      final dir = await getTemporaryDirectory();
-      final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-      final file = File('${dir.path}/incidents_$timestamp.csv');
-      await file.writeAsString(csv);
-      return file.path;
-    } catch (e) {
-      return null;
-    }
+    final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+    return saveExportFile('incidents_$timestamp.csv', utf8.encode(csv));
   }
 
   static Future<String?> exportToPdf(List<IncidentModel> incidents) async {
@@ -130,15 +122,8 @@ class ExportService {
       );
     }
 
-    try {
-      final dir = await getTemporaryDirectory();
-      final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-      final file = File('${dir.path}/incidents_$timestamp.pdf');
-      await file.writeAsBytes(await pdf.save());
-      return file.path;
-    } catch (e) {
-      return null;
-    }
+    final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+    return saveExportFile('incidents_$timestamp.pdf', await pdf.save());
   }
 
   static pw.Widget _buildIncidentRow(IncidentModel incident) {
@@ -280,6 +265,6 @@ class ExportService {
   }
 
   static Future<void> shareFile(String filePath) async {
-    await Share.shareXFiles([XFile(filePath)]);
+    await shareExportFile(filePath);
   }
 }

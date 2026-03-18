@@ -62,7 +62,7 @@ class AnalyticsData {
 }
 
 class AnalyticsService {
-  static AnalyticsData calculateAnalytics(List<IncidentModel> incidents) {
+  static AnalyticsData calculateAnalytics(List<IncidentModel> incidents, {int trendDays = 7}) {
     if (incidents.isEmpty) {
       return AnalyticsData(
         totalIncidents: 0,
@@ -147,8 +147,8 @@ class AnalyticsService {
       return StatusCount(status: e.key, count: e.value);
     }).toList();
 
-    // Calculate trend data (last 30 days)
-    final trendData = _calculateTrendData(incidents, 30);
+    // Calculate trend data
+    final trendData = _calculateTrendData(incidents, trendDays);
 
     // Calculate average resolution time
     final resolvedIncidents = incidents

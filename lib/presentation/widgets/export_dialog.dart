@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../data/services/export_service.dart';
@@ -41,17 +42,23 @@ class _ExportDialogState extends State<ExportDialog> {
 
     setState(() => _isExporting = false);
 
-    if (filePath != null) {
+    if (filePath != null || kIsWeb) {
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Exported ${incidents.length} incidents to ${format.toUpperCase()}'),
-          backgroundColor: AppTheme.successGreen,
-          action: SnackBarAction(
-            label: 'Share',
-            textColor: Colors.white,
-            onPressed: () => ExportService.shareFile(filePath!),
+          content: Text(
+            kIsWeb
+                ? 'Downloaded ${incidents.length} incidents as ${format.toUpperCase()}'
+                : 'Exported ${incidents.length} incidents to ${format.toUpperCase()}',
           ),
+          backgroundColor: AppTheme.successGreen,
+          action: (!kIsWeb && filePath != null)
+              ? SnackBarAction(
+                  label: 'Share',
+                  textColor: Colors.white,
+                  onPressed: () => ExportService.shareFile(filePath!),
+                )
+              : null,
         ),
       );
     } else {
