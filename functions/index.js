@@ -79,13 +79,14 @@ exports.notifyNearbyUsers = onDocumentCreated(
       if (!severityFilters.includes(severity)) continue;
       if (!categoryFilters.includes(category)) continue;
 
-      // Active hours check
+      // Active hours check (convert UTC to user's local time using stored offset)
       if (alertSettings.activeHoursEnabled) {
-        const now = new Date();
-        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        const tzOffsetMinutes = user.timezoneOffsetMinutes ?? 0;
+        const nowUtcMs = Date.now();
+        const localMinutes = Math.floor((nowUtcMs / 60000 + tzOffsetMinutes) % (24 * 60));
         const fromMinutes = parseTime(alertSettings.activeFrom ?? '07:00 AM');
         const toMinutes = parseTime(alertSettings.activeTo ?? '11:00 PM');
-        if (currentMinutes < fromMinutes || currentMinutes > toMinutes) continue;
+        if (localMinutes < fromMinutes || localMinutes > toMinutes) continue;
       }
 
       const distance = calcDistanceKm(

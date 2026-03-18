@@ -128,6 +128,10 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
         'injured', 'injure', 'hurt', 'bleeding', 'bleed', 'wound', 'fracture',
         'broken bone', 'heart attack', 'stroke', 'overdose', 'choking',
         'electrocuted', 'drowning', 'gas leak', 'trapped',
+        // Malay
+        'kebakaran', 'banjir', 'kecemasan', 'lemas', 'pengsan', 'cedera',
+        'patah', 'berdarah', 'darah', 'terbakar', 'terperangkap', 'letupan',
+        'gempa', 'runtuh', 'serangan jantung', 'strok', 'lemas dalam air',
       ],
       IncidentCategory.crime: [
         'robbery', 'theft', 'steal', 'stolen', 'murder', 'assault', 'rape',
@@ -135,29 +139,49 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
         'drug', 'criminal', 'crime', 'burglary', 'snatch', 'pickpocket',
         'scam', 'fraud', 'kidnap', 'threaten', 'threat', 'weapon', 'gun',
         'knife', 'parang', 'punch', 'beat up', 'molest', 'harass', 'victim',
+        // Malay
+        'rompak', 'ragut', 'curi', 'pecah masuk', 'dadah', 'ugut', 'pukul',
+        'rogol', 'bunuh', 'samun', 'penipuan', 'scam', 'culik', 'senjata',
+        'pisau', 'histeria', 'cabul', 'ganggu', 'mangsa', 'tangkap',
       ],
       IncidentCategory.traffic: [
         'accident', 'crash', 'collision', 'traffic', 'motorcycle', 'motorbike',
         'lorry', 'truck', 'jam', 'congestion', 'roadblock', 'pothole',
         'highway', 'vehicle', 'parking', 'car', 'bus', 'van', 'taxi',
         'road', 'reckless', 'speeding', 'drunk driving', 'hit and run',
+        // Malay
+        'kemalangan', 'langgar', 'terlanggar', 'sesak', 'kesesakan', 'motosikal',
+        'lori', 'jalan', 'trafik', 'laju', 'lari', 'jambatan', 'lebuh raya',
+        'kenderaan', 'parkir', 'bas', 'teksi', 'lumba haram',
       ],
       IncidentCategory.infrastructure: [
         'pipe', 'burst', 'electricity', 'power outage', 'blackout',
         'sewage', 'drain', 'lamppost', 'streetlight', 'pavement', 'sidewalk',
         'bridge', 'construction', 'infrastructure', 'broken', 'water supply',
         'no water', 'leaking', 'sinkhole', 'landslide', 'building',
+        // Malay
+        'paip bocor', 'bekalan air', 'tiada air', 'lampu jalan', 'longkang',
+        'gelap', 'gangguan bekalan', 'tanah runtuh', 'pembetungan', 'rosak',
+        'elektrik', 'pembinaan', 'infrastruktur', 'bumbung', 'dinding retak',
       ],
       IncidentCategory.environmental: [
         'rubbish', 'garbage', 'litter', 'pollution', 'smoke', 'haze',
         'fallen tree', 'tree fell', 'environmental', 'dumping', 'illegal dump',
         'dead animal', 'pest', 'dengue', 'mosquito', 'rat', 'dirty',
         'stench', 'smell', 'river', 'toxic',
+        // Malay
+        'sampah', 'pembuangan haram', 'bau', 'asap', 'jerebu', 'pokok tumbang',
+        'nyamuk', 'tikus', 'pencemaran', 'busuk', 'sungai', 'biawak',
+        'buang sampah', 'alam sekitar', 'haiwan mati', 'kotor',
       ],
       IncidentCategory.suspicious: [
         'suspicious', 'stranger', 'loitering', 'following', 'watching',
         'unknown', 'weird', 'odd', 'lurking', 'stalking', 'spy', 'peeping',
         'abandoned', 'unattended', 'bag left', 'package',
+        // Malay
+        'mencurigakan', 'orang asing', 'merayau', 'ikut', 'mengintai',
+        'pelik', 'beg ditinggal', 'bungkusan', 'suspek', 'tidak dikenali',
+        'terbiar', 'memerhati', 'intai', 'stalker',
       ],
     };
 

@@ -69,6 +69,7 @@ class UserRepository {
     await _usersCollection.doc(uid).update({
       'lastLatitude': latitude,
       'lastLongitude': longitude,
+      'timezoneOffsetMinutes': DateTime.now().timeZoneOffset.inMinutes,
     });
   }
 
