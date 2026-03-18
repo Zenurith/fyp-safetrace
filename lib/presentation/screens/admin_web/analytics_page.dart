@@ -7,92 +7,76 @@ import '../../widgets/analytics/stats_card.dart';
 import '../../widgets/analytics/incident_trend_chart.dart';
 import '../../widgets/analytics/category_pie_chart.dart';
 import '../../widgets/analytics/severity_bar_chart.dart';
-import '../../widgets/admin_web/responsive_layout.dart';
 
 class AnalyticsPage extends StatelessWidget {
   const AnalyticsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final incidentProvider = context.watch<IncidentProvider>();
-    final incidents = incidentProvider.allIncidents;
+    final incidents = context.watch<IncidentProvider>().allIncidents;
     final analytics = AnalyticsService.calculateAnalytics(incidents);
-    final columns = ResponsiveLayout.getGridColumns(context);
-    final isDesktop = ResponsiveLayout.isDesktop(context);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Stats grid
-          Text(
-            'Key Metrics',
-            style: AppTheme.headingMedium.copyWith(
-              color: AppTheme.primaryDark,
-            ),
+          // Stats grid — 3 columns on wide, 2 on narrow
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final cols = constraints.maxWidth > 900 ? 3 : 2;
+              return GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: cols,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                childAspectRatio: 2.2,
+                children: [
+                  StatsCard(
+                    title: 'Total Incidents',
+                    value: '${analytics.totalIncidents}',
+                    icon: Icons.warning_amber_rounded,
+                    color: AppTheme.primaryDark,
+                  ),
+                  StatsCard(
+                    title: 'Active',
+                    value: '${analytics.activeIncidents}',
+                    icon: Icons.pending_actions,
+                    color: AppTheme.warningOrange,
+                  ),
+                  StatsCard(
+                    title: 'Resolved',
+                    value: '${analytics.resolvedIncidents}',
+                    icon: Icons.check_circle_outline,
+                    color: AppTheme.successGreen,
+                  ),
+                  StatsCard(
+                    title: 'Last 24h',
+                    value: '${analytics.incidentsLast24h}',
+                    icon: Icons.schedule,
+                    color: AppTheme.primaryRed,
+                  ),
+                  StatsCard(
+                    title: 'Last 7 Days',
+                    value: '${analytics.incidentsLast7d}',
+                    icon: Icons.date_range,
+                    color: AppTheme.primaryDark,
+                  ),
+                  StatsCard(
+                    title: 'Avg Resolution',
+                    value: '${analytics.averageResolutionDays.toStringAsFixed(1)}d',
+                    icon: Icons.timer_outlined,
+                    color: AppTheme.warningOrange,
+                    subtitle: 'days',
+                  ),
+                ],
+              );
+            },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
 
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: columns == 1 ? 2 : columns,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            childAspectRatio: columns == 1 ? 1.5 : 2,
-            children: [
-              StatsCard(
-                title: 'Total Incidents',
-                value: '${analytics.totalIncidents}',
-                icon: Icons.warning_amber_rounded,
-                color: AppTheme.primaryDark,
-              ),
-              StatsCard(
-                title: 'Active',
-                value: '${analytics.activeIncidents}',
-                icon: Icons.pending_actions,
-                color: AppTheme.warningOrange,
-              ),
-              StatsCard(
-                title: 'Resolved',
-                value: '${analytics.resolvedIncidents}',
-                icon: Icons.check_circle_outline,
-                color: AppTheme.successGreen,
-              ),
-              StatsCard(
-                title: 'Last 24h',
-                value: '${analytics.incidentsLast24h}',
-                icon: Icons.schedule,
-                color: AppTheme.primaryRed,
-              ),
-              StatsCard(
-                title: 'Last 7 Days',
-                value: '${analytics.incidentsLast7d}',
-                icon: Icons.date_range,
-                color: AppTheme.primaryDark,
-              ),
-              StatsCard(
-                title: 'Avg Resolution',
-                value: '${analytics.averageResolutionDays.toStringAsFixed(1)}d',
-                icon: Icons.timer_outlined,
-                color: AppTheme.primaryDark,
-                subtitle: 'days',
-              ),
-            ],
-          ),
-          const SizedBox(height: 32),
-
-          // Charts section
-          Text(
-            'Trends & Distribution',
-            style: AppTheme.headingMedium.copyWith(
-              color: AppTheme.primaryDark,
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Trend chart (full width)
+          // Incident Trend Chart (full width)
           Container(
             padding: const EdgeInsets.all(20),
             decoration: AppTheme.cardDecorationFor(context),
@@ -101,162 +85,54 @@ class AnalyticsPage extends StatelessWidget {
               children: [
                 Text(
                   'Incident Trend (Last 7 Days)',
-                  style: AppTheme.headingSmall.copyWith(
-                    color: AppTheme.primaryDark,
-                  ),
+                  style: AppTheme.headingSmall.copyWith(color: AppTheme.primaryDark),
                 ),
                 const SizedBox(height: 16),
                 SizedBox(
-                  height: 300,
+                  height: 260,
                   child: IncidentTrendChart(data: analytics.trendData),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 24),
-
-          // Category and severity charts side by side on desktop
-          if (isDesktop)
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: AppTheme.cardDecorationFor(context),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'By Category',
-                          style: AppTheme.headingSmall.copyWith(
-                            color: AppTheme.primaryDark,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          height: 300,
-                          child: CategoryPieChart(data: analytics.categoryDistribution),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 24),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: AppTheme.cardDecorationFor(context),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'By Severity',
-                          style: AppTheme.headingSmall.copyWith(
-                            color: AppTheme.primaryDark,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          height: 300,
-                          child: SeverityBarChart(data: analytics.severityDistribution),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            )
-          else ...[
-            // Stack on mobile/tablet
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: AppTheme.cardDecorationFor(context),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'By Category',
-                    style: AppTheme.headingSmall.copyWith(
-                      color: AppTheme.primaryDark,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    height: 300,
-                    child: CategoryPieChart(data: analytics.categoryDistribution),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: AppTheme.cardDecorationFor(context),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'By Severity',
-                    style: AppTheme.headingSmall.copyWith(
-                      color: AppTheme.primaryDark,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    height: 300,
-                    child: SeverityBarChart(data: analytics.severityDistribution),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          const SizedBox(height: 32),
-
-          // Summary stats
-          Text(
-            'Summary',
-            style: AppTheme.headingMedium.copyWith(
-              color: AppTheme.primaryDark,
-            ),
-          ),
           const SizedBox(height: 16),
 
+          // Category Distribution
           Container(
             padding: const EdgeInsets.all(20),
             decoration: AppTheme.cardDecorationFor(context),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _SummaryRow(
-                  label: 'Total incidents reported',
-                  value: '${analytics.totalIncidents}',
-                  icon: Icons.warning_amber_rounded,
+                Text(
+                  'Category Distribution',
+                  style: AppTheme.headingSmall.copyWith(color: AppTheme.primaryDark),
                 ),
-                const Divider(height: 24),
-                _SummaryRow(
-                  label: 'Resolution rate',
-                  value: analytics.totalIncidents > 0
-                      ? '${((analytics.resolvedIncidents / analytics.totalIncidents) * 100).toStringAsFixed(1)}%'
-                      : 'N/A',
-                  icon: Icons.check_circle_outline,
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 280,
+                  child: CategoryPieChart(data: analytics.categoryDistribution),
                 ),
-                const Divider(height: 24),
-                _SummaryRow(
-                  label: 'Average time to resolution',
-                  value: '${analytics.averageResolutionDays.toStringAsFixed(1)} days',
-                  icon: Icons.timer_outlined,
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Severity Distribution
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: AppTheme.cardDecorationFor(context),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Severity Distribution',
+                  style: AppTheme.headingSmall.copyWith(color: AppTheme.primaryDark),
                 ),
-                const Divider(height: 24),
-                _SummaryRow(
-                  label: 'Most active period',
-                  value: 'Last 7 days: ${analytics.incidentsLast7d} incidents',
-                  icon: Icons.trending_up,
-                ),
-                const Divider(height: 24),
-                _SummaryRow(
-                  label: 'Current active incidents',
-                  value: '${analytics.activeIncidents}',
-                  icon: Icons.pending_actions,
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 260,
+                  child: SeverityBarChart(data: analytics.severityDistribution),
                 ),
               ],
             ),
@@ -264,45 +140,6 @@ class AnalyticsPage extends StatelessWidget {
           const SizedBox(height: 32),
         ],
       ),
-    );
-  }
-}
-
-class _SummaryRow extends StatelessWidget {
-  final String label;
-  final String value;
-  final IconData icon;
-  const _SummaryRow({
-    required this.label,
-    required this.value,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(
-          icon,
-          size: 20,
-          color: AppTheme.textSecondary,
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            label,
-            style: AppTheme.bodyMedium.copyWith(
-              color: AppTheme.textSecondary,
-            ),
-          ),
-        ),
-        Text(
-          value,
-          style: AppTheme.headingSmall.copyWith(
-            color: AppTheme.primaryDark,
-          ),
-        ),
-      ],
     );
   }
 }

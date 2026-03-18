@@ -974,6 +974,12 @@ class _DetailInfoGrid extends StatelessWidget {
           label: 'Reported',
           value: _fmt(incident.reportedAt),
         ),
+        if (incident.incidentTime != null)
+          _InfoTile(
+            icon: Icons.event_outlined,
+            label: 'Incident occurred',
+            value: _fmt(incident.incidentTime!),
+          ),
         _InfoTile(
           icon: incident.isAnonymous ? Icons.person_off_outlined : Icons.person_outline,
           label: 'Reporter',

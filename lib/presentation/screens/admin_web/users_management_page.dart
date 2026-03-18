@@ -638,7 +638,7 @@ class _StatsSection extends StatelessWidget {
         _StatItem(
           icon: Icons.emoji_events_outlined,
           value: 'Lv.${user.level}',
-          label: 'Level',
+          label: user.levelTitle,
           color: AppTheme.successGreen,
 ),
       ],

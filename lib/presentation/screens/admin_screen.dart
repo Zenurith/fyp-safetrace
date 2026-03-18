@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../utils/app_theme.dart';
 import '../providers/user_provider.dart';
+import '../providers/incident_provider.dart';
 import '../widgets/admin/admin_users_tab.dart';
 import '../widgets/admin/admin_incidents_tab.dart';
 import '../widgets/admin/admin_categories_tab.dart';
@@ -23,8 +24,16 @@ class _AdminScreenState extends State<AdminScreen> {
       final user = context.read<UserProvider>().currentUser;
       if (user == null || !user.isAdmin) {
         Navigator.of(context).pop();
+        return;
       }
+      context.read<IncidentProvider>().startListeningAll();
     });
+  }
+
+  @override
+  void dispose() {
+    context.read<IncidentProvider>().startListening();
+    super.dispose();
   }
 
   @override

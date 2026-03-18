@@ -15,27 +15,6 @@ class _AdminIncidentsTabState extends State<AdminIncidentsTab> {
   String _searchQuery = '';
   IncidentStatus? _statusFilter;
   String _dateFilter = 'all';
-  late IncidentProvider _incidentProvider;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _incidentProvider = context.read<IncidentProvider>();
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<IncidentProvider>().startListeningAll();
-    });
-  }
-
-  @override
-  void dispose() {
-    _incidentProvider.startListening();
-    super.dispose();
-  }
 
   List<IncidentModel> _filterIncidents(List<IncidentModel> incidents) {
     return incidents.where((incident) {
