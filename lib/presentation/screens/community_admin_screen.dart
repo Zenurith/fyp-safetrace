@@ -360,11 +360,22 @@ class _MembersTabState extends State<_MembersTab> {
   List<CommunityMemberModel> _members = [];
   bool _isLoading = true;
   final Map<String, UserModel?> _users = {};
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(() {
+      setState(() => _searchQuery = _searchController.text.toLowerCase());
+    });
     _loadMembers();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadMembers() async {
@@ -404,29 +415,73 @@ class _MembersTabState extends State<_MembersTab> {
       return const Center(child: Text('No members found'));
     }
 
-    return RefreshIndicator(
-      onRefresh: () async {
-        setState(() {
-          _isLoading = true;
-          _users.clear();
-        });
-        await _loadMembers();
-      },
-      child: ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: _members.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          final member = _members[index];
-          return _MemberListItem(
-            member: member,
-            user: _users[member.userId],
-            communityId: widget.communityId,
-            currentUserId: currentUserId,
-            onChanged: _reload,
-          );
-        },
-      ),
+    final filtered = _searchQuery.isEmpty
+        ? _members
+        : _members.where((m) {
+            final name = _users[m.userId]?.name.toLowerCase() ?? '';
+            return name.contains(_searchQuery);
+          }).toList();
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Search members...',
+              prefixIcon: const Icon(Icons.search, size: 20),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.close, size: 18),
+                      onPressed: () => _searchController.clear(),
+                    )
+                  : null,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppTheme.cardBorder),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppTheme.cardBorder),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppTheme.primaryRed),
+              ),
+              contentPadding: const EdgeInsets.symmetric(vertical: 10),
+            ),
+          ),
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: () async {
+              setState(() {
+                _isLoading = true;
+                _users.clear();
+              });
+              await _loadMembers();
+            },
+            child: filtered.isEmpty
+                ? const Center(child: Text('No members match your search'))
+                : ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final member = filtered[index];
+                      return _MemberListItem(
+                        member: member,
+                        user: _users[member.userId],
+                        communityId: widget.communityId,
+                        currentUserId: currentUserId,
+                        onChanged: _reload,
+                      );
+                    },
+                  ),
+          ),
+        ),
+      ],
     );
   }
 }

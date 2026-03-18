@@ -20,7 +20,9 @@ class CommunityDetailScreen extends StatefulWidget {
   State<CommunityDetailScreen> createState() => _CommunityDetailScreenState();
 }
 
-class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
+class _CommunityDetailScreenState extends State<CommunityDetailScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   bool _isLoading = true;
   bool _isAdmin = false;
   int _pendingCount = 0;
@@ -28,7 +30,14 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this);
     _loadCommunity();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadCommunity() async {
@@ -121,6 +130,57 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
     }
   }
 
+  Future<void> _deleteCommunity() async {
+    final community = context.read<CommunityProvider>().selectedCommunity;
+    if (community == null) return;
+
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Community'),
+        content: Text(
+            'Are you sure you want to permanently delete "${community.name}"? This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete',
+                style: TextStyle(color: AppTheme.primaryRed)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final success = await context
+        .read<CommunityProvider>()
+        .deleteCommunity(widget.communityId);
+
+    if (mounted) {
+      if (success) {
+        navigator.pop();
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Community deleted')),
+        );
+      } else {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(context.read<CommunityProvider>().error ??
+                'Failed to delete community'),
+            backgroundColor: AppTheme.primaryRed,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<CommunityProvider>();
@@ -146,6 +206,17 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(community.name),
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white60,
+          indicatorColor: AppTheme.primaryRed,
+          tabs: const [
+            Tab(text: 'About'),
+            Tab(text: 'Posts'),
+            Tab(text: 'Incidents'),
+          ],
+        ),
         actions: [
           if (_isAdmin) ...[
             IconButton(
@@ -197,39 +268,144 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                   ),
               ],
             ),
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'delete') _deleteCommunity();
+              },
+              itemBuilder: (_) => [
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete_outline,
+                          size: 18, color: AppTheme.primaryRed),
+                      SizedBox(width: 8),
+                      Text('Delete Community',
+                          style: TextStyle(color: AppTheme.primaryRed)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ],
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _CommunityHeader(community: community),
-
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: _MembershipSection(
-                membership: membership,
-                isAdmin: _isAdmin,
-                onRequestJoin: _requestToJoin,
-                onLeave: _leaveCommunity,
-              ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          // ── About tab ──────────────────────────────────────────────────
+          SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _CommunityHeader(community: community),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: _MembershipSection(
+                    membership: membership,
+                    isAdmin: _isAdmin,
+                    onRequestJoin: _requestToJoin,
+                    onLeave: _leaveCommunity,
+                  ),
+                ),
+                _InfoSection(community: community),
+                const SizedBox(height: 32),
+              ],
             ),
+          ),
 
-            _InfoSection(community: community),
+          // ── Posts tab (incidents shared to this community) ─────────────
+          isApprovedMember
+              ? _SharedPostsTab(communityId: widget.communityId)
+              : const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Text(
+                      'Join this community to see posts',
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
 
-            if (isApprovedMember) ...[
-              const SizedBox(height: 8),
-              _CommunitySharedIncidentsSection(communityId: widget.communityId),
-              const SizedBox(height: 8),
-              _CommunityIncidentsSection(community: community),
-            ],
-
-            const SizedBox(height: 32),
-          ],
-        ),
+          // ── Incidents tab (nearby incidents within radius) ─────────────
+          isApprovedMember
+              ? _NearbyIncidentsTab(community: community)
+              : const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Text(
+                      'Join this community to see incidents',
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+        ],
       ),
-      floatingActionButton: null,
+    );
+  }
+}
+
+// ── Posts Tab (incidents shared to this community) ────────────────────────────
+
+class _SharedPostsTab extends StatelessWidget {
+  final String communityId;
+
+  const _SharedPostsTab({required this.communityId});
+
+  @override
+  Widget build(BuildContext context) {
+    final shared = context
+        .watch<IncidentProvider>()
+        .allIncidents
+        .where((i) => i.communityIds.contains(communityId))
+        .toList();
+
+    if (shared.isEmpty) {
+      return Center(
+        child: _EmptyState(
+          icon: Icons.share_outlined,
+          message:
+              'No incidents shared here yet.\nReport an incident and share it to this community.',
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: shared.length,
+      itemBuilder: (_, i) => _IncidentCard(incident: shared[i]),
+    );
+  }
+}
+
+// ── Incidents Tab (nearby incidents within radius) ────────────────────────────
+
+class _NearbyIncidentsTab extends StatelessWidget {
+  final CommunityModel community;
+
+  const _NearbyIncidentsTab({required this.community});
+
+  @override
+  Widget build(BuildContext context) {
+    final nearby = context
+        .watch<IncidentProvider>()
+        .allIncidents
+        .where((i) => community.isLocationWithinRadius(i.latitude, i.longitude))
+        .toList();
+
+    if (nearby.isEmpty) {
+      return Center(
+        child: _EmptyState(
+          icon: Icons.shield_outlined,
+          message: 'No incidents reported in this area',
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: nearby.length,
+      itemBuilder: (_, i) => _IncidentCard(incident: nearby[i]),
     );
   }
 }
@@ -395,84 +571,8 @@ class _InfoSection extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Community shared incidents section
+// Incident card
 // ---------------------------------------------------------------------------
-
-class _CommunitySharedIncidentsSection extends StatelessWidget {
-  final String communityId;
-
-  const _CommunitySharedIncidentsSection({required this.communityId});
-
-  @override
-  Widget build(BuildContext context) {
-    final allIncidents = context.watch<IncidentProvider>().allIncidents;
-    final shared = allIncidents
-        .where((i) => i.communityIds.contains(communityId))
-        .toList();
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _SectionHeader(title: 'Posts', count: shared.length),
-          const SizedBox(height: 12),
-          if (shared.isEmpty)
-            _EmptyState(
-              icon: Icons.forum_outlined,
-              message: 'No posts yet. Report an incident and share it here!',
-            )
-          else
-            ...shared.map((i) => _IncidentCard(incident: i)),
-        ],
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Incidents section
-// ---------------------------------------------------------------------------
-
-class _CommunityIncidentsSection extends StatelessWidget {
-  final CommunityModel community;
-
-  const _CommunityIncidentsSection({required this.community});
-
-  @override
-  Widget build(BuildContext context) {
-    final allIncidents = context.watch<IncidentProvider>().allIncidents;
-    final nearby = allIncidents
-        .where((i) => community.isLocationWithinRadius(i.latitude, i.longitude))
-        .toList();
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _SectionHeader(title: 'Nearby Incidents', count: nearby.length),
-          const SizedBox(height: 12),
-          if (nearby.isEmpty)
-            _EmptyState(
-              icon: Icons.shield_outlined,
-              message: 'No incidents reported in this area',
-            )
-          else
-            ...nearby.take(5).map((i) => _IncidentCard(incident: i)),
-          if (nearby.length > 5)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                '+ ${nearby.length - 5} more incidents in this area',
-                style: AppTheme.caption,
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
 
 class _IncidentCard extends StatelessWidget {
   final IncidentModel incident;
@@ -536,23 +636,6 @@ class _IncidentCard extends StatelessWidget {
 // Shared small widgets
 // ---------------------------------------------------------------------------
 
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  final int count;
-
-  const _SectionHeader({required this.title, required this.count});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Text(title, style: AppTheme.headingSmall),
-        const SizedBox(width: 8),
-        Text('($count)', style: AppTheme.caption),
-      ],
-    );
-  }
-}
 
 class _EmptyState extends StatelessWidget {
   final IconData icon;
@@ -573,7 +656,7 @@ class _EmptyState extends StatelessWidget {
         children: [
           Icon(icon, size: 40, color: AppTheme.textSecondary),
           const SizedBox(height: 8),
-          Text(message, style: AppTheme.caption),
+          Text(message, style: AppTheme.caption, textAlign: TextAlign.center),
         ],
       ),
     );
@@ -770,7 +853,9 @@ class _DetailRow extends StatelessWidget {
         children: [
           Icon(icon, size: 20, color: AppTheme.textSecondary),
           const SizedBox(width: 12),
-          Text(label, style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary)),
+          Text(label,
+              style:
+                  AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary)),
           const Spacer(),
           Text(value, style: AppTheme.bodyMedium),
         ],

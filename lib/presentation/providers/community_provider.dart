@@ -290,6 +290,21 @@ class CommunityProvider extends ChangeNotifier {
     return await _repository.isMember(communityId, userId);
   }
 
+  Future<bool> deleteCommunity(String communityId) async {
+    try {
+      await _repository.delete(communityId);
+      _communities.removeWhere((c) => c.id == communityId);
+      _myCommunities.removeWhere((c) => c.id == communityId);
+      _selectedCommunity = null;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<List<CommunityMemberModel>> getCommunityMembers(
       String communityId) async {
     return await _repository.getCommunityMembers(communityId);
