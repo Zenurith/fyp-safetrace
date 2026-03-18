@@ -17,22 +17,26 @@ class AdminScreen extends StatefulWidget {
 }
 
 class _AdminScreenState extends State<AdminScreen> {
+  late final IncidentProvider _incidentProvider;
+
   @override
   void initState() {
     super.initState();
+    _incidentProvider = context.read<IncidentProvider>();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final user = context.read<UserProvider>().currentUser;
       if (user == null || !user.isAdmin) {
         Navigator.of(context).pop();
         return;
       }
-      context.read<IncidentProvider>().startListeningAll();
+      _incidentProvider.startListeningAll();
     });
   }
 
   @override
   void dispose() {
-    context.read<IncidentProvider>().startListening();
+    _incidentProvider.startListening();
     super.dispose();
   }
 
