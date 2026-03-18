@@ -70,7 +70,7 @@ class _CommunityAdminScreenState extends State<CommunityAdminScreen>
   }
 }
 
-// ── Pending Requests Tab ────────────────────────────────────────────────────
+// ── Pending Requests Tab ─────────────────────────────────────────────────────
 
 class _PendingRequestsTab extends StatefulWidget {
   final String communityId;
@@ -89,7 +89,6 @@ class _PendingRequestsTabState extends State<_PendingRequestsTab> {
   final Set<String> _requestedIds = {};
   final Map<String, UserModel?> _users = {};
 
-  /// Batch-fetches any user IDs not yet loaded.
   void _loadMissingUsers(List<CommunityMemberModel> requests) {
     final missing = requests
         .map((r) => r.userId)
@@ -109,7 +108,6 @@ class _PendingRequestsTabState extends State<_PendingRequestsTab> {
     final provider = context.watch<CommunityProvider>();
     final requests = provider.pendingRequests;
 
-    // Batch-load users after the current frame to avoid calling async in build.
     if (requests.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _loadMissingUsers(requests);
@@ -191,14 +189,16 @@ class _PendingRequestCardState extends State<_PendingRequestCard> {
 
     final userId = context.read<UserProvider>().currentUser?.id ?? '';
     final provider = context.read<CommunityProvider>();
-    final success = await provider.approveRequest(widget.request.id, userId);
+    final success = await provider.approveRequest(
+        widget.request.id, widget.communityId, userId);
 
     if (mounted) {
       setState(() => _isProcessing = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(success ? 'Request approved' : 'Failed to approve'),
-          backgroundColor: success ? AppTheme.successGreen : AppTheme.primaryRed,
+          backgroundColor:
+              success ? AppTheme.successGreen : AppTheme.primaryRed,
         ),
       );
     }
@@ -238,7 +238,8 @@ class _PendingRequestCardState extends State<_PendingRequestCard> {
       messenger.showSnackBar(
         SnackBar(
           content: Text(success ? 'Request rejected' : 'Failed to reject'),
-          backgroundColor: success ? AppTheme.warningOrange : AppTheme.primaryRed,
+          backgroundColor:
+              success ? AppTheme.warningOrange : AppTheme.primaryRed,
         ),
       );
     }
@@ -280,7 +281,7 @@ class _PendingRequestCardState extends State<_PendingRequestCard> {
                       if (user != null)
                         Text(
                           user.handle,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 13,
                             color: AppTheme.textSecondary,
                           ),
@@ -290,7 +291,7 @@ class _PendingRequestCardState extends State<_PendingRequestCard> {
                 ),
                 Text(
                   widget.request.timeAgo,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 12,
                     color: AppTheme.textSecondary,
                   ),
@@ -344,7 +345,7 @@ class _PendingRequestCardState extends State<_PendingRequestCard> {
   }
 }
 
-// ── Members Tab ─────────────────────────────────────────────────────────────
+// ── Members Tab ───────────────────────────────────────────────────────────────
 
 class _MembersTab extends StatefulWidget {
   final String communityId;
@@ -374,7 +375,6 @@ class _MembersTabState extends State<_MembersTab> {
       _members = members;
       _isLoading = false;
     });
-    // Batch-fetch all member user docs in one go.
     if (members.isNotEmpty) {
       final ids = members.map((m) => m.userId).toList();
       context.read<UserProvider>().getUsersByIds(ids).then((fetched) {
@@ -383,8 +383,19 @@ class _MembersTabState extends State<_MembersTab> {
     }
   }
 
+  void _reload() {
+    setState(() {
+      _isLoading = true;
+      _users.clear();
+    });
+    _loadMembers();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final currentUserId =
+        context.read<UserProvider>().currentUser?.id ?? '';
+
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -410,6 +421,9 @@ class _MembersTabState extends State<_MembersTab> {
           return _MemberListItem(
             member: member,
             user: _users[member.userId],
+            communityId: widget.communityId,
+            currentUserId: currentUserId,
+            onChanged: _reload,
           );
         },
       ),
@@ -417,14 +431,102 @@ class _MembersTabState extends State<_MembersTab> {
   }
 }
 
-class _MemberListItem extends StatelessWidget {
+class _MemberListItem extends StatefulWidget {
   final CommunityMemberModel member;
   final UserModel? user;
+  final String communityId;
+  final String currentUserId;
+  final VoidCallback onChanged;
 
-  const _MemberListItem({required this.member, required this.user});
+  const _MemberListItem({
+    required this.member,
+    required this.user,
+    required this.communityId,
+    required this.currentUserId,
+    required this.onChanged,
+  });
+
+  @override
+  State<_MemberListItem> createState() => _MemberListItemState();
+}
+
+class _MemberListItemState extends State<_MemberListItem> {
+  bool _isProcessing = false;
+
+  Future<void> _handleAction(String action) async {
+    if (action == 'remove') {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Remove Member'),
+          content: Text(
+              'Remove ${widget.user?.name ?? 'this member'} from the community?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Remove',
+                  style: TextStyle(color: AppTheme.primaryRed)),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+    }
+
+    if (!mounted) return;
+    setState(() => _isProcessing = true);
+
+    final provider = context.read<CommunityProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    bool success = false;
+    String successMsg = '';
+
+    try {
+      switch (action) {
+        case 'promote':
+          success = await provider.promoteToAdmin(widget.member.id);
+          successMsg = 'Promoted to admin';
+          break;
+        case 'demote':
+          success = await provider.demoteToMember(
+              widget.member.id, widget.communityId);
+          successMsg = 'Demoted to member';
+          break;
+        case 'remove':
+          success = await provider.removeMember(
+              widget.communityId, widget.member.userId);
+          successMsg = 'Member removed';
+          break;
+      }
+    } catch (_) {}
+
+    if (mounted) {
+      setState(() => _isProcessing = false);
+      if (success) {
+        widget.onChanged();
+        messenger.showSnackBar(SnackBar(
+          content: Text(successMsg),
+          backgroundColor: AppTheme.successGreen,
+        ));
+      } else {
+        messenger.showSnackBar(SnackBar(
+          content: Text(provider.error ?? 'Action failed'),
+          backgroundColor: AppTheme.primaryRed,
+        ));
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final member = widget.member;
+    final user = widget.user;
+    final isSelf = member.userId == widget.currentUserId;
+
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(vertical: 4),
       leading: UserAvatar(
@@ -443,23 +545,69 @@ class _MemberListItem extends StatelessWidget {
               member.isAdmin ? FontWeight.w500 : FontWeight.normal,
         ),
       ),
-      trailing: member.isAdmin
-          ? Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppTheme.primaryRed.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Text(
-                'Admin',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: AppTheme.primaryRed,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+      trailing: _isProcessing
+          ? const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
             )
-          : null,
+          : isSelf
+              ? Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryRed.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'You',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.primaryRed,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                )
+              : PopupMenuButton<String>(
+                  onSelected: _handleAction,
+                  icon: const Icon(Icons.more_vert),
+                  itemBuilder: (context) => [
+                    if (!member.isAdmin)
+                      const PopupMenuItem(
+                        value: 'promote',
+                        child: Row(
+                          children: [
+                            Icon(Icons.arrow_upward, size: 16),
+                            SizedBox(width: 8),
+                            Text('Promote to Admin'),
+                          ],
+                        ),
+                      ),
+                    if (member.isAdmin)
+                      const PopupMenuItem(
+                        value: 'demote',
+                        child: Row(
+                          children: [
+                            Icon(Icons.arrow_downward, size: 16),
+                            SizedBox(width: 8),
+                            Text('Demote to Member'),
+                          ],
+                        ),
+                      ),
+                    const PopupMenuItem(
+                      value: 'remove',
+                      child: Row(
+                        children: [
+                          Icon(Icons.remove_circle_outline,
+                              size: 16, color: AppTheme.primaryRed),
+                          SizedBox(width: 8),
+                          Text('Remove',
+                              style: TextStyle(color: AppTheme.primaryRed)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
     );
   }
 }

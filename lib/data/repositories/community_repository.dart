@@ -94,46 +94,41 @@ class CommunityRepository {
     }).toList();
   }
 
-  /// Get all communities where the user is an approved member
-  Future<List<CommunityModel>> getUserCommunities(String userId) async {
-    // Query by userId only (avoids composite index requirement), filter status client-side
-    final membershipSnapshot = await _membersCollection
-        .where('userId', isEqualTo: userId)
-        .get();
-
-    final approvedDocs = membershipSnapshot.docs
-        .where((doc) => doc.data()['status'] == MemberStatus.approved.index)
-        .toList();
-
-    if (approvedDocs.isEmpty) return [];
-
-    final communityIds = approvedDocs
-        .map((doc) => doc.data()['communityId'] as String)
-        .toList();
-
-    // Batch fetch communities (handle Firestore's 10-item whereIn limit)
-    final communities = <CommunityModel>[];
-    for (var i = 0; i < communityIds.length; i += 10) {
-      final batch = communityIds.skip(i).take(10).toList();
-      final snapshot = await _communitiesCollection
-          .where(FieldPath.documentId, whereIn: batch)
-          .get();
-      communities.addAll(snapshot.docs
-          .map((doc) => CommunityModel.fromMap(doc.data(), doc.id)));
-    }
-
-    return communities;
-  }
-
-  /// Returns ALL community IDs where the user has any membership record
-  /// (approved, pending, or rejected) — used to filter the Discover tab.
-  Future<Set<String>> getUserMembershipCommunityIds(String userId) async {
+  /// Returns all membership records for a user in a single query.
+  /// Used to derive both joined communities and all membership IDs.
+  Future<List<CommunityMemberModel>> getUserMemberships(String userId) async {
     final snapshot = await _membersCollection
         .where('userId', isEqualTo: userId)
         .get();
     return snapshot.docs
-        .map((doc) => doc.data()['communityId'] as String)
-        .toSet();
+        .map((doc) => CommunityMemberModel.fromMap(doc.data(), doc.id))
+        .toList();
+  }
+
+  /// Batch-fetch communities by IDs (handles Firestore's 10-item whereIn limit).
+  Future<List<CommunityModel>> getCommunitiesByIds(List<String> ids) async {
+    if (ids.isEmpty) return [];
+    final communities = <CommunityModel>[];
+    for (var i = 0; i < ids.length; i += 10) {
+      final batch = ids.skip(i).take(10).toList();
+      final snapshot = await _communitiesCollection
+          .where(FieldPath.documentId, whereIn: batch)
+          .get();
+      communities.addAll(
+          snapshot.docs.map((doc) => CommunityModel.fromMap(doc.data(), doc.id)));
+    }
+    return communities;
+  }
+
+  /// Get all communities where the user is an approved member.
+  /// Prefer calling getUserMemberships() directly if you also need membership IDs.
+  Future<List<CommunityModel>> getUserCommunities(String userId) async {
+    final memberships = await getUserMemberships(userId);
+    final approvedIds = memberships
+        .where((m) => m.isApproved)
+        .map((m) => m.communityId)
+        .toList();
+    return getCommunitiesByIds(approvedIds);
   }
 
   // ==================== Membership Management ====================
@@ -207,21 +202,16 @@ class CommunityRepository {
   }
 
   /// Approve a membership request (admin only)
-  Future<void> approveRequest(String memberId, String approvedBy) async {
+  Future<void> approveRequest(
+      String memberId, String communityId, String approvedBy) async {
     await _membersCollection.doc(memberId).update({
       'status': MemberStatus.approved.index,
       'approvedAt': Timestamp.now(),
       'approvedBy': approvedBy,
     });
-
-    // Increment community member count
-    final memberDoc = await _membersCollection.doc(memberId).get();
-    if (memberDoc.exists) {
-      final communityId = memberDoc.data()!['communityId'] as String;
-      await _communitiesCollection.doc(communityId).update({
-        'memberCount': FieldValue.increment(1),
-      });
-    }
+    await _communitiesCollection.doc(communityId).update({
+      'memberCount': FieldValue.increment(1),
+    });
   }
 
   /// Reject a membership request (admin only)

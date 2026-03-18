@@ -30,6 +30,7 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = context.read<UserProvider>().currentUser;
     return FutureBuilder<List<UserModel>>(
       future: _usersFuture,
       builder: (context, snapshot) {
@@ -58,7 +59,11 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
           itemCount: users.length,
           separatorBuilder: (_, __) => const SizedBox(height: 12),
           itemBuilder: (context, index) {
-            return _UserCard(user: users[index], onRefresh: _refresh);
+            return _UserCard(
+              user: users[index],
+              currentUser: currentUser,
+              onRefresh: _refresh,
+            );
           },
         );
       },
@@ -68,12 +73,46 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
 
 class _UserCard extends StatelessWidget {
   final UserModel user;
+  final UserModel? currentUser;
   final VoidCallback onRefresh;
 
-  const _UserCard({required this.user, required this.onRefresh});
+  const _UserCard({
+    required this.user,
+    required this.currentUser,
+    required this.onRefresh,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final viewer = currentUser;
+    final isSelf = viewer != null && user.id == viewer.id;
+
+    // Promote button visibility and target role
+    String? promoteToRole;
+    if (!isSelf) {
+      if (user.role == 'user') {
+        promoteToRole = 'admin';
+      } else if (user.role == 'admin' && (viewer?.isSuperAdmin ?? false)) {
+        promoteToRole = 'superadmin';
+      }
+    }
+
+    // Demote button visibility and target role
+    String? demoteToRole;
+    if (!isSelf && (viewer?.isSuperAdmin ?? false)) {
+      if (user.role == 'admin') {
+        demoteToRole = 'user';
+      } else if (user.isSuperAdmin) {
+        demoteToRole = 'admin';
+      }
+    }
+
+    // Moderate button visibility
+    final showModerate = !isSelf &&
+        (user.role == 'user' ||
+            (user.role == 'admin' && (viewer?.isSuperAdmin ?? false)) ||
+            (user.isSuperAdmin && (viewer?.isSuperAdmin ?? false)));
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: AppTheme.cardDecoration,
@@ -171,7 +210,7 @@ class _UserCard extends StatelessWidget {
                   ],
                 ),
               ),
-              _RoleChip(isAdmin: user.isAdmin),
+              _RoleChip(role: user.role),
             ],
           ),
           const SizedBox(height: 12),
@@ -183,49 +222,81 @@ class _UserCard extends StatelessWidget {
                   style: AppTheme.caption,
                 ),
               ),
-              TextButton(
-                onPressed: () async {
-                  final newRole = user.isAdmin ? 'user' : 'admin';
-                  await context.read<UserProvider>().setUserRole(user.id, newRole);
-                  onRefresh();
-                },
-                style: TextButton.styleFrom(
-                  foregroundColor:
-                      user.isAdmin ? AppTheme.warningOrange : AppTheme.successGreen,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: Text(
-                  user.isAdmin ? 'Demote' : 'Promote',
-                  style: const TextStyle(
-                    fontFamily: AppTheme.fontFamily,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
+              if (promoteToRole != null) ...[
+                TextButton(
+                  onPressed: () async {
+                    await context
+                        .read<UserProvider>()
+                        .setUserRole(user.id, promoteToRole!);
+                    onRefresh();
+                  },
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppTheme.successGreen,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text(
+                    'Promote',
+                    style: TextStyle(
+                      fontFamily: AppTheme.fontFamily,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              TextButton(
-                onPressed: () async {
-                  final result = await UserModerationDialog.show(context, user);
-                  if (result == true) onRefresh();
-                },
-                style: TextButton.styleFrom(
-                  foregroundColor: AppTheme.primaryRed,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text(
-                  'Moderate',
-                  style: TextStyle(
-                    fontFamily: AppTheme.fontFamily,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
+                const SizedBox(width: 8),
+              ],
+              if (demoteToRole != null) ...[
+                TextButton(
+                  onPressed: () async {
+                    await context
+                        .read<UserProvider>()
+                        .setUserRole(user.id, demoteToRole!);
+                    onRefresh();
+                  },
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppTheme.warningOrange,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text(
+                    'Demote',
+                    style: TextStyle(
+                      fontFamily: AppTheme.fontFamily,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
-              ),
+                const SizedBox(width: 8),
+              ],
+              if (showModerate)
+                TextButton(
+                  onPressed: () async {
+                    final result =
+                        await UserModerationDialog.show(context, user);
+                    if (result == true) onRefresh();
+                  },
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppTheme.primaryRed,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text(
+                    'Moderate',
+                    style: TextStyle(
+                      fontFamily: AppTheme.fontFamily,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
             ],
           ),
         ],
@@ -235,32 +306,47 @@ class _UserCard extends StatelessWidget {
 }
 
 class _RoleChip extends StatelessWidget {
-  final bool isAdmin;
+  final String role;
 
-  const _RoleChip({required this.isAdmin});
+  const _RoleChip({required this.role});
 
   @override
   Widget build(BuildContext context) {
+    final (label, bgColor, borderColor, textColor) = switch (role) {
+      'superadmin' => (
+          'Admin',
+          AppTheme.primaryRed.withValues(alpha: 0.1),
+          AppTheme.primaryRed.withValues(alpha: 0.3),
+          AppTheme.primaryRed,
+        ),
+      'admin' => (
+          'Moderator',
+          AppTheme.warningOrange.withValues(alpha: 0.1),
+          AppTheme.warningOrange.withValues(alpha: 0.3),
+          AppTheme.warningOrange,
+        ),
+      _ => (
+          'User',
+          AppTheme.backgroundGrey,
+          AppTheme.cardBorder,
+          AppTheme.textSecondary,
+        ),
+    };
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: isAdmin
-            ? AppTheme.primaryRed.withValues(alpha: 0.1)
-            : AppTheme.backgroundGrey,
+        color: bgColor,
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(
-          color: isAdmin
-              ? AppTheme.primaryRed.withValues(alpha: 0.3)
-              : AppTheme.cardBorder,
-        ),
+        border: Border.all(color: borderColor),
       ),
       child: Text(
-        isAdmin ? 'Admin' : 'User',
+        label,
         style: TextStyle(
           fontFamily: AppTheme.fontFamily,
           fontSize: 11,
           fontWeight: FontWeight.w700,
-          color: isAdmin ? AppTheme.primaryRed : AppTheme.textSecondary,
+          color: textColor,
         ),
       ),
     );

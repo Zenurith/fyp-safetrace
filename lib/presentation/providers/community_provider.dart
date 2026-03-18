@@ -17,6 +17,8 @@ class CommunityProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   StreamSubscription? _communitiesSubscription;
+  double? _userLat;
+  double? _userLng;
 
   List<CommunityModel> get communities => _communities;
   List<CommunityModel> get myCommunities => _myCommunities;
@@ -27,6 +29,8 @@ class CommunityProvider extends ChangeNotifier {
   CommunityMemberModel? get currentMembership => _currentMembership;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  double? get userLat => _userLat;
+  double? get userLng => _userLng;
 
   void startListening() {
     _communitiesSubscription?.cancel();
@@ -54,9 +58,17 @@ class CommunityProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _myCommunities = await _repository.getUserCommunities(userId);
+      final memberships = await _repository.getUserMemberships(userId);
       _myMembershipCommunityIds =
-          await _repository.getUserMembershipCommunityIds(userId);
+          memberships.map((m) => m.communityId).toSet();
+
+      final approvedIds = memberships
+          .where((m) => m.isApproved)
+          .map((m) => m.communityId)
+          .toList();
+      _myCommunities = approvedIds.isEmpty
+          ? []
+          : await _repository.getCommunitiesByIds(approvedIds);
       _error = null;
     } catch (e) {
       _error = e.toString();
@@ -68,11 +80,16 @@ class CommunityProvider extends ChangeNotifier {
 
   Future<void> loadNearbyCommunities(double latitude, double longitude) async {
     _isLoading = true;
+    _userLat = latitude;
+    _userLng = longitude;
     notifyListeners();
 
     try {
       _nearbyCommunities =
           await _repository.getNearbyCommunities(latitude, longitude);
+      _nearbyCommunities.sort((a, b) =>
+          a.calculateDistance(latitude, longitude)
+              .compareTo(b.calculateDistance(latitude, longitude)));
       _error = null;
     } catch (e) {
       _error = e.toString();
@@ -175,9 +192,10 @@ class CommunityProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> approveRequest(String memberId, String approvedBy) async {
+  Future<bool> approveRequest(
+      String memberId, String communityId, String approvedBy) async {
     try {
-      await _repository.approveRequest(memberId, approvedBy);
+      await _repository.approveRequest(memberId, communityId, approvedBy);
       _pendingRequests.removeWhere((m) => m.id == memberId);
       notifyListeners();
       return true;
@@ -201,11 +219,60 @@ class CommunityProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> updateCommunity(CommunityModel community) async {
+    try {
+      await _repository.update(community);
+      _selectedCommunity = community;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<bool> leaveCommunity(String communityId, String userId) async {
     try {
       await _repository.leaveCommunity(communityId, userId);
       _myCommunities.removeWhere((c) => c.id == communityId);
       _currentMembership = null;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> promoteToAdmin(String memberId) async {
+    try {
+      await _repository.promoteToAdmin(memberId);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> demoteToMember(String memberId, String communityId) async {
+    try {
+      await _repository.demoteToMember(memberId, communityId);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> removeMember(String communityId, String userId) async {
+    try {
+      await _repository.leaveCommunity(communityId, userId);
       notifyListeners();
       return true;
     } catch (e) {

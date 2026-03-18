@@ -89,6 +89,8 @@ class IncidentProvider extends ChangeNotifier {
   /// Start listening to recent incidents (last 7 days) - for map/main feed
   void startListening() {
     _incidentsSubscription?.cancel();
+    _incidents = [];
+    notifyListeners();
     _incidentsSubscription = _repository.watchAll().listen(
       (incidents) {
         _incidents = incidents;

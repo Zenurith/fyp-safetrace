@@ -15,6 +15,13 @@ class _AdminIncidentsTabState extends State<AdminIncidentsTab> {
   String _searchQuery = '';
   IncidentStatus? _statusFilter;
   String _dateFilter = 'all';
+  late IncidentProvider _incidentProvider;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _incidentProvider = context.read<IncidentProvider>();
+  }
 
   @override
   void initState() {
@@ -26,7 +33,7 @@ class _AdminIncidentsTabState extends State<AdminIncidentsTab> {
 
   @override
   void dispose() {
-    context.read<IncidentProvider>().startListening();
+    _incidentProvider.startListening();
     super.dispose();
   }
 

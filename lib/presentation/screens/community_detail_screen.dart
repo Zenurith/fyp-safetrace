@@ -9,6 +9,7 @@ import '../providers/incident_provider.dart';
 import '../providers/user_provider.dart';
 import '../widgets/incident_bottom_sheet.dart';
 import 'community_admin_screen.dart';
+import 'create_community_screen.dart';
 
 class CommunityDetailScreen extends StatefulWidget {
   final String communityId;
@@ -22,6 +23,7 @@ class CommunityDetailScreen extends StatefulWidget {
 class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
   bool _isLoading = true;
   bool _isAdmin = false;
+  int _pendingCount = 0;
 
   @override
   void initState() {
@@ -30,14 +32,20 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
   }
 
   Future<void> _loadCommunity() async {
-    if (mounted) setState(() { _isLoading = true; _isAdmin = false; });
+    if (mounted) setState(() { _isLoading = true; _isAdmin = false; _pendingCount = 0; });
 
     final userId = context.read<UserProvider>().currentUser?.id;
     if (userId == null) return;
 
     final provider = context.read<CommunityProvider>();
     await provider.loadCommunityDetails(widget.communityId, userId);
-    _isAdmin = await provider.isAdmin(widget.communityId, userId);
+    final m = provider.currentMembership;
+    _isAdmin = m != null && m.isAdmin && m.isApproved;
+
+    if (_isAdmin) {
+      await provider.loadPendingRequests(widget.communityId);
+      if (mounted) _pendingCount = provider.pendingRequests.length;
+    }
 
     if (mounted) {
       setState(() => _isLoading = false);
@@ -139,18 +147,57 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
       appBar: AppBar(
         title: Text(community.name),
         actions: [
-          if (_isAdmin)
+          if (_isAdmin) ...[
             IconButton(
-              icon: const Icon(Icons.admin_panel_settings),
-              tooltip: 'Admin Panel',
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: 'Edit Community',
               onPressed: () => Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (_) =>
-                      CommunityAdminScreen(communityId: widget.communityId),
+                      CreateCommunityScreen(communityToEdit: community),
                 ),
-              ),
+              ).then((_) => _loadCommunity()),
             ),
+            Stack(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.admin_panel_settings),
+                  tooltip: 'Admin Panel',
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          CommunityAdminScreen(communityId: widget.communityId),
+                    ),
+                  ).then((_) => _loadCommunity()),
+                ),
+                if (_pendingCount > 0)
+                  Positioned(
+                    right: 6,
+                    top: 6,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: const BoxDecoration(
+                        color: AppTheme.primaryRed,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints:
+                          const BoxConstraints(minWidth: 16, minHeight: 16),
+                      child: Text(
+                        '$_pendingCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
       body: SingleChildScrollView(

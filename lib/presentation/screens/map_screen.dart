@@ -26,11 +26,24 @@ class _MapScreenState extends State<MapScreen> {
   bool _showHeatmap = false;
   final Map<IncidentCategory, BitmapDescriptor> _markerIconCache = {};
   String? _lastCenteredIncidentId;
+  String _currentLocationName = 'Locating...';
 
   @override
   void initState() {
     super.initState();
     _loadMarkerIcons();
+    _loadLocationName();
+  }
+
+  Future<void> _loadLocationName() async {
+    final position = await _locationService.getQuickPosition();
+    if (position != null && mounted) {
+      final name = await _locationService.getShortLocationName(
+        position.latitude,
+        position.longitude,
+      );
+      if (mounted) setState(() => _currentLocationName = name);
+    }
   }
 
   Future<void> _loadMarkerIcons() async {
@@ -425,7 +438,7 @@ class _MapScreenState extends State<MapScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      'Setapak, Selangor',
+                      _currentLocationName,
                       style: TextStyle(
                         fontFamily: AppTheme.fontFamily,
                         fontSize: 16,
