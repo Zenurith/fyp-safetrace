@@ -612,7 +612,7 @@ class _IncidentCardState extends State<_IncidentCard> {
       builder: (ctx) => AlertDialog(
         title: const Text('Remove Post'),
         content: const Text(
-            'Remove this incident from the community? It will still be visible on the map.'),
+            'Remove this post from the community? The incident will be deleted and removed from the map.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
