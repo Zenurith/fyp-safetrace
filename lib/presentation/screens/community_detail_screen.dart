@@ -24,7 +24,6 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _isLoading = true;
-  bool _isAdmin = false;
   int _pendingCount = 0;
 
   @override
@@ -41,7 +40,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
   }
 
   Future<void> _loadCommunity() async {
-    if (mounted) setState(() { _isLoading = true; _isAdmin = false; _pendingCount = 0; });
+    if (mounted) setState(() { _isLoading = true; _pendingCount = 0; });
 
     final userId = context.read<UserProvider>().currentUser?.id;
     if (userId == null) return;
@@ -49,9 +48,8 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
     final provider = context.read<CommunityProvider>();
     await provider.loadCommunityDetails(widget.communityId, userId);
     final m = provider.currentMembership;
-    _isAdmin = m != null && m.isAdmin && m.isApproved;
 
-    if (_isAdmin) {
+    if (m?.isStaff == true && m?.isApproved == true) {
       await provider.loadPendingRequests(widget.communityId);
       if (mounted) _pendingCount = provider.pendingRequests.length;
     }
@@ -71,10 +69,13 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
 
     if (mounted) {
       if (success) await _loadCommunity();
+      final isPending = provider.currentMembership?.isPending ?? false;
       messenger.showSnackBar(
         SnackBar(
           content: Text(success
-              ? 'You have joined the community!'
+              ? (isPending
+                  ? 'Join request sent! Waiting for admin approval.'
+                  : 'You have joined the community!')
               : provider.error ?? 'Failed to join'),
           backgroundColor: success ? AppTheme.successGreen : AppTheme.primaryRed,
         ),
@@ -202,6 +203,12 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
     }
 
     final isApprovedMember = membership != null && membership.isApproved;
+    final isStaff =
+        membership?.isStaff == true && membership?.isApproved == true;
+    final canEdit = membership?.isApproved == true &&
+        (membership?.isOwner == true || membership?.isHeadModerator == true);
+    final canDelete =
+        membership?.isOwner == true && membership?.isApproved == true;
 
     return Scaffold(
       appBar: AppBar(
@@ -218,23 +225,24 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
           ],
         ),
         actions: [
-          if (_isAdmin) ...[
-            IconButton(
-              icon: const Icon(Icons.edit_outlined),
-              tooltip: 'Edit Community',
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      CreateCommunityScreen(communityToEdit: community),
-                ),
-              ).then((_) => _loadCommunity()),
-            ),
+          if (isStaff) ...[
+            if (canEdit)
+              IconButton(
+                icon: const Icon(Icons.edit_outlined),
+                tooltip: 'Edit Community',
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        CreateCommunityScreen(communityToEdit: community),
+                  ),
+                ).then((_) => _loadCommunity()),
+              ),
             Stack(
               children: [
                 IconButton(
                   icon: const Icon(Icons.admin_panel_settings),
-                  tooltip: 'Admin Panel',
+                  tooltip: 'Manage Community',
                   onPressed: () => Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -268,25 +276,26 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
                   ),
               ],
             ),
-            PopupMenuButton<String>(
-              onSelected: (value) {
-                if (value == 'delete') _deleteCommunity();
-              },
-              itemBuilder: (_) => [
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete_outline,
-                          size: 18, color: AppTheme.primaryRed),
-                      SizedBox(width: 8),
-                      Text('Delete Community',
-                          style: TextStyle(color: AppTheme.primaryRed)),
-                    ],
+            if (canDelete)
+              PopupMenuButton<String>(
+                onSelected: (value) {
+                  if (value == 'delete') _deleteCommunity();
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete_outline,
+                            size: 18, color: AppTheme.primaryRed),
+                        SizedBox(width: 8),
+                        Text('Delete Community',
+                            style: TextStyle(color: AppTheme.primaryRed)),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
           ],
         ],
       ),
@@ -303,7 +312,6 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
                   padding: const EdgeInsets.all(16),
                   child: _MembershipSection(
                     membership: membership,
-                    isAdmin: _isAdmin,
                     onRequestJoin: _requestToJoin,
                     onLeave: _leaveCommunity,
                   ),
@@ -316,7 +324,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
 
           // ── Posts tab (incidents shared to this community) ─────────────
           isApprovedMember
-              ? _SharedPostsTab(communityId: widget.communityId)
+              ? _SharedPostsTab(communityId: widget.communityId, isStaff: isStaff)
               : const Center(
                   child: Padding(
                     padding: EdgeInsets.all(32),
@@ -349,8 +357,9 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
 
 class _SharedPostsTab extends StatelessWidget {
   final String communityId;
+  final bool isStaff;
 
-  const _SharedPostsTab({required this.communityId});
+  const _SharedPostsTab({required this.communityId, required this.isStaff});
 
   @override
   Widget build(BuildContext context) {
@@ -373,7 +382,11 @@ class _SharedPostsTab extends StatelessWidget {
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: shared.length,
-      itemBuilder: (_, i) => _IncidentCard(incident: shared[i]),
+      itemBuilder: (_, i) => _IncidentCard(
+        incident: shared[i],
+        communityId: communityId,
+        isStaff: isStaff,
+      ),
     );
   }
 }
@@ -574,15 +587,124 @@ class _InfoSection extends StatelessWidget {
 // Incident card
 // ---------------------------------------------------------------------------
 
-class _IncidentCard extends StatelessWidget {
+class _IncidentCard extends StatefulWidget {
   final IncidentModel incident;
+  final String? communityId;
+  final bool isStaff;
 
-  const _IncidentCard({required this.incident});
+  const _IncidentCard({
+    required this.incident,
+    this.communityId,
+    this.isStaff = false,
+  });
+
+  @override
+  State<_IncidentCard> createState() => _IncidentCardState();
+}
+
+class _IncidentCardState extends State<_IncidentCard> {
+  Future<void> _removeFromCommunity() async {
+    final communityId = widget.communityId;
+    if (communityId == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remove Post'),
+        content: const Text(
+            'Remove this incident from the community? It will still be visible on the map.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Remove',
+                style: TextStyle(color: AppTheme.primaryRed)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final success = await context
+        .read<IncidentProvider>()
+        .removeFromCommunity(widget.incident.id, communityId);
+    if (mounted && !success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to remove post'),
+          backgroundColor: AppTheme.primaryRed,
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final incident = widget.incident;
     final isHigh = incident.severity == SeverityLevel.high;
     final color = isHigh ? AppTheme.primaryRed : AppTheme.warningOrange;
+
+    final cardContent = Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: AppTheme.cardDecoration,
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(Icons.warning_amber_rounded, size: 20, color: color),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  incident.title,
+                  style: AppTheme.headingSmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${incident.categoryLabel}  •  ${incident.severityLabel}  •  ${incident.timeAgo}',
+                  style: AppTheme.caption,
+                ),
+              ],
+            ),
+          ),
+          if (widget.isStaff && widget.communityId != null)
+            PopupMenuButton<String>(
+              onSelected: (action) {
+                if (action == 'remove') _removeFromCommunity();
+              },
+              icon: Icon(Icons.more_vert, size: 18, color: AppTheme.textSecondary),
+              itemBuilder: (_) => [
+                const PopupMenuItem(
+                  value: 'remove',
+                  child: Row(
+                    children: [
+                      Icon(Icons.remove_circle_outline,
+                          size: 16, color: AppTheme.primaryRed),
+                      SizedBox(width: 8),
+                      Text('Remove from community',
+                          style: TextStyle(color: AppTheme.primaryRed)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
 
     return GestureDetector(
       onTap: () => showModalBottomSheet(
@@ -591,43 +713,7 @@ class _IncidentCard extends StatelessWidget {
         backgroundColor: Colors.transparent,
         builder: (_) => IncidentBottomSheet(incidentId: incident.id),
       ),
-      child: Container(
-        width: double.infinity,
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(12),
-        decoration: AppTheme.cardDecoration,
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(Icons.warning_amber_rounded, size: 20, color: color),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    incident.title,
-                    style: AppTheme.headingSmall,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${incident.categoryLabel}  •  ${incident.severityLabel}  •  ${incident.timeAgo}',
-                    style: AppTheme.caption,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+      child: cardContent,
     );
   }
 }
@@ -692,13 +778,11 @@ class _StatBadge extends StatelessWidget {
 
 class _MembershipSection extends StatelessWidget {
   final CommunityMemberModel? membership;
-  final bool isAdmin;
   final VoidCallback onRequestJoin;
   final VoidCallback onLeave;
 
   const _MembershipSection({
     required this.membership,
-    required this.isAdmin,
     required this.onRequestJoin,
     required this.onLeave,
   });
@@ -757,6 +841,34 @@ class _MembershipSection extends StatelessWidget {
       );
     }
 
+    if (membership!.isBanned) {
+      final until = membership!.bannedUntil;
+      final subtitle = until != null
+          ? 'Banned until ${until.day}/${until.month}/${until.year}'
+          : 'You are permanently banned from this community';
+      return _statusCard(
+        color: AppTheme.primaryRed,
+        child: Row(
+          children: [
+            const Icon(Icons.block, color: AppTheme.primaryRed),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Banned',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primaryRed)),
+                  Text(subtitle, style: const TextStyle(fontSize: 12)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     if (membership!.isRejected) {
       return _statusCard(
         color: AppTheme.primaryRed,
@@ -792,7 +904,9 @@ class _MembershipSection extends StatelessWidget {
       child: Row(
         children: [
           Icon(
-            isAdmin ? Icons.admin_panel_settings : Icons.verified_user,
+            membership!.isStaff
+                ? Icons.admin_panel_settings
+                : Icons.verified_user,
             color: AppTheme.successGreen,
           ),
           const SizedBox(width: 12),
@@ -801,7 +915,7 @@ class _MembershipSection extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isAdmin ? 'Admin' : 'Member',
+                  membership!.roleLabel,
                   style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       color: AppTheme.successGreen),

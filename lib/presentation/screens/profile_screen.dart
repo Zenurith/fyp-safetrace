@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 import '../../utils/app_theme.dart';
 import '../providers/user_provider.dart';
 import '../widgets/user_avatar.dart';
-import 'admin_screen.dart';
 import 'my_reports_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -345,30 +344,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                 ),
-                // Admin Dashboard button (only for admins)
-                if (user.isAdmin) ...[
-                  const SizedBox(height: 12),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const AdminScreen()),
-                          );
-                        },
-                        icon: const Icon(Icons.admin_panel_settings),
-                        label: const Text('Admin Dashboard'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryDark,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
                 // My Reports button
                 const SizedBox(height: 12),
                 Padding(

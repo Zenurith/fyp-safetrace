@@ -9,6 +9,7 @@ import '../../data/services/location_service.dart';
 import '../../data/services/heatmap_service.dart';
 import '../../utils/app_theme.dart';
 import '../providers/incident_provider.dart';
+import '../providers/community_provider.dart';
 import '../widgets/incident_bottom_sheet.dart';
 import '../widgets/incident_search_delegate.dart';
 
@@ -390,9 +391,15 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<IncidentProvider>(
-      builder: (context, provider, _) {
-        final incidents = provider.incidents;
+    return Consumer2<IncidentProvider, CommunityProvider>(
+      builder: (context, provider, communityProvider, _) {
+        final myApprovedIds = communityProvider.myApprovedCommunityIds;
+        // Show public incidents + community-only incidents the user is an approved member of
+        final incidents = provider.incidents
+            .where((i) =>
+                i.communityIds.isEmpty ||
+                i.communityIds.any((id) => myApprovedIds.contains(id)))
+            .toList();
         // Center camera on a selected incident (set by "View on Map" from other screens)
         final selectedIncident = provider.selectedIncident;
         if (selectedIncident != null && selectedIncident.id != _lastCenteredIncidentId) {

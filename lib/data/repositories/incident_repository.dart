@@ -119,6 +119,13 @@ class IncidentRepository {
     await _incidentsCollection.doc(id).delete();
   }
 
+  /// Remove an incident from a specific community (community staff action).
+  Future<void> removeFromCommunity(String incidentId, String communityId) async {
+    await _incidentsCollection.doc(incidentId).update({
+      'communityIds': FieldValue.arrayRemove([communityId]),
+    });
+  }
+
   Future<void> confirm(String id) async {
     await _incidentsCollection.doc(id).update({
       'confirmations': FieldValue.increment(1),

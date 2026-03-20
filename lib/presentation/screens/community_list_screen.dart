@@ -81,6 +81,17 @@ class _CommunityListScreenState extends State<CommunityListScreen>
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
+          final user = context.read<UserProvider>().currentUser;
+          if (user == null || user.level < 2) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                    'You need to reach Level 2 (Observer) to create a community.'),
+                backgroundColor: AppTheme.warningOrange,
+              ),
+            );
+            return;
+          }
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -512,29 +523,19 @@ class _CommunityCard extends StatelessWidget {
                       color: AppTheme.textSecondary,
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 12),
                   Icon(Icons.radar, size: 16, color: AppTheme.textSecondary),
                   const SizedBox(width: 4),
-                  Text(
-                    '${community.radius} km radius',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                  if (distanceKm != null) ...[
-                    const SizedBox(width: 16),
-                    Icon(Icons.near_me,
-                        size: 16, color: AppTheme.textSecondary),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${distanceKm!.toStringAsFixed(1)} km away',
+                  Flexible(
+                    child: Text(
+                      '${community.radius} km radius',
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppTheme.textSecondary,
                       ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ],
+                  ),
                   const Spacer(),
                   Text(
                     community.timeAgo,
@@ -545,6 +546,23 @@ class _CommunityCard extends StatelessWidget {
                   ),
                 ],
               ),
+              if (distanceKm != null) ...[
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(Icons.near_me,
+                        size: 14, color: AppTheme.textSecondary),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${distanceKm!.toStringAsFixed(1)} km away',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),

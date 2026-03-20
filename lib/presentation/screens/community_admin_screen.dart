@@ -6,6 +6,7 @@ import '../../utils/app_theme.dart';
 import '../providers/community_provider.dart';
 import '../providers/user_provider.dart';
 import '../widgets/user_avatar.dart';
+import 'create_community_screen.dart';
 
 class CommunityAdminScreen extends StatefulWidget {
   final String communityId;
@@ -19,11 +20,13 @@ class CommunityAdminScreen extends StatefulWidget {
 class _CommunityAdminScreenState extends State<CommunityAdminScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  CommunityMemberModel? _myMembership;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _myMembership = context.read<CommunityProvider>().currentMembership;
     _loadData();
   }
 
@@ -40,11 +43,34 @@ class _CommunityAdminScreenState extends State<CommunityAdminScreen>
 
   @override
   Widget build(BuildContext context) {
+    final canEdit = _myMembership?.isOwner == true ||
+        _myMembership?.isHeadModerator == true;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Community Admin'),
+        title: const Text('Manage Community'),
         backgroundColor: AppTheme.primaryDark,
         foregroundColor: Colors.white,
+        actions: [
+          if (canEdit)
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: 'Edit Community',
+              onPressed: () {
+                final community =
+                    context.read<CommunityProvider>().selectedCommunity;
+                if (community != null) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          CreateCommunityScreen(communityToEdit: community),
+                    ),
+                  );
+                }
+              },
+            ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           labelColor: Colors.white,
@@ -63,7 +89,10 @@ class _CommunityAdminScreenState extends State<CommunityAdminScreen>
             communityId: widget.communityId,
             onRefresh: _loadData,
           ),
-          _MembersTab(communityId: widget.communityId),
+          _MembersTab(
+            communityId: widget.communityId,
+            myMembership: _myMembership,
+          ),
         ],
       ),
     );
@@ -349,8 +378,12 @@ class _PendingRequestCardState extends State<_PendingRequestCard> {
 
 class _MembersTab extends StatefulWidget {
   final String communityId;
+  final CommunityMemberModel? myMembership;
 
-  const _MembersTab({required this.communityId});
+  const _MembersTab({
+    required this.communityId,
+    required this.myMembership,
+  });
 
   @override
   State<_MembersTab> createState() => _MembersTabState();
@@ -405,7 +438,7 @@ class _MembersTabState extends State<_MembersTab> {
   @override
   Widget build(BuildContext context) {
     final currentUserId =
-        context.read<UserProvider>().currentUser?.id ?? '';
+        context.watch<UserProvider>().currentUser?.id ?? '';
 
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -475,6 +508,7 @@ class _MembersTabState extends State<_MembersTab> {
                         user: _users[member.userId],
                         communityId: widget.communityId,
                         currentUserId: currentUserId,
+                        myMembership: widget.myMembership,
                         onChanged: _reload,
                       );
                     },
@@ -491,6 +525,7 @@ class _MemberListItem extends StatefulWidget {
   final UserModel? user;
   final String communityId;
   final String currentUserId;
+  final CommunityMemberModel? myMembership;
   final VoidCallback onChanged;
 
   const _MemberListItem({
@@ -498,6 +533,7 @@ class _MemberListItem extends StatefulWidget {
     required this.user,
     required this.communityId,
     required this.currentUserId,
+    required this.myMembership,
     required this.onChanged,
   });
 
@@ -508,8 +544,113 @@ class _MemberListItem extends StatefulWidget {
 class _MemberListItemState extends State<_MemberListItem> {
   bool _isProcessing = false;
 
+  // ── Permission helpers ────────────────────────────────────────────────────
+
+  bool _canPromoteToMod(MemberRole? my, MemberRole target) =>
+      (my == MemberRole.owner || my == MemberRole.headModerator) &&
+      target == MemberRole.member;
+
+  bool _canPromoteToHeadMod(MemberRole? my, MemberRole target) =>
+      my == MemberRole.owner && target == MemberRole.moderator;
+
+  bool _canDemoteToMod(MemberRole? my, MemberRole target) =>
+      my == MemberRole.owner && target == MemberRole.headModerator;
+
+  bool _canDemoteToMember(MemberRole? my, MemberRole target) =>
+      (my == MemberRole.owner || my == MemberRole.headModerator) &&
+      target == MemberRole.moderator;
+
+  bool _canRemove(MemberRole? my, MemberRole target) {
+    if (target == MemberRole.owner) return false;
+    if (target == MemberRole.member) {
+      return my == MemberRole.owner ||
+          my == MemberRole.headModerator ||
+          my == MemberRole.moderator;
+    }
+    if (target == MemberRole.moderator) {
+      return my == MemberRole.owner || my == MemberRole.headModerator;
+    }
+    if (target == MemberRole.headModerator) {
+      return my == MemberRole.owner;
+    }
+    return false;
+  }
+
+  bool _canTransfer(MemberRole? my, MemberRole target) =>
+      my == MemberRole.owner && target != MemberRole.owner;
+
+  // Ban has the same permission matrix as remove
+  bool _canBan(MemberRole? my, MemberRole target) => _canRemove(my, target);
+
+  Future<DateTime?> _pickBanDuration() async {
+    const options = [
+      ('1 hour', Duration(hours: 1)),
+      ('1 day', Duration(days: 1)),
+      ('3 days', Duration(days: 3)),
+      ('7 days', Duration(days: 7)),
+      ('30 days', Duration(days: 30)),
+    ];
+    return showDialog<DateTime>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('Ban Duration'),
+        children: options
+            .map((opt) => SimpleDialogOption(
+                  onPressed: () =>
+                      Navigator.pop(ctx, DateTime.now().add(opt.$2)),
+                  child: Text(opt.$1),
+                ))
+            .toList(),
+      ),
+    );
+  }
+
+  // ── Role badge color ──────────────────────────────────────────────────────
+
+  Color _roleBadgeColor(MemberRole role) {
+    switch (role) {
+      case MemberRole.owner:
+        return AppTheme.primaryRed;
+      case MemberRole.headModerator:
+        return AppTheme.warningOrange;
+      case MemberRole.moderator:
+        return AppTheme.successGreen;
+      case MemberRole.member:
+        return AppTheme.textSecondary;
+    }
+  }
+
+  // ── Action handler ────────────────────────────────────────────────────────
+
   Future<void> _handleAction(String action) async {
-    if (action == 'remove') {
+    // Show dialogs before entering processing state
+    DateTime? tempBanUntil;
+
+    if (action == 'temp_ban') {
+      tempBanUntil = await _pickBanDuration();
+      if (tempBanUntil == null) return;
+    } else if (action == 'ban') {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Permanently Ban'),
+          content: Text(
+              'Permanently ban ${widget.user?.name ?? 'this member'} from the community? They will not be able to rejoin.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Ban',
+                  style: TextStyle(color: AppTheme.primaryRed)),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+    } else if (action == 'remove') {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -530,6 +671,27 @@ class _MemberListItemState extends State<_MemberListItem> {
         ),
       );
       if (confirmed != true) return;
+    } else if (action == 'transfer') {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Transfer Ownership'),
+          content: Text(
+              'Transfer ownership to ${widget.user?.name ?? 'this member'}? You will become Head Moderator.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Transfer',
+                  style: TextStyle(color: AppTheme.primaryRed)),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
     }
 
     if (!mounted) return;
@@ -542,18 +704,43 @@ class _MemberListItemState extends State<_MemberListItem> {
 
     try {
       switch (action) {
-        case 'promote':
-          success = await provider.promoteToAdmin(widget.member.id);
-          successMsg = 'Promoted to admin';
+        case 'promote_mod':
+          success = await provider.promoteToModerator(widget.member.id);
+          successMsg = 'Promoted to Moderator';
           break;
-        case 'demote':
+        case 'promote_headmod':
+          success = await provider.promoteToHeadModerator(
+              widget.communityId, widget.member.id);
+          successMsg = 'Promoted to Head Moderator';
+          break;
+        case 'demote_mod':
+          success = await provider.promoteToModerator(widget.member.id);
+          successMsg = 'Demoted to Moderator';
+          break;
+        case 'demote_member':
           success = await provider.demoteToMember(
               widget.member.id, widget.communityId);
-          successMsg = 'Demoted to member';
+          successMsg = 'Demoted to Member';
+          break;
+        case 'temp_ban':
+          success = await provider.banMember(
+              widget.member.id, widget.communityId,
+              bannedUntil: tempBanUntil);
+          successMsg = 'Member temporarily banned';
+          break;
+        case 'ban':
+          success = await provider.banMember(
+              widget.member.id, widget.communityId);
+          successMsg = 'Member permanently banned';
+          break;
+        case 'transfer':
+          success = await provider.transferOwnership(
+              widget.communityId, widget.currentUserId, widget.member.userId);
+          successMsg = 'Ownership transferred';
           break;
         case 'remove':
           success = await provider.removeMember(
-              widget.communityId, widget.member.userId);
+              widget.member.id, widget.communityId);
           successMsg = 'Member removed';
           break;
       }
@@ -581,6 +768,9 @@ class _MemberListItemState extends State<_MemberListItem> {
     final member = widget.member;
     final user = widget.user;
     final isSelf = member.userId == widget.currentUserId;
+    final myRole = widget.myMembership?.role;
+    final targetRole = member.role;
+    final badgeColor = _roleBadgeColor(targetRole);
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(vertical: 4),
@@ -589,15 +779,14 @@ class _MemberListItemState extends State<_MemberListItem> {
         initials: user?.initials ?? '?',
         radius: 20,
         backgroundColor:
-            member.isAdmin ? AppTheme.primaryRed : AppTheme.primaryDark,
+            member.isStaff ? AppTheme.primaryRed : AppTheme.primaryDark,
       ),
       title: Text(user?.name ?? '...'),
       subtitle: Text(
-        member.isAdmin ? 'Admin' : 'Member',
+        member.roleLabel,
         style: TextStyle(
-          color: member.isAdmin ? AppTheme.primaryRed : AppTheme.textSecondary,
-          fontWeight:
-              member.isAdmin ? FontWeight.w500 : FontWeight.normal,
+          color: badgeColor,
+          fontWeight: member.isStaff ? FontWeight.w500 : FontWeight.normal,
         ),
       ),
       trailing: _isProcessing
@@ -627,40 +816,83 @@ class _MemberListItemState extends State<_MemberListItem> {
                   onSelected: _handleAction,
                   icon: const Icon(Icons.more_vert),
                   itemBuilder: (context) => [
-                    if (!member.isAdmin)
+                    if (_canPromoteToMod(myRole, targetRole))
                       const PopupMenuItem(
-                        value: 'promote',
-                        child: Row(
-                          children: [
-                            Icon(Icons.arrow_upward, size: 16),
-                            SizedBox(width: 8),
-                            Text('Promote to Admin'),
-                          ],
-                        ),
+                        value: 'promote_mod',
+                        child: Row(children: [
+                          Icon(Icons.arrow_upward, size: 16),
+                          SizedBox(width: 8),
+                          Text('Promote to Moderator'),
+                        ]),
                       ),
-                    if (member.isAdmin)
+                    if (_canPromoteToHeadMod(myRole, targetRole))
                       const PopupMenuItem(
-                        value: 'demote',
-                        child: Row(
-                          children: [
-                            Icon(Icons.arrow_downward, size: 16),
-                            SizedBox(width: 8),
-                            Text('Demote to Member'),
-                          ],
-                        ),
+                        value: 'promote_headmod',
+                        child: Row(children: [
+                          Icon(Icons.keyboard_double_arrow_up, size: 16),
+                          SizedBox(width: 8),
+                          Text('Promote to Head Mod'),
+                        ]),
                       ),
-                    const PopupMenuItem(
-                      value: 'remove',
-                      child: Row(
-                        children: [
+                    if (_canDemoteToMod(myRole, targetRole))
+                      const PopupMenuItem(
+                        value: 'demote_mod',
+                        child: Row(children: [
+                          Icon(Icons.arrow_downward, size: 16),
+                          SizedBox(width: 8),
+                          Text('Demote to Moderator'),
+                        ]),
+                      ),
+                    if (_canDemoteToMember(myRole, targetRole))
+                      const PopupMenuItem(
+                        value: 'demote_member',
+                        child: Row(children: [
+                          Icon(Icons.arrow_downward, size: 16),
+                          SizedBox(width: 8),
+                          Text('Demote to Member'),
+                        ]),
+                      ),
+                    if (_canTransfer(myRole, targetRole))
+                      const PopupMenuItem(
+                        value: 'transfer',
+                        child: Row(children: [
+                          Icon(Icons.swap_horiz, size: 16),
+                          SizedBox(width: 8),
+                          Text('Transfer Ownership'),
+                        ]),
+                      ),
+                    if (_canBan(myRole, targetRole)) ...[
+                      const PopupMenuItem(
+                        value: 'remove',
+                        child: Row(children: [
                           Icon(Icons.remove_circle_outline,
                               size: 16, color: AppTheme.primaryRed),
                           SizedBox(width: 8),
-                          Text('Remove',
+                          Text('Kick',
                               style: TextStyle(color: AppTheme.primaryRed)),
-                        ],
+                        ]),
                       ),
-                    ),
+                      const PopupMenuItem(
+                        value: 'temp_ban',
+                        child: Row(children: [
+                          Icon(Icons.timer_off_outlined,
+                              size: 16, color: AppTheme.primaryRed),
+                          SizedBox(width: 8),
+                          Text('Temp Ban',
+                              style: TextStyle(color: AppTheme.primaryRed)),
+                        ]),
+                      ),
+                      const PopupMenuItem(
+                        value: 'ban',
+                        child: Row(children: [
+                          Icon(Icons.block,
+                              size: 16, color: AppTheme.primaryRed),
+                          SizedBox(width: 8),
+                          Text('Ban',
+                              style: TextStyle(color: AppTheme.primaryRed)),
+                        ]),
+                      ),
+                    ],
                   ],
                 ),
     );

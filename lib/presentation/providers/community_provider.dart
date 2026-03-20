@@ -14,6 +14,7 @@ class CommunityProvider extends ChangeNotifier {
   Set<String> _myMembershipCommunityIds = {};
   CommunityModel? _selectedCommunity;
   CommunityMemberModel? _currentMembership;
+  int _detailLoadGeneration = 0;
   bool _isLoading = false;
   String? _error;
   StreamSubscription? _communitiesSubscription;
@@ -25,6 +26,9 @@ class CommunityProvider extends ChangeNotifier {
   List<CommunityModel> get nearbyCommunities => _nearbyCommunities;
   List<CommunityMemberModel> get pendingRequests => _pendingRequests;
   Set<String> get myMembershipCommunityIds => _myMembershipCommunityIds;
+  /// Only approved memberships — use this for content visibility checks.
+  Set<String> get myApprovedCommunityIds =>
+      _myCommunities.map((c) => c.id).toSet();
   CommunityModel? get selectedCommunity => _selectedCommunity;
   CommunityMemberModel? get currentMembership => _currentMembership;
   bool get isLoading => _isLoading;
@@ -147,15 +151,23 @@ class CommunityProvider extends ChangeNotifier {
   }
 
   Future<void> loadCommunityDetails(String communityId, String userId) async {
+    final generation = ++_detailLoadGeneration;
     _isLoading = true;
+    _currentMembership = null;
     notifyListeners();
 
     try {
-      _selectedCommunity = await _repository.getById(communityId);
-      _currentMembership =
+      final community = await _repository.getById(communityId);
+      final membership =
           await _repository.getUserMembership(communityId, userId);
+
+      if (_detailLoadGeneration != generation) return;
+
+      _selectedCommunity = community;
+      _currentMembership = membership;
       _error = null;
     } catch (e) {
+      if (_detailLoadGeneration != generation) return;
       _error = e.toString();
     }
 
@@ -168,6 +180,7 @@ class CommunityProvider extends ChangeNotifier {
       await _repository.requestToJoin(communityId, userId);
       _currentMembership =
           await _repository.getUserMembership(communityId, userId);
+      _myMembershipCommunityIds.add(communityId);
       notifyListeners();
       return true;
     } catch (e) {
@@ -236,6 +249,7 @@ class CommunityProvider extends ChangeNotifier {
     try {
       await _repository.leaveCommunity(communityId, userId);
       _myCommunities.removeWhere((c) => c.id == communityId);
+      _myMembershipCommunityIds.remove(communityId);
       _currentMembership = null;
       notifyListeners();
       return true;
@@ -246,9 +260,21 @@ class CommunityProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> promoteToAdmin(String memberId) async {
+  Future<bool> promoteToModerator(String memberId) async {
     try {
-      await _repository.promoteToAdmin(memberId);
+      await _repository.promoteToModerator(memberId);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> promoteToHeadModerator(String communityId, String memberId) async {
+    try {
+      await _repository.promoteToHeadModerator(memberId);
       notifyListeners();
       return true;
     } catch (e) {
@@ -270,9 +296,10 @@ class CommunityProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> removeMember(String communityId, String userId) async {
+  /// Remove a member by their membership document ID (not userId).
+  Future<bool> removeMember(String memberId, String communityId) async {
     try {
-      await _repository.leaveCommunity(communityId, userId);
+      await _repository.removeMemberById(memberId, communityId);
       notifyListeners();
       return true;
     } catch (e) {
@@ -282,8 +309,37 @@ class CommunityProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> isAdmin(String communityId, String userId) async {
-    return await _repository.isAdmin(communityId, userId);
+  Future<bool> banMember(String memberId, String communityId,
+      {DateTime? bannedUntil}) async {
+    try {
+      await _repository.banMember(memberId, communityId,
+          bannedUntil: bannedUntil);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> transferOwnership(
+      String communityId, String currentOwnerId, String newOwnerId) async {
+    try {
+      await _repository.transferOwnership(communityId, currentOwnerId, newOwnerId);
+      _currentMembership =
+          await _repository.getUserMembership(communityId, currentOwnerId);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> isStaff(String communityId, String userId) async {
+    return await _repository.isStaff(communityId, userId);
   }
 
   Future<bool> isMember(String communityId, String userId) async {
@@ -295,6 +351,7 @@ class CommunityProvider extends ChangeNotifier {
       await _repository.delete(communityId);
       _communities.removeWhere((c) => c.id == communityId);
       _myCommunities.removeWhere((c) => c.id == communityId);
+      _myMembershipCommunityIds.remove(communityId);
       _selectedCommunity = null;
       notifyListeners();
       return true;

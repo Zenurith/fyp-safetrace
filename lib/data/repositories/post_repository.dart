@@ -166,32 +166,6 @@ class PostRepository {
             .toList());
   }
 
-  // ==================== Voting ====================
-
-  Future<void> upvote(String postId) async {
-    await _postsCollection.doc(postId).update({
-      'upvotes': FieldValue.increment(1),
-    });
-  }
-
-  Future<void> downvote(String postId) async {
-    await _postsCollection.doc(postId).update({
-      'downvotes': FieldValue.increment(1),
-    });
-  }
-
-  Future<void> removeUpvote(String postId) async {
-    await _postsCollection.doc(postId).update({
-      'upvotes': FieldValue.increment(-1),
-    });
-  }
-
-  Future<void> removeDownvote(String postId) async {
-    await _postsCollection.doc(postId).update({
-      'downvotes': FieldValue.increment(-1),
-    });
-  }
-
   // ==================== Media ====================
 
   Future<void> updateMediaUrls(String postId, List<String> mediaUrls) async {

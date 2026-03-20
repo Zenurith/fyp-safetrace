@@ -75,10 +75,11 @@ service cloud.firestore {
     match /votes/{voteId} {
       allow read: if isAuth();
 
-      // Vote ID format is "{incidentId}_{voterId}" — enforce both ownership and ID pattern
+      // Vote ID format is "{targetId}_{voterId}" — enforce both ownership and ID pattern.
+      // Falls back to legacy 'incidentId' field for backward compatibility with existing vote docs.
       allow create: if isAuth()
         && request.resource.data.voterId == request.auth.uid
-        && voteId == request.resource.data.get('incidentId', '') + '_' + request.auth.uid;
+        && voteId == request.resource.data.get('targetId', request.resource.data.get('incidentId', '')) + '_' + request.auth.uid;
 
       // Only the original voter can change or remove their vote
       allow update, delete: if isAuth()
@@ -99,27 +100,49 @@ service cloud.firestore {
       allow read: if isAuth();
       allow create: if isAuth();
 
-      // Only the creator or a system admin can change community settings
+      // Community creator or system admin can update community settings.
+      // NOTE: field is 'creatorId' (was incorrectly 'createdBy' — caused creator updates to fail).
       allow update: if isAuth()
-        && (resource.data.createdBy == request.auth.uid || isAdmin());
+        && (resource.data.creatorId == request.auth.uid || isAdmin());
 
-      // Only system admins can delete communities
-      allow delete: if isAdmin();
+      // Any authenticated user can update memberCount only.
+      // Required for join/leave operations where the requester is not the creator.
+      allow update: if isAuth()
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['memberCount']);
+
+      // Community creator or system admin can delete.
+      allow delete: if isAuth()
+        && (resource.data.creatorId == request.auth.uid || isAdmin());
     }
 
     // ─── Community Members (root-level collection) ───────────────────────────
+    // Role hierarchy: owner > headModerator > moderator > member
+    // Roles stored as string names (e.g. "owner", "headModerator", "moderator", "member").
+    // Staff roles (owner/headModerator/moderator) grant access to management actions.
 
     match /community_members/{memberId} {
       allow read: if isAuth();
 
-      // Users can only create a membership record for themselves
+      // Users can only create a membership record for themselves.
       allow create: if isAuth()
         && request.resource.data.userId == request.auth.uid;
 
-      // Members can update/delete their own membership (leave, update status)
-      // Admins can manage all memberships (approve, reject, promote, demote)
+      // Members can update or delete their own membership (e.g. leave community).
       allow update, delete: if isAuth()
-        && (resource.data.userId == request.auth.uid || isAdmin());
+        && resource.data.userId == request.auth.uid;
+
+      // Staff actions: approve/reject requests, promote/demote members, transfer ownership.
+      // Membership IDs are auto-generated so staff role cannot be verified here —
+      // app layer enforces role-based permission checks before calling Firestore.
+      // TODO: migrate to Cloud Functions for server-side enforcement in production.
+      allow update: if isAuth()
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'approvedAt', 'approvedBy', 'role']);
+
+      // Remove member: app layer enforces community staff role and prevents owner removal.
+      // TODO: migrate to Cloud Functions for server-side enforcement in production.
+      allow delete: if isAuth();
     }
 
     // ─── Posts ──────────────────────────────────────────────────────────────
@@ -133,6 +156,12 @@ service cloud.firestore {
       // Author or admin can edit/delete posts
       allow update, delete: if isAuth()
         && (resource.data.authorId == request.auth.uid || isAdmin());
+
+      // Any authenticated user can update vote-count fields only.
+      // Required for client-side post vote transactions where the voter is not the author.
+      allow update: if isAuth()
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['upvotes', 'downvotes']);
     }
 
     // ─── Comments ───────────────────────────────────────────────────────────

@@ -708,15 +708,15 @@ class _MemberItemState extends State<_MemberItem> {
     try {
       switch (action) {
         case 'promote':
-          success = await provider.promoteToAdmin(widget.member.id);
-          successMsg = 'Promoted to admin';
+          success = await provider.promoteToModerator(widget.member.id);
+          successMsg = 'Promoted to Moderator';
           break;
         case 'demote':
           success = await provider.demoteToMember(widget.member.id, widget.communityId);
           successMsg = 'Demoted to member';
           break;
         case 'remove':
-          success = await provider.removeMember(widget.communityId, widget.member.userId);
+          success = await provider.removeMember(widget.member.id, widget.communityId);
           successMsg = 'Member removed';
           break;
       }
@@ -758,7 +758,7 @@ class _MemberItemState extends State<_MemberItem> {
             photoUrl: user?.profilePhotoUrl,
             initials: user?.initials ?? '?',
             radius: 20,
-            backgroundColor: member.isAdmin ? AppTheme.primaryRed : AppTheme.primaryDark,
+            backgroundColor: member.isStaff ? AppTheme.primaryRed : AppTheme.primaryDark,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -784,18 +784,18 @@ class _MemberItemState extends State<_MemberItem> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: member.isAdmin
+              color: member.isStaff
                   ? AppTheme.primaryRed.withValues(alpha: 0.1)
                   : AppTheme.backgroundGrey,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
-              member.isAdmin ? 'Admin' : 'Member',
+              member.roleLabel,
               style: TextStyle(
                 fontFamily: AppTheme.fontFamily,
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
-                color: member.isAdmin ? AppTheme.primaryRed : AppTheme.textSecondary,
+                color: member.isStaff ? AppTheme.primaryRed : AppTheme.textSecondary,
               ),
             ),
           ),
@@ -828,18 +828,18 @@ class _MemberItemState extends State<_MemberItem> {
               onSelected: _handleAction,
               icon: Icon(Icons.more_vert, size: 18, color: AppTheme.textSecondary),
               itemBuilder: (context) => [
-                if (!member.isAdmin)
+                if (!member.isStaff)
                   const PopupMenuItem(
                     value: 'promote',
                     child: Row(
                       children: [
                         Icon(Icons.arrow_upward, size: 16),
                         SizedBox(width: 8),
-                        Text('Promote to Admin'),
+                        Text('Promote to Moderator'),
                       ],
                     ),
                   ),
-                if (member.isAdmin)
+                if (member.isStaff)
                   const PopupMenuItem(
                     value: 'demote',
                     child: Row(

@@ -11,6 +11,7 @@ import '../providers/user_provider.dart';
 import '../providers/incident_provider.dart';
 import '../providers/vote_provider.dart';
 import '../providers/alert_settings_provider.dart';
+import '../providers/community_provider.dart';
 import '../widgets/incident_bottom_sheet.dart';
 import '../widgets/incident_notification_overlay.dart';
 import 'map_screen.dart';
@@ -101,7 +102,15 @@ class _HomeScreenState extends State<HomeScreen> {
   void _checkForNewIncidents() {
     if (!mounted) return;
 
-    final incidents = context.read<IncidentProvider>().incidents;
+    final allIncidents = context.read<IncidentProvider>().incidents;
+    final myMembershipIds =
+        context.read<CommunityProvider>().myMembershipCommunityIds;
+    // Only notify for public incidents or community incidents the user belongs to
+    final incidents = allIncidents
+        .where((i) =>
+            i.communityIds.isEmpty ||
+            i.communityIds.any((id) => myMembershipIds.contains(id)))
+        .toList();
     final settings = context.read<AlertSettingsProvider>().settings;
     final userId = context.read<UserProvider>().currentUser?.id;
 
@@ -275,6 +284,7 @@ class _HomeScreenState extends State<HomeScreen> {
             )
           : null,
       body: Stack(
+        fit: StackFit.expand,
         children: [
           // Main content
           currentScreen,
@@ -284,9 +294,7 @@ class _HomeScreenState extends State<HomeScreen> {
               top: 0,
               left: 0,
               right: 0,
-              child: Material(
-                color: Colors.transparent,
-                child: IncidentNotificationOverlay(
+              child: IncidentNotificationOverlay(
                   incident: _currentNotification!.incident,
                   distance: _currentNotification!.distance,
                   onTap: () {
@@ -300,7 +308,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     _dequeueNextNotification();
                   },
                 ),
-              ),
             ),
         ],
       ),
