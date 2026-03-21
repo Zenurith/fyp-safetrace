@@ -55,6 +55,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
   static const int _maxMediaFiles = 5;
 
   IncidentCategory _selectedCategory = IncidentCategory.crime;
+  String? _selectedCategoryName; // Non-null only for admin-created custom categories
   SeverityLevel _selectedSeverity = SeverityLevel.high;
   bool _isAnonymous = true;
   double _latitude = AppConstants.defaultLat;
@@ -708,7 +709,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
           final imageBytes = await media.readAsBytes();
           final result = await _verificationService.verifyImage(
             imageBytes: imageBytes,
-            categoryName: categoryLabel(_selectedCategory),
+            categoryName: _selectedCategoryName ?? categoryLabel(_selectedCategory),
             description: _descriptionController.text.trim(),
           );
           if (worstResult == null ||
@@ -760,6 +761,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
         communityIds:
             _selectedCommunityId != null ? [_selectedCommunityId!] : [],
         incidentTime: _incidentTime,
+        customCategoryName: _selectedCategoryName,
       ).timeout(
         const Duration(seconds: 30),
         onTimeout: () {
@@ -1025,8 +1027,11 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                   const SizedBox(height: 12),
                   ReportCategoryGrid(
                     selectedCategory: _selectedCategory,
-                    onCategorySelected: (cat) =>
-                        setState(() => _selectedCategory = cat),
+                    selectedCategoryName: _selectedCategoryName,
+                    onCategorySelected: (cat, customName) => setState(() {
+                      _selectedCategory = cat;
+                      _selectedCategoryName = customName;
+                    }),
                   ),
                   const SizedBox(height: 24),
 

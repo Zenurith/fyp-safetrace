@@ -44,7 +44,7 @@ Color categoryColor(IncidentCategory cat) {
   return AppTheme.categoryColor(categoryLabel(cat));
 }
 
-IncidentCategory? incidentCategoryFromName(String name) {
+IncidentCategory incidentCategoryFromName(String name) {
   switch (name.toLowerCase()) {
     case 'crime':
       return IncidentCategory.crime;
@@ -59,7 +59,7 @@ IncidentCategory? incidentCategoryFromName(String name) {
     case 'emergency':
       return IncidentCategory.emergency;
     default:
-      return null;
+      return IncidentCategory.other;
   }
 }
 

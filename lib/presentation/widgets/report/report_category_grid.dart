@@ -7,11 +7,13 @@ import '../../providers/category_provider.dart';
 
 class ReportCategoryGrid extends StatelessWidget {
   final IncidentCategory selectedCategory;
-  final ValueChanged<IncidentCategory> onCategorySelected;
+  final String? selectedCategoryName; // Non-null only for custom categories
+  final void Function(IncidentCategory category, String? customName) onCategorySelected;
 
   const ReportCategoryGrid({
     super.key,
     required this.selectedCategory,
+    this.selectedCategoryName,
     required this.onCategorySelected,
   });
 
@@ -20,11 +22,8 @@ class ReportCategoryGrid extends StatelessWidget {
     final categoryProvider = context.watch<CategoryProvider>();
     final enabledCategories = categoryProvider.enabledCategories;
 
-    final availableCategories = enabledCategories
-        .where((cat) => incidentCategoryFromName(cat.name) != null)
-        .toList();
-
-    if (availableCategories.isEmpty) {
+    if (enabledCategories.isEmpty) {
+      // Fallback to hardcoded enum list while admin categories load
       return GridView.count(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
@@ -32,13 +31,15 @@ class ReportCategoryGrid extends StatelessWidget {
         mainAxisSpacing: 10,
         crossAxisSpacing: 10,
         childAspectRatio: 1.1,
-        children: IncidentCategory.values.map((cat) {
+        children: IncidentCategory.values
+            .where((c) => c != IncidentCategory.other)
+            .map((cat) {
           return _CategoryItem(
             label: categoryLabel(cat),
             icon: categoryIcon(cat),
             color: AppTheme.categoryColor(categoryLabel(cat)),
             selected: selectedCategory == cat,
-            onTap: () => onCategorySelected(cat),
+            onTap: () => onCategorySelected(cat, null),
           );
         }).toList(),
       );
@@ -51,16 +52,19 @@ class ReportCategoryGrid extends StatelessWidget {
       mainAxisSpacing: 10,
       crossAxisSpacing: 10,
       childAspectRatio: 1.1,
-      children: availableCategories.map((cat) {
+      children: enabledCategories.map((cat) {
         final incidentCat = incidentCategoryFromName(cat.name);
-        if (incidentCat == null) return const SizedBox.shrink();
+        final isCustom = incidentCat == IncidentCategory.other;
+        final selected = isCustom
+            ? selectedCategoryName == cat.name
+            : selectedCategory == incidentCat;
 
         return _CategoryItem(
           label: cat.name,
           icon: cat.icon,
           color: cat.color,
-          selected: selectedCategory == incidentCat,
-          onTap: () => onCategorySelected(incidentCat),
+          selected: selected,
+          onTap: () => onCategorySelected(incidentCat, isCustom ? cat.name : null),
         );
       }).toList(),
     );
