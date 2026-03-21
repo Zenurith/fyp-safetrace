@@ -132,6 +132,8 @@ class _MapScreenState extends State<MapScreen> {
         return Colors.green[700]!;
       case IncidentCategory.suspicious:
         return Colors.deepPurple;
+      case IncidentCategory.other:
+        return Colors.grey;
     }
   }
 
@@ -149,6 +151,8 @@ class _MapScreenState extends State<MapScreen> {
         return Icons.eco;
       case IncidentCategory.emergency:
         return Icons.local_hospital;
+      case IncidentCategory.other:
+        return Icons.category;
     }
   }
 

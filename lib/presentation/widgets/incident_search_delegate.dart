@@ -301,6 +301,8 @@ class _IncidentSearchTile extends StatelessWidget {
         return AppTheme.successGreen;
       case IncidentCategory.suspicious:
         return AppTheme.textSecondary;
+      case IncidentCategory.other:
+        return AppTheme.textSecondary;
     }
   }
 
@@ -318,6 +320,8 @@ class _IncidentSearchTile extends StatelessWidget {
         return Icons.eco;
       case IncidentCategory.suspicious:
         return Icons.visibility;
+      case IncidentCategory.other:
+        return Icons.category;
     }
   }
 

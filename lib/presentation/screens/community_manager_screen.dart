@@ -8,16 +8,16 @@ import '../providers/user_provider.dart';
 import '../widgets/user_avatar.dart';
 import 'create_community_screen.dart';
 
-class CommunityAdminScreen extends StatefulWidget {
+class CommunityManagerScreen extends StatefulWidget {
   final String communityId;
 
-  const CommunityAdminScreen({super.key, required this.communityId});
+  const CommunityManagerScreen({super.key, required this.communityId});
 
   @override
-  State<CommunityAdminScreen> createState() => _CommunityAdminScreenState();
+  State<CommunityManagerScreen> createState() => _CommunityManagerScreenState();
 }
 
-class _CommunityAdminScreenState extends State<CommunityAdminScreen>
+class _CommunityManagerScreenState extends State<CommunityManagerScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   CommunityMemberModel? _myMembership;

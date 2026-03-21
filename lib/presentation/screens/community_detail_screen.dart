@@ -8,7 +8,7 @@ import '../providers/community_provider.dart';
 import '../providers/incident_provider.dart';
 import '../providers/user_provider.dart';
 import '../widgets/incident_bottom_sheet.dart';
-import 'community_admin_screen.dart';
+import 'community_manager_screen.dart';
 import 'create_community_screen.dart';
 
 class CommunityDetailScreen extends StatefulWidget {
@@ -247,7 +247,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
                     context,
                     MaterialPageRoute(
                       builder: (_) =>
-                          CommunityAdminScreen(communityId: widget.communityId),
+                          CommunityManagerScreen(communityId: widget.communityId),
                     ),
                   ).then((_) => _loadCommunity()),
                 ),

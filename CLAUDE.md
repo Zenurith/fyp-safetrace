@@ -156,7 +156,7 @@ lib/
 ## Known Bugs & Issues
 
 ### Communities Feature
-Communities are **location-based groups** (center point + radius). Membership eligibility uses the **Haversine formula**. Members can create posts/discussions within the community. Joining is currently **auto-approved** (no admin approval) for testing.
+Communities are **location-based groups** (center point + radius). Membership eligibility uses the **Haversine formula**. Members can create posts/discussions within the community. Joining respects the `requiresApproval` flag — public communities default to auto-approve; private communities force `requiresApproval = true`, putting new members in `pending` status until staff (owner/headMod/mod) approves via the community admin screen.
 
 #### Community Role Hierarchy
 ```
@@ -265,7 +265,7 @@ Roles are stored as **string names** in Firestore (migrated from legacy int indi
 - Use `AppTheme.textSecondary` for grey text, not `Colors.grey`
 
 ### State Management
-- Community joining is currently **auto-approved** (no admin approval needed) for testing
+- Community joining respects `requiresApproval` — private communities require staff approval; public communities auto-approve by default
 - Call `setState()` or reload data after async operations that change UI state
 - **Never call `context.read()` inside `dispose()`** — Flutter invalidates the BuildContext during widget teardown, so the provider lookup silently fails. Cache the provider reference in `initState()` instead:
   ```dart
