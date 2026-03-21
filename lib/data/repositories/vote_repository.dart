@@ -67,13 +67,6 @@ class VoteRepository {
     return null;
   }
 
-  /// Determines vote weight based on user trust status.
-  /// Trusted users (500+ points) get 2x vote weight.
-  int _getVoteWeight(Map<String, dynamic>? voterData) {
-    if (voterData == null) return 1;
-    final isTrusted = voterData['isTrusted'] ?? false;
-    return isTrusted ? 2 : 1;
-  }
 
   // ══════════════════════════════════════════════════════════════════════════
   // Incident Votes
@@ -133,10 +126,8 @@ class VoteRepository {
       final currentDownvotes = incidentData['downvotes'] ?? 0;
       final currentStatus = IncidentStatus.values[incidentData['status'] ?? 0];
 
-      // Trusted users get 2x vote weight
-      final weight = _getVoteWeight(voterDoc.exists ? voterDoc.data() : null);
-      final newUpvotes = type == VoteType.upvote ? currentUpvotes + weight : currentUpvotes;
-      final newDownvotes = type == VoteType.downvote ? currentDownvotes + weight : currentDownvotes;
+      final newUpvotes = type == VoteType.upvote ? currentUpvotes + 1 : currentUpvotes;
+      final newDownvotes = type == VoteType.downvote ? currentDownvotes + 1 : currentDownvotes;
 
       // Calculate if status should auto-change
       final newStatus = _calculateAutoStatus(
@@ -180,9 +171,12 @@ class VoteRepository {
       return vote;
     });
 
-    // Recalculate reporter's level after transaction completes
+    // Recalculate reporter's level after transaction completes.
+    // Wrapped in try-catch: a failure here must not roll back the committed vote.
     if (result != null) {
-      await _userRepository.recalculateReputation(reporterId);
+      try {
+        await _userRepository.recalculateReputation(reporterId);
+      } catch (_) {}
     }
 
     return result;
@@ -240,20 +234,17 @@ class VoteRepository {
         final currentDownvotes = incidentData['downvotes'] ?? 0;
         final currentStatus = IncidentStatus.values[incidentData['status'] ?? 0];
 
-        // Use voter's current weight so trusted users' vote changes are counted correctly
-        final weight = _getVoteWeight(voterDoc.exists ? voterDoc.data() : null);
-
-        int newUpvotes;
-        int newDownvotes;
+        final int newUpvotes;
+        final int newDownvotes;
 
         if (newType == VoteType.upvote) {
           // Changed from downvote to upvote
-          newUpvotes = currentUpvotes + weight;
-          newDownvotes = (currentDownvotes - weight).clamp(0, double.infinity).toInt();
+          newUpvotes = currentUpvotes + 1;
+          newDownvotes = (currentDownvotes - 1).clamp(0, double.infinity).toInt();
         } else {
           // Changed from upvote to downvote
-          newUpvotes = (currentUpvotes - weight).clamp(0, double.infinity).toInt();
-          newDownvotes = currentDownvotes + weight;
+          newUpvotes = (currentUpvotes - 1).clamp(0, double.infinity).toInt();
+          newDownvotes = currentDownvotes + 1;
         }
 
         // Calculate if status should auto-change
@@ -291,9 +282,12 @@ class VoteRepository {
       return updatedVote;
     });
 
-    // Recalculate reporter's level after transaction completes
+    // Recalculate reporter's level after transaction completes.
+    // Wrapped in try-catch: a failure here must not roll back the committed vote.
     if (result != null) {
-      await _userRepository.recalculateReputation(reporterId);
+      try {
+        await _userRepository.recalculateReputation(reporterId);
+      } catch (_) {}
     }
 
     return result;
@@ -337,18 +331,15 @@ class VoteRepository {
         final currentDownvotes = incidentData['downvotes'] ?? 0;
         final currentStatus = IncidentStatus.values[incidentData['status'] ?? 0];
 
-        // Use voter's current weight to reverse their contribution
-        final weight = _getVoteWeight(voterDoc.exists ? voterDoc.data() : null);
-
-        int newUpvotes;
-        int newDownvotes;
+        final int newUpvotes;
+        final int newDownvotes;
 
         if (existingVote.type == VoteType.upvote) {
-          newUpvotes = (currentUpvotes - weight).clamp(0, double.infinity).toInt();
+          newUpvotes = (currentUpvotes - 1).clamp(0, double.infinity).toInt();
           newDownvotes = currentDownvotes;
         } else {
           newUpvotes = currentUpvotes;
-          newDownvotes = (currentDownvotes - weight).clamp(0, double.infinity).toInt();
+          newDownvotes = (currentDownvotes - 1).clamp(0, double.infinity).toInt();
         }
 
         // Calculate if status should auto-change (e.g., downgrade if upvotes removed)
@@ -394,9 +385,12 @@ class VoteRepository {
       return true;
     });
 
-    // Recalculate reporter's level after transaction completes
+    // Recalculate reporter's level after transaction completes.
+    // Wrapped in try-catch: a failure here must not roll back the committed vote.
     if (result) {
-      await _userRepository.recalculateReputation(reporterId);
+      try {
+        await _userRepository.recalculateReputation(reporterId);
+      } catch (_) {}
     }
 
     return result;

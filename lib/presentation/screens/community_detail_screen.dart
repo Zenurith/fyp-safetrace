@@ -3,11 +3,13 @@ import 'package:provider/provider.dart';
 import '../../data/models/community_member_model.dart';
 import '../../data/models/community_model.dart';
 import '../../data/models/incident_model.dart';
+import '../../data/models/user_model.dart';
 import '../../utils/app_theme.dart';
 import '../providers/community_provider.dart';
 import '../providers/incident_provider.dart';
 import '../providers/user_provider.dart';
 import '../widgets/incident_bottom_sheet.dart';
+import '../widgets/user_avatar.dart';
 import 'community_manager_screen.dart';
 import 'create_community_screen.dart';
 
@@ -219,7 +221,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
           tabs: const [
             Tab(text: 'About'),
             Tab(text: 'Posts'),
-            Tab(text: 'Incidents'),
+            Tab(text: 'Members'),
           ],
         ),
         actions: [
@@ -333,14 +335,17 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
                   ),
                 ),
 
-          // ── Incidents tab (nearby incidents within radius) ─────────────
+          // ── Members tab ────────────────────────────────────────────────
           isApprovedMember
-              ? _NearbyIncidentsTab(community: community, isStaff: isStaff)
+              ? _MembersListTab(
+                  communityId: widget.communityId,
+                  isStaff: isStaff,
+                )
               : const Center(
                   child: Padding(
                     padding: EdgeInsets.all(32),
                     child: Text(
-                      'Join this community to see incidents',
+                      'Join this community to see members',
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -389,35 +394,174 @@ class _SharedPostsTab extends StatelessWidget {
   }
 }
 
-// ── Incidents Tab (nearby incidents within radius) ────────────────────────────
+// ── Members Tab ───────────────────────────────────────────────────────────────
 
-class _NearbyIncidentsTab extends StatelessWidget {
-  final CommunityModel community;
+class _MembersListTab extends StatefulWidget {
+  final String communityId;
   final bool isStaff;
 
-  const _NearbyIncidentsTab({required this.community, this.isStaff = false});
+  const _MembersListTab({
+    required this.communityId,
+    required this.isStaff,
+  });
+
+  @override
+  State<_MembersListTab> createState() => _MembersListTabState();
+}
+
+class _MembersListTabState extends State<_MembersListTab> {
+  List<CommunityMemberModel> _members = [];
+  final Map<String, UserModel?> _users = {};
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final provider = context.read<CommunityProvider>();
+    final members = await provider.getCommunityMembers(widget.communityId);
+    if (!mounted) return;
+
+    // Sort: owner → headMod → moderator → member
+    members.sort((a, b) => a.role.index.compareTo(b.role.index));
+
+    setState(() {
+      _members = members;
+      _isLoading = false;
+    });
+
+    if (members.isNotEmpty) {
+      final ids = members.map((m) => m.userId).toList();
+      context.read<UserProvider>().getUsersByIds(ids).then((fetched) {
+        if (mounted) setState(() => _users.addAll(fetched));
+      });
+    }
+  }
+
+  Color _roleColor(MemberRole role) {
+    switch (role) {
+      case MemberRole.owner:
+        return AppTheme.primaryRed;
+      case MemberRole.headModerator:
+        return AppTheme.warningOrange;
+      case MemberRole.moderator:
+        return AppTheme.successGreen;
+      case MemberRole.member:
+        return AppTheme.textSecondary;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final nearby = context
-        .watch<IncidentProvider>()
-        .allIncidents
-        .where((i) => community.isLocationWithinRadius(i.latitude, i.longitude))
-        .toList();
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-    if (nearby.isEmpty) {
+    if (_members.isEmpty) {
       return Center(
         child: _EmptyState(
-          icon: Icons.shield_outlined,
-          message: 'No incidents reported in this area',
+          icon: Icons.people_outline,
+          message: 'No members found',
         ),
       );
     }
 
-    return ListView.builder(
+    final currentUserId =
+        context.read<UserProvider>().currentUser?.id ?? '';
+
+    return ListView.separated(
       padding: const EdgeInsets.all(16),
-      itemCount: nearby.length,
-      itemBuilder: (_, i) => _IncidentCard(incident: nearby[i], isStaff: isStaff),
+      itemCount: _members.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, i) {
+        final member = _members[i];
+        final user = _users[member.userId];
+        final isSelf = member.userId == currentUserId;
+        final roleColor = _roleColor(member.role);
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: AppTheme.cardDecoration,
+          child: Row(
+            children: [
+              UserAvatar(
+                photoUrl: user?.profilePhotoUrl,
+                initials: user?.initials ?? '?',
+                radius: 20,
+                backgroundColor:
+                    member.isStaff ? AppTheme.primaryRed : AppTheme.primaryDark,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            user?.name ?? '...',
+                            style: AppTheme.bodyMedium,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (isSelf) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryRed.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'You',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: AppTheme.primaryRed,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      member.roleLabel,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: roleColor,
+                        fontWeight: member.isStaff
+                            ? FontWeight.w600
+                            : FontWeight.normal,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (member.isStaff)
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: roleColor.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    member.isOwner
+                        ? Icons.star_rounded
+                        : Icons.shield_outlined,
+                    size: 16,
+                    color: roleColor,
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
