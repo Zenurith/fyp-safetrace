@@ -24,7 +24,6 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _isLoading = true;
-  int _pendingCount = 0;
 
   @override
   void initState() {
@@ -40,7 +39,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
   }
 
   Future<void> _loadCommunity() async {
-    if (mounted) setState(() { _isLoading = true; _pendingCount = 0; });
+    if (mounted) setState(() => _isLoading = true);
 
     final userId = context.read<UserProvider>().currentUser?.id;
     if (userId == null) return;
@@ -51,7 +50,6 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
 
     if (m?.isStaff == true && m?.isApproved == true) {
       await provider.loadPendingRequests(widget.communityId);
-      if (mounted) _pendingCount = provider.pendingRequests.length;
     }
 
     if (mounted) {
@@ -251,7 +249,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
                     ),
                   ).then((_) => _loadCommunity()),
                 ),
-                if (_pendingCount > 0)
+                if (provider.pendingRequests.isNotEmpty)
                   Positioned(
                     right: 6,
                     top: 6,
@@ -264,7 +262,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
                       constraints:
                           const BoxConstraints(minWidth: 16, minHeight: 16),
                       child: Text(
-                        '$_pendingCount',
+                        '${provider.pendingRequests.length}',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 10,
@@ -337,7 +335,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
 
           // ── Incidents tab (nearby incidents within radius) ─────────────
           isApprovedMember
-              ? _NearbyIncidentsTab(community: community)
+              ? _NearbyIncidentsTab(community: community, isStaff: isStaff)
               : const Center(
                   child: Padding(
                     padding: EdgeInsets.all(32),
@@ -395,8 +393,9 @@ class _SharedPostsTab extends StatelessWidget {
 
 class _NearbyIncidentsTab extends StatelessWidget {
   final CommunityModel community;
+  final bool isStaff;
 
-  const _NearbyIncidentsTab({required this.community});
+  const _NearbyIncidentsTab({required this.community, this.isStaff = false});
 
   @override
   Widget build(BuildContext context) {
@@ -418,7 +417,7 @@ class _NearbyIncidentsTab extends StatelessWidget {
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: nearby.length,
-      itemBuilder: (_, i) => _IncidentCard(incident: nearby[i]),
+      itemBuilder: (_, i) => _IncidentCard(incident: nearby[i], isStaff: isStaff),
     );
   }
 }
@@ -603,16 +602,13 @@ class _IncidentCard extends StatefulWidget {
 }
 
 class _IncidentCardState extends State<_IncidentCard> {
-  Future<void> _removeFromCommunity() async {
-    final communityId = widget.communityId;
-    if (communityId == null) return;
-
+  Future<void> _deleteIncident() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Remove Post'),
-        content: const Text(
-            'Remove this post from the community? The incident will be deleted and removed from the map.'),
+        title: const Text('Delete Incident'),
+        content: Text(
+            'Permanently delete "${widget.incident.title}"? This cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -620,7 +616,7 @@ class _IncidentCardState extends State<_IncidentCard> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Remove',
+            child: const Text('Delete',
                 style: TextStyle(color: AppTheme.primaryRed)),
           ),
         ],
@@ -628,17 +624,7 @@ class _IncidentCardState extends State<_IncidentCard> {
     );
     if (confirmed != true || !mounted) return;
 
-    final success = await context
-        .read<IncidentProvider>()
-        .removeFromCommunity(widget.incident.id, communityId);
-    if (mounted && !success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to remove post'),
-          backgroundColor: AppTheme.primaryRed,
-        ),
-      );
-    }
+    await context.read<IncidentProvider>().deleteIncident(widget.incident.id);
   }
 
   @override
@@ -681,21 +667,21 @@ class _IncidentCardState extends State<_IncidentCard> {
               ],
             ),
           ),
-          if (widget.isStaff && widget.communityId != null)
+          if (widget.isStaff)
             PopupMenuButton<String>(
               onSelected: (action) {
-                if (action == 'remove') _removeFromCommunity();
+                if (action == 'delete') _deleteIncident();
               },
               icon: Icon(Icons.more_vert, size: 18, color: AppTheme.textSecondary),
               itemBuilder: (_) => [
                 const PopupMenuItem(
-                  value: 'remove',
+                  value: 'delete',
                   child: Row(
                     children: [
-                      Icon(Icons.remove_circle_outline,
+                      Icon(Icons.delete_outline,
                           size: 16, color: AppTheme.primaryRed),
                       SizedBox(width: 8),
-                      Text('Remove from community',
+                      Text('Delete incident',
                           style: TextStyle(color: AppTheme.primaryRed)),
                     ],
                   ),

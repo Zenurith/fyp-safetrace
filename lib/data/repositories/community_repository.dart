@@ -221,15 +221,19 @@ class CommunityRepository {
   /// Get all pending requests for a community (for staff view).
   Future<List<CommunityMemberModel>> getPendingRequests(
       String communityId) async {
+    // Avoid .orderBy() here — combining two .where() clauses with .orderBy()
+    // on a third field requires a Firestore composite index. Sort client-side.
     final snapshot = await _membersCollection
         .where('communityId', isEqualTo: communityId)
         .where('status', isEqualTo: MemberStatus.pending.index)
-        .orderBy('requestedAt', descending: true)
         .get();
 
-    return snapshot.docs
+    final results = snapshot.docs
         .map((doc) => CommunityMemberModel.fromMap(doc.data(), doc.id))
         .toList();
+
+    results.sort((a, b) => b.requestedAt.compareTo(a.requestedAt));
+    return results;
   }
 
   /// Get all approved members of a community.

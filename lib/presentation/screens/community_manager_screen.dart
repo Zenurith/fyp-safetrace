@@ -20,13 +20,14 @@ class CommunityManagerScreen extends StatefulWidget {
 class _CommunityManagerScreenState extends State<CommunityManagerScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  CommunityMemberModel? _myMembership;
+  // Incrementing this causes _MembersTab to rebuild with a new Key, resetting
+  // its state and triggering a fresh member list load.
+  int _membersReloadKey = 0;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _myMembership = context.read<CommunityProvider>().currentMembership;
     _loadData();
   }
 
@@ -39,12 +40,15 @@ class _CommunityManagerScreenState extends State<CommunityManagerScreen>
   Future<void> _loadData() async {
     final provider = context.read<CommunityProvider>();
     await provider.loadPendingRequests(widget.communityId);
+    if (mounted) setState(() => _membersReloadKey++);
   }
 
   @override
   Widget build(BuildContext context) {
-    final canEdit = _myMembership?.isOwner == true ||
-        _myMembership?.isHeadModerator == true;
+    final myMembership =
+        context.watch<CommunityProvider>().currentMembership;
+    final canEdit = myMembership?.isOwner == true ||
+        myMembership?.isHeadModerator == true;
 
     return Scaffold(
       appBar: AppBar(
@@ -90,8 +94,9 @@ class _CommunityManagerScreenState extends State<CommunityManagerScreen>
             onRefresh: _loadData,
           ),
           _MembersTab(
+            key: ValueKey(_membersReloadKey),
             communityId: widget.communityId,
-            myMembership: _myMembership,
+            myMembership: myMembership,
           ),
         ],
       ),
@@ -137,7 +142,10 @@ class _PendingRequestsTabState extends State<_PendingRequestsTab> {
     final provider = context.watch<CommunityProvider>();
     final requests = provider.pendingRequests;
 
-    if (requests.isNotEmpty) {
+    // Only schedule a user fetch when there are IDs not yet requested.
+    final hasNew =
+        requests.any((r) => !_requestedIds.contains(r.userId));
+    if (hasNew) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _loadMissingUsers(requests);
       });
@@ -381,6 +389,7 @@ class _MembersTab extends StatefulWidget {
   final CommunityMemberModel? myMembership;
 
   const _MembersTab({
+    super.key,
     required this.communityId,
     required this.myMembership,
   });
