@@ -321,6 +321,13 @@ class CommunityRepository {
     });
   }
 
+  /// Demote a head moderator to moderator.
+  Future<void> demoteToModerator(String memberId) async {
+    await _membersCollection.doc(memberId).update({
+      'role': MemberRole.moderator.name,
+    });
+  }
+
   /// Demote a staff member to regular member. Throws if target is owner.
   Future<void> demoteToMember(String memberId, String communityId) async {
     final doc = await _membersCollection.doc(memberId).get();

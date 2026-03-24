@@ -723,7 +723,7 @@ class _MemberListItemState extends State<_MemberListItem> {
           successMsg = 'Promoted to Head Moderator';
           break;
         case 'demote_mod':
-          success = await provider.promoteToModerator(widget.member.id);
+          success = await provider.demoteToModerator(widget.member.id);
           successMsg = 'Demoted to Moderator';
           break;
         case 'demote_member':
@@ -753,7 +753,16 @@ class _MemberListItemState extends State<_MemberListItem> {
           successMsg = 'Member removed';
           break;
       }
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        messenger.showSnackBar(SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: AppTheme.primaryRed,
+        ));
+      }
+      return;
+    }
 
     if (mounted) {
       setState(() => _isProcessing = false);

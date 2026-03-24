@@ -30,7 +30,7 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
 
   @override
   Widget build(BuildContext context) {
-    final currentUser = context.read<UserProvider>().currentUser;
+    final currentUser = context.watch<UserProvider>().currentUser;
     return FutureBuilder<List<UserModel>>(
       future: _usersFuture,
       builder: (context, snapshot) {

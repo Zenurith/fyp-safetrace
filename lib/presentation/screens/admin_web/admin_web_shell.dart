@@ -4,6 +4,7 @@ import '../../../utils/app_theme.dart';
 import '../../providers/flag_provider.dart';
 import '../../providers/incident_provider.dart';
 import '../../providers/community_provider.dart';
+import '../../providers/system_config_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../widgets/admin_web/admin_sidebar.dart';
 import '../../widgets/admin_web/admin_header.dart';
@@ -15,6 +16,7 @@ import 'categories_management_page.dart';
 import 'communities_management_page.dart';
 import 'flags_management_page.dart';
 import 'analytics_page.dart';
+import 'system_config_page.dart';
 
 class AdminWebShell extends StatefulWidget {
   const AdminWebShell({super.key});
@@ -35,6 +37,7 @@ class _AdminWebShellState extends State<AdminWebShell> {
     'Community Management',
     'Flag Management',
     'Analytics',
+    'System Configuration',
   ];
 
   @override
@@ -49,6 +52,7 @@ class _AdminWebShellState extends State<AdminWebShell> {
       // Start listening to flags for badge count
       context.read<FlagProvider>().startListeningPending();
       context.read<FlagProvider>().startListening();
+      context.read<SystemConfigProvider>().startListening();
     });
   }
 
@@ -114,6 +118,7 @@ class _AdminWebShellState extends State<AdminWebShell> {
                       const CommunitiesManagementPage(),
                       const FlagsManagementPage(),
                       const AnalyticsPage(),
+                      const SystemConfigPage(),
                     ],
                   ),
                 ),
