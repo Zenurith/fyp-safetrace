@@ -37,7 +37,8 @@
       "Bash(gcloud auth:*)",
       "Bash(git check-ignore:*)",
       "Bash(grep:*)",
-      "Bash(xargs cat:*)"
+      "Bash(xargs cat:*)",
+      "Bash(git log:*)"
     ]
   }
 }
