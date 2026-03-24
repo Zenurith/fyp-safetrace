@@ -15,9 +15,9 @@ class CommunitySelectorField extends StatelessWidget {
   });
 
   String get _selectedLabel {
-    if (selectedCommunityId == null) return 'Public';
+    if (selectedCommunityId == null) return 'Select a community';
     final match = communities.where((c) => c.id == selectedCommunityId);
-    return match.isNotEmpty ? match.first.name : 'Public';
+    return match.isNotEmpty ? match.first.name : 'Select a community';
   }
 
   void _showSheet(BuildContext context) {
@@ -82,43 +82,47 @@ class CommunitySelectorField extends StatelessWidget {
                     constraints: BoxConstraints(
                       maxHeight: MediaQuery.of(ctx).size.height * 0.4,
                     ),
-                    child: ListView(
-                      shrinkWrap: true,
-                      children: [
-                        if (query.isEmpty ||
-                            'public'.contains(query.toLowerCase()))
-                          ListTile(
-                            leading: const Icon(Icons.public),
-                            title: const Text('Public'),
-                            selected: selectedCommunityId == null,
-                            selectedColor: AppTheme.primaryRed,
-                            onTap: () {
-                              onCommunitySelected(null);
-                              Navigator.pop(ctx);
-                            },
-                          ),
-                        ...filtered.map((community) => ListTile(
-                              leading: const Icon(Icons.group),
-                              title: Text(community.name),
-                              selected: selectedCommunityId == community.id,
-                              selectedColor: AppTheme.primaryRed,
-                              onTap: () {
-                                onCommunitySelected(community.id);
-                                Navigator.pop(ctx);
-                              },
-                            )),
-                        if (filtered.isEmpty &&
-                            !('public'.contains(query.toLowerCase())))
-                          Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Text(
-                              'No communities found.',
-                              style: AppTheme.caption,
-                              textAlign: TextAlign.center,
+                    child: communities.isEmpty
+                        ? Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.group_off,
+                                    size: 36, color: AppTheme.textSecondary),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'You have not joined any community yet.\nJoin a community to post a report.',
+                                  style: AppTheme.caption,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
                             ),
+                          )
+                        : ListView(
+                            shrinkWrap: true,
+                            children: [
+                              ...filtered.map((community) => ListTile(
+                                    leading: const Icon(Icons.group),
+                                    title: Text(community.name),
+                                    selected: selectedCommunityId == community.id,
+                                    selectedColor: AppTheme.primaryRed,
+                                    onTap: () {
+                                      onCommunitySelected(community.id);
+                                      Navigator.pop(ctx);
+                                    },
+                                  )),
+                              if (filtered.isEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Text(
+                                    'No communities found.',
+                                    style: AppTheme.caption,
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                            ],
                           ),
-                      ],
-                    ),
                   ),
                   const SizedBox(height: 16),
                 ],
@@ -135,9 +139,15 @@ class CommunitySelectorField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Share to Communities',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        Row(
+          children: [
+            const Text(
+              'Community',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(width: 4),
+            const Text('*', style: TextStyle(fontSize: 16, color: AppTheme.primaryRed, fontWeight: FontWeight.bold)),
+          ],
         ),
         const SizedBox(height: 8),
         GestureDetector(
@@ -153,9 +163,11 @@ class CommunitySelectorField extends StatelessWidget {
             child: Row(
               children: [
                 Icon(
-                  selectedCommunityId == null ? Icons.public : Icons.group,
+                  Icons.group,
                   size: 18,
-                  color: AppTheme.textSecondary,
+                  color: selectedCommunityId == null
+                      ? AppTheme.textSecondary
+                      : AppTheme.primaryRed,
                 ),
                 const SizedBox(width: 8),
                 Expanded(

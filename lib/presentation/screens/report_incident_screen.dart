@@ -597,6 +597,15 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
   // ─── Submit Flow ──────────────────────────────────────────────────────────
 
   Future<void> _submit() async {
+    if (_selectedCommunityId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a community to post this report.'),
+          backgroundColor: AppTheme.primaryRed,
+        ),
+      );
+      return;
+    }
     final isValid = _formKey.currentState!.validate();
     if (!isValid) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1036,6 +1045,30 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                   const SizedBox(height: 16),
 
                   // ── Community ─────────────────────────────────────────
+                  if (myCommunities.isEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.warningOrange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.warningOrange),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline,
+                              color: AppTheme.warningOrange, size: 18),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              'You must join a community before posting a report.',
+                              style: TextStyle(
+                                  fontSize: 13, color: AppTheme.warningOrange),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   CommunitySelectorField(
                     communities: myCommunities,
                     selectedCommunityId: _selectedCommunityId,
