@@ -15,6 +15,7 @@ class IncidentProvider extends ChangeNotifier {
   final Set<IncidentStatus> _statusFilters = {};
   DateTimeRange? _dateRange;
   IncidentModel? _selectedIncident;
+  bool _mapTabRequested = false;
   bool _isLoading = false;
   String? _error;
   StreamSubscription? _incidentsSubscription;
@@ -77,6 +78,7 @@ class IncidentProvider extends ChangeNotifier {
   Set<IncidentStatus> get statusFilters => _statusFilters;
   DateTimeRange? get dateRange => _dateRange;
   IncidentModel? get selectedIncident => _selectedIncident;
+  bool get mapTabRequested => _mapTabRequested;
   bool get isLoading => _isLoading;
   String? get error => _error;
 
@@ -217,6 +219,16 @@ class IncidentProvider extends ChangeNotifier {
   void selectIncident(IncidentModel? incident) {
     _selectedIncident = incident;
     notifyListeners();
+  }
+
+  void requestMapFocus(IncidentModel incident) {
+    _selectedIncident = incident;
+    _mapTabRequested = true;
+    notifyListeners();
+  }
+
+  void acknowledgeMapTabRequest() {
+    _mapTabRequested = false;
   }
 
   Future<String?> reportIncident({

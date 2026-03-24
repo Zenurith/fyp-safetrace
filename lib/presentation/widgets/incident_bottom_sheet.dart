@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../utils/share_utils.dart';
 import '../../data/models/incident_model.dart';
+import '../../data/repositories/incident_repository.dart';
 import '../../utils/app_theme.dart';
 import '../providers/incident_provider.dart';
 import '../providers/user_provider.dart';
@@ -11,23 +12,70 @@ import 'photo_gallery_viewer.dart';
 import 'status_timeline_widget.dart';
 import 'vote_buttons.dart';
 
-class IncidentBottomSheet extends StatelessWidget {
+class IncidentBottomSheet extends StatefulWidget {
   final String incidentId;
   final VoidCallback? onViewOnMap;
 
   const IncidentBottomSheet({super.key, required this.incidentId, this.onViewOnMap});
 
   @override
+  State<IncidentBottomSheet> createState() => _IncidentBottomSheetState();
+}
+
+class _IncidentBottomSheetState extends State<IncidentBottomSheet> {
+  final _repository = IncidentRepository();
+  IncidentModel? _fetched;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchIfNeeded());
+  }
+
+  Future<void> _fetchIfNeeded() async {
+    if (!mounted) return;
+    final provider = context.read<IncidentProvider>();
+    final inProvider = provider.incidents.where((i) => i.id == widget.incidentId).firstOrNull
+        ?? provider.myReports.where((i) => i.id == widget.incidentId).firstOrNull;
+    if (inProvider != null) return; // already loaded, build() will pick it up
+
+    setState(() => _loading = true);
+    final incident = await _repository.getById(widget.incidentId);
+    if (!mounted) return;
+    setState(() {
+      _fetched = incident;
+      _loading = false;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Watch the incident from the provider to get real-time updates
-    // Falls back to myReports so the profile post history can open older incidents
+    // Watch the incident from the provider to get real-time updates.
+    // Falls back to myReports, then to a direct Firestore fetch (_fetched)
+    // for cold-start notification taps where the provider isn't loaded yet.
     final provider = context.watch<IncidentProvider>();
-    final incident = provider.incidents.where((i) => i.id == incidentId).firstOrNull
-        ?? provider.myReports.where((i) => i.id == incidentId).firstOrNull;
+    final incident = provider.incidents.where((i) => i.id == widget.incidentId).firstOrNull
+        ?? provider.myReports.where((i) => i.id == widget.incidentId).firstOrNull
+        ?? _fetched;
+
+    final sheetDecoration = BoxDecoration(
+      color: Colors.white,
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+    );
+
+    if (_loading) {
+      return Container(
+        height: 120,
+        decoration: sheetDecoration,
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
 
     if (incident == null) {
       return Container(
         padding: const EdgeInsets.all(20),
+        decoration: sheetDecoration,
         child: const Center(
           child: Text('Incident not found'),
         ),
@@ -35,12 +83,9 @@ class IncidentBottomSheet extends StatelessWidget {
     }
 
     return Container(
+      decoration: sheetDecoration,
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.9,
-      ),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(
@@ -291,9 +336,10 @@ class IncidentBottomSheet extends StatelessWidget {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () {
-                    if (onViewOnMap != null) {
-                      onViewOnMap!();
+                    if (widget.onViewOnMap != null) {
+                      widget.onViewOnMap!();
                     } else {
+                      context.read<IncidentProvider>().requestMapFocus(incident);
                       Navigator.pop(context);
                     }
                   },

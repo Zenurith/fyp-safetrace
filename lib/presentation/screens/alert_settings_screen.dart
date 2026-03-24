@@ -38,6 +38,32 @@ class _AlertSettingsScreenState extends State<AlertSettingsScreen> {
     return '$hour12:$minute $period';
   }
 
+  Future<void> _pickActiveFrom(
+      BuildContext ctx, AlertSettingsProvider provider) async {
+    final initial = _parseTimeString(provider.settings.activeFrom);
+    final picked = await showTimePicker(
+      context: ctx,
+      initialTime: initial,
+      helpText: 'Select active hours start',
+    );
+    if (picked != null) {
+      provider.updateActiveFrom(_formatTimeOfDay(picked));
+    }
+  }
+
+  Future<void> _pickActiveTo(
+      BuildContext ctx, AlertSettingsProvider provider) async {
+    final initial = _parseTimeString(provider.settings.activeTo);
+    final picked = await showTimePicker(
+      context: ctx,
+      initialTime: initial,
+      helpText: 'Select active hours end',
+    );
+    if (picked != null) {
+      provider.updateActiveTo(_formatTimeOfDay(picked));
+    }
+  }
+
   Future<void> _pickQuietFrom(
       BuildContext ctx, AlertSettingsProvider provider) async {
     final initial = _parseTimeString(provider.settings.quietFrom);
@@ -138,7 +164,7 @@ class _AlertSettingsScreenState extends State<AlertSettingsScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                ...[1.0, 2.0, 5.0].map((r) => RadioListTile<double>(
+                ...[2.0, 5.0, 10.0].map((r) => RadioListTile<double>(
                       title: Text('${r.toInt()} km'),
                       value: r,
                       groupValue: settings.radiusKm,
@@ -221,17 +247,25 @@ class _AlertSettingsScreenState extends State<AlertSettingsScreen> {
                   ],
                 ),
                 if (settings.activeHoursEnabled) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppTheme.backgroundGrey,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppTheme.cardBorder),
-                    ),
-                    child: Text(
-                      'From ${settings.activeFrom} to ${settings.activeTo}',
-                      style: const TextStyle(fontSize: 15),
+                    decoration: AppTheme.cardDecoration,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _TimePickerRow(
+                          label: 'From',
+                          timeStr: settings.activeFrom,
+                          onTap: () => _pickActiveFrom(context, provider),
+                        ),
+                        const SizedBox(height: 8),
+                        _TimePickerRow(
+                          label: 'To',
+                          timeStr: settings.activeTo,
+                          onTap: () => _pickActiveTo(context, provider),
+                        ),
+                      ],
                     ),
                   ),
                 ],

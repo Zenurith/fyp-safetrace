@@ -12,8 +12,21 @@ class AlertSettingsProvider extends ChangeNotifier {
 
   AlertSettingsModel get settings => _repository.getSettings();
 
-  void setUserId(String uid) {
+  Future<void> setUserId(String uid) async {
+    if (_userId == uid) return;
     _userId = uid;
+    await _loadFromFirestore();
+  }
+
+  Future<void> _loadFromFirestore() async {
+    if (_userId == null) return;
+    try {
+      final map = await _userRepository.getAlertSettings(_userId!);
+      if (map != null) {
+        _repository.saveSettings(AlertSettingsModel.fromMap(map));
+        notifyListeners();
+      }
+    } catch (_) {}
   }
 
   void updateRadius(double km) {
@@ -48,6 +61,18 @@ class AlertSettingsProvider extends ChangeNotifier {
 
   void toggleActiveHours(bool enabled) {
     _repository.saveSettings(settings.copyWith(activeHoursEnabled: enabled));
+    _syncToFirestore();
+    notifyListeners();
+  }
+
+  void updateActiveFrom(String time) {
+    _repository.saveSettings(settings.copyWith(activeFrom: time));
+    _syncToFirestore();
+    notifyListeners();
+  }
+
+  void updateActiveTo(String time) {
+    _repository.saveSettings(settings.copyWith(activeTo: time));
     _syncToFirestore();
     notifyListeners();
   }

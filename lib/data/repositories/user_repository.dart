@@ -49,11 +49,17 @@ class UserRepository {
     await _usersCollection.doc(uid).update({
       'lastLatitude': latitude,
       'lastLongitude': longitude,
+      'timezoneOffsetMinutes': DateTime.now().timeZoneOffset.inMinutes,
     });
   }
 
   Future<void> updateAlertSettings(String uid, Map<String, dynamic> settings) async {
     await _usersCollection.doc(uid).update({'alertSettings': settings});
+  }
+
+  Future<Map<String, dynamic>?> getAlertSettings(String uid) async {
+    final doc = await _usersCollection.doc(uid).get();
+    return doc.data()?['alertSettings'] as Map<String, dynamic>?;
   }
 
   Future<void> updatePoints(String uid, int delta) async {
@@ -147,9 +153,11 @@ class UserRepository {
   }
 
   Future<void> updateFcmToken(String uid, String? token) async {
-    await _usersCollection.doc(uid).update({
-      'fcmToken': token,
-    });
+    final data = <String, dynamic>{'fcmToken': token};
+    if (token != null) {
+      data['timezoneOffsetMinutes'] = DateTime.now().timeZoneOffset.inMinutes;
+    }
+    await _usersCollection.doc(uid).update(data);
   }
 
   Stream<List<UserModel>> watchAllUsers() {

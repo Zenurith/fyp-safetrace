@@ -21,6 +21,9 @@ class PushNotificationService {
   /// Receives the navigator context and the incidentId from the notification.
   void Function(BuildContext context, String incidentId)? _onIncidentTap;
 
+  /// Callback set by the presentation layer to handle community navigation.
+  void Function(BuildContext context, String communityId)? _onCommunityTap;
+
   /// Set the navigator key for context access from notification taps.
   void setNavigatorKey(GlobalKey<NavigatorState> key) {
     _navigatorKey = key;
@@ -29,6 +32,11 @@ class PushNotificationService {
   /// Set the callback that the presentation layer uses to navigate to an incident.
   void setOnIncidentTap(void Function(BuildContext context, String incidentId) callback) {
     _onIncidentTap = callback;
+  }
+
+  /// Set the callback that the presentation layer uses to navigate to a community.
+  void setOnCommunityTap(void Function(BuildContext context, String communityId) callback) {
+    _onCommunityTap = callback;
   }
 
   Future<void> initialize(String? userId) async {
@@ -67,6 +75,14 @@ class PushNotificationService {
 
     // Handle background/terminated messages
     FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpenedApp);
+
+    // Handle cold start: app launched by tapping a notification while terminated
+    final initialMessage = await _fcm.getInitialMessage();
+    if (initialMessage != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _routeMessage(initialMessage.data);
+      });
+    }
 
     _isInitialized = true;
   }
@@ -115,25 +131,50 @@ class PushNotificationService {
     final notification = message.notification;
     if (notification == null) return;
 
-    // Show local notification
+    // Encode type into payload so _onNotificationTap can route correctly
+    final type = message.data['type'];
+    String? payload;
+    if (type == 'community_post') {
+      final communityId = message.data['communityId'];
+      if (communityId != null) payload = 'community:$communityId';
+    } else {
+      final incidentId = message.data['incidentId'];
+      if (incidentId != null) payload = 'incident:$incidentId';
+    }
+
     _showLocalNotification(
       title: notification.title ?? 'SafeTrace',
       body: notification.body ?? '',
-      payload: message.data['incidentId'],
+      payload: payload,
     );
   }
 
   void _handleMessageOpenedApp(RemoteMessage message) {
-    final incidentId = message.data['incidentId'];
-    if (incidentId != null) {
-      _navigateToIncident(incidentId);
-    }
+    _routeMessage(message.data);
   }
 
   void _onNotificationTap(NotificationResponse response) {
-    final incidentId = response.payload;
-    if (incidentId != null) {
-      _navigateToIncident(incidentId);
+    final payload = response.payload;
+    if (payload == null) return;
+    if (payload.startsWith('community:')) {
+      _navigateToCommunity(payload.substring('community:'.length));
+    } else if (payload.startsWith('incident:')) {
+      _navigateToIncident(payload.substring('incident:'.length));
+    } else {
+      // Legacy: bare incidentId (no prefix)
+      _navigateToIncident(payload);
+    }
+  }
+
+  /// Route a notification data payload to the correct screen.
+  void _routeMessage(Map<String, dynamic> data) {
+    final type = data['type'];
+    if (type == 'community_post') {
+      final communityId = data['communityId'];
+      if (communityId != null) _navigateToCommunity(communityId);
+    } else {
+      final incidentId = data['incidentId'];
+      if (incidentId != null) _navigateToIncident(incidentId);
     }
   }
 
@@ -141,6 +182,12 @@ class PushNotificationService {
     final context = _navigatorKey?.currentContext;
     if (context == null) return;
     _onIncidentTap?.call(context, incidentId);
+  }
+
+  void _navigateToCommunity(String communityId) {
+    final context = _navigatorKey?.currentContext;
+    if (context == null) return;
+    _onCommunityTap?.call(context, communityId);
   }
 
   Future<void> _showLocalNotification({
