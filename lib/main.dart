@@ -19,6 +19,7 @@ import 'presentation/providers/flag_provider.dart';
 import 'presentation/providers/post_provider.dart';
 import 'presentation/screens/home_screen.dart';
 import 'presentation/screens/auth_screen.dart';
+import 'presentation/screens/community_detail_screen.dart';
 import 'presentation/widgets/incident_bottom_sheet.dart';
 import 'presentation/screens/admin_web/admin_web_shell.dart';
 import 'presentation/screens/admin_web/admin_auth_screen.dart';
@@ -172,6 +173,14 @@ class _UserLoaderState extends State<_UserLoader> {
             isScrollControlled: true,
             backgroundColor: Colors.transparent,
             builder: (_) => IncidentBottomSheet(incidentId: incidentId),
+          );
+        });
+        pushService.setOnCommunityTap((context, communityId) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => CommunityDetailScreen(communityId: communityId),
+            ),
           );
         });
         await pushService.initialize(widget.firebaseUser.uid);

@@ -23,8 +23,11 @@ async function sendToToken(token, title, body, data = {}) {
     await getMessaging().send({
       notification: { title, body },
       data,
-      android: { notification: { channelId: 'safetrace_incidents', priority: 'high' } },
-      apns: { payload: { aps: { sound: 'default' } } },
+      android: {
+        priority: 'high', // FCM delivery priority — wakes device from Doze
+        notification: { channelId: 'safetrace_incidents', priority: 'high' },
+      },
+      apns: { payload: { aps: { sound: 'default', contentAvailable: true } } },
       token,
     });
   } catch (e) {
@@ -40,8 +43,11 @@ async function sendToTokens(tokens, title, body, data = {}) {
     const response = await getMessaging().sendEachForMulticast({
       notification: { title, body },
       data,
-      android: { notification: { channelId: 'safetrace_incidents', priority: 'high' } },
-      apns: { payload: { aps: { sound: 'default' } } },
+      android: {
+        priority: 'high', // FCM delivery priority — wakes device from Doze
+        notification: { channelId: 'safetrace_incidents', priority: 'high' },
+      },
+      apns: { payload: { aps: { sound: 'default', contentAvailable: true } } },
       tokens,
     });
     console.log(`Sent ${response.successCount}/${tokens.length} notifications`);
@@ -65,19 +71,21 @@ exports.notifyNearbyUsers = onDocumentCreated(
     const usersSnapshot = await db.collection('users').get();
 
     const tokens = [];
+    let skippedNoToken = 0, skippedNoLocation = 0, skippedSeverity = 0,
+        skippedCategory = 0, skippedActiveHours = 0, skippedRadius = 0;
 
     for (const userDoc of usersSnapshot.docs) {
       const user = userDoc.data();
-      if (!user.fcmToken) continue;
-      if (user.lastLatitude == null || user.lastLongitude == null) continue;
+      if (!user.fcmToken) { skippedNoToken++; continue; }
+      if (user.lastLatitude == null || user.lastLongitude == null) { skippedNoLocation++; continue; }
 
       const alertSettings = user.alertSettings || {};
       const radiusKm = alertSettings.radiusKm ?? DEFAULT_RADIUS_KM;
       const severityFilters = alertSettings.severityFilters ?? DEFAULT_SEVERITY_FILTERS;
       const categoryFilters = alertSettings.categoryFilters ?? DEFAULT_CATEGORY_FILTERS;
 
-      if (!severityFilters.includes(severity)) continue;
-      if (!categoryFilters.includes(category)) continue;
+      if (!severityFilters.includes(severity)) { skippedSeverity++; continue; }
+      if (!categoryFilters.includes(category)) { skippedCategory++; continue; }
 
       // Active hours check (convert UTC to user's local time using stored offset)
       if (alertSettings.activeHoursEnabled) {
@@ -86,17 +94,19 @@ exports.notifyNearbyUsers = onDocumentCreated(
         const localMinutes = Math.floor((nowUtcMs / 60000 + tzOffsetMinutes) % (24 * 60));
         const fromMinutes = parseTime(alertSettings.activeFrom ?? '07:00 AM');
         const toMinutes = parseTime(alertSettings.activeTo ?? '11:00 PM');
-        if (localMinutes < fromMinutes || localMinutes > toMinutes) continue;
+        if (localMinutes < fromMinutes || localMinutes > toMinutes) { skippedActiveHours++; continue; }
       }
 
       const distance = calcDistanceKm(
         user.lastLatitude, user.lastLongitude,
         latitude, longitude,
       );
-      if (distance > radiusKm) continue;
+      if (distance > radiusKm) { skippedRadius++; continue; }
 
       tokens.push(user.fcmToken);
     }
+
+    console.log(`notifyNearbyUsers: incident=${incidentId} severity=${severity} category=${category} users=${usersSnapshot.size} eligible=${tokens.length} skipped=[noToken=${skippedNoToken} noLocation=${skippedNoLocation} severity=${skippedSeverity} category=${skippedCategory} activeHours=${skippedActiveHours} radius=${skippedRadius}]`);
 
     if (tokens.length === 0) return;
 

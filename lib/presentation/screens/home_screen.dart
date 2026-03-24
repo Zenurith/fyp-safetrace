@@ -44,13 +44,21 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // Start listening to incidents when home screen loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<IncidentProvider>().startListening();
       _loadUserVotesIfNeeded();
       _initNotifications();
       _wireUpAlertSettings();
+      context.read<IncidentProvider>().addListener(_onIncidentProviderChanged);
     });
+  }
+
+  void _onIncidentProviderChanged() {
+    final provider = context.read<IncidentProvider>();
+    if (provider.mapTabRequested) {
+      provider.acknowledgeMapTabRequest();
+      if (mounted) setState(() => _currentIndex = 0);
+    }
   }
 
   void _initNotifications() {
@@ -69,10 +77,10 @@ class _HomeScreenState extends State<HomeScreen> {
     _updateUserLocation();
   }
 
-  void _wireUpAlertSettings() {
+  Future<void> _wireUpAlertSettings() async {
     final userId = context.read<UserProvider>().currentUser?.id;
     if (userId != null) {
-      context.read<AlertSettingsProvider>().setUserId(userId);
+      await context.read<AlertSettingsProvider>().setUserId(userId);
     }
   }
 
@@ -201,6 +209,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    context.read<IncidentProvider>().removeListener(_onIncidentProviderChanged);
     _notificationSubscription?.cancel();
     _notificationService.dispose();
     super.dispose();
