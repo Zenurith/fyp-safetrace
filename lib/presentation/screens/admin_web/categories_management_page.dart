@@ -301,18 +301,19 @@ class _CategoryCard extends StatelessWidget {
             },
           ),
 
-          // Actions (only for non-default)
-          if (!category.isDefault) ...[
-            const SizedBox(width: 8),
-            IconButton(
-              onPressed: () => _showEditDialog(context),
-              icon: Icon(
-                Icons.edit_outlined,
-                size: 20,
-                color: AppTheme.textSecondary,
-              ),
-              tooltip: 'Edit',
+          // Edit (all categories)
+          const SizedBox(width: 8),
+          IconButton(
+            onPressed: () => _showEditDialog(context),
+            icon: Icon(
+              Icons.edit_outlined,
+              size: 20,
+              color: AppTheme.textSecondary,
             ),
+            tooltip: 'Edit',
+          ),
+          // Delete (custom categories only)
+          if (!category.isDefault)
             IconButton(
               onPressed: () => _showDeleteDialog(context),
               icon: const Icon(
@@ -322,7 +323,6 @@ class _CategoryCard extends StatelessWidget {
               ),
               tooltip: 'Delete',
             ),
-          ],
         ],
       ),
     );

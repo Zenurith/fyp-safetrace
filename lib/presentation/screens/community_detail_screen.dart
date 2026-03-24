@@ -3,12 +3,15 @@ import 'package:provider/provider.dart';
 import '../../data/models/community_member_model.dart';
 import '../../data/models/community_model.dart';
 import '../../data/models/incident_model.dart';
+import '../../data/models/user_model.dart';
 import '../../utils/app_theme.dart';
 import '../providers/community_provider.dart';
 import '../providers/incident_provider.dart';
 import '../providers/user_provider.dart';
 import '../widgets/incident_bottom_sheet.dart';
-import 'community_admin_screen.dart';
+import '../widgets/user_avatar.dart';
+import 'community_manager_screen.dart';
+import 'create_community_screen.dart';
 
 class CommunityDetailScreen extends StatefulWidget {
   final String communityId;
@@ -19,25 +22,37 @@ class CommunityDetailScreen extends StatefulWidget {
   State<CommunityDetailScreen> createState() => _CommunityDetailScreenState();
 }
 
-class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
+class _CommunityDetailScreenState extends State<CommunityDetailScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   bool _isLoading = true;
-  bool _isAdmin = false;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this);
     _loadCommunity();
   }
 
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadCommunity() async {
-    if (mounted) setState(() { _isLoading = true; _isAdmin = false; });
+    if (mounted) setState(() => _isLoading = true);
 
     final userId = context.read<UserProvider>().currentUser?.id;
     if (userId == null) return;
 
     final provider = context.read<CommunityProvider>();
     await provider.loadCommunityDetails(widget.communityId, userId);
-    _isAdmin = await provider.isAdmin(widget.communityId, userId);
+    final m = provider.currentMembership;
+
+    if (m?.isStaff == true && m?.isApproved == true) {
+      await provider.loadPendingRequests(widget.communityId);
+    }
 
     if (mounted) {
       setState(() => _isLoading = false);
@@ -54,10 +69,13 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
 
     if (mounted) {
       if (success) await _loadCommunity();
+      final isPending = provider.currentMembership?.isPending ?? false;
       messenger.showSnackBar(
         SnackBar(
           content: Text(success
-              ? 'You have joined the community!'
+              ? (isPending
+                  ? 'Join request sent! Waiting for admin approval.'
+                  : 'You have joined the community!')
               : provider.error ?? 'Failed to join'),
           backgroundColor: success ? AppTheme.successGreen : AppTheme.primaryRed,
         ),
@@ -113,6 +131,57 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
     }
   }
 
+  Future<void> _deleteCommunity() async {
+    final community = context.read<CommunityProvider>().selectedCommunity;
+    if (community == null) return;
+
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Community'),
+        content: Text(
+            'Are you sure you want to permanently delete "${community.name}"? This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete',
+                style: TextStyle(color: AppTheme.primaryRed)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final success = await context
+        .read<CommunityProvider>()
+        .deleteCommunity(widget.communityId);
+
+    if (mounted) {
+      if (success) {
+        navigator.pop();
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Community deleted')),
+        );
+      } else {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(context.read<CommunityProvider>().error ??
+                'Failed to delete community'),
+            backgroundColor: AppTheme.primaryRed,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<CommunityProvider>();
@@ -134,55 +203,365 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
     }
 
     final isApprovedMember = membership != null && membership.isApproved;
+    final isStaff =
+        membership?.isStaff == true && membership?.isApproved == true;
+    final canEdit = membership?.isApproved == true &&
+        (membership?.isOwner == true || membership?.isHeadModerator == true);
+    final canDelete =
+        membership?.isOwner == true && membership?.isApproved == true;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(community.name),
-        actions: [
-          if (_isAdmin)
-            IconButton(
-              icon: const Icon(Icons.admin_panel_settings),
-              tooltip: 'Admin Panel',
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      CommunityAdminScreen(communityId: widget.communityId),
-                ),
-              ),
-            ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _CommunityHeader(community: community),
-
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: _MembershipSection(
-                membership: membership,
-                isAdmin: _isAdmin,
-                onRequestJoin: _requestToJoin,
-                onLeave: _leaveCommunity,
-              ),
-            ),
-
-            _InfoSection(community: community),
-
-            if (isApprovedMember) ...[
-              const SizedBox(height: 8),
-              _CommunitySharedIncidentsSection(communityId: widget.communityId),
-              const SizedBox(height: 8),
-              _CommunityIncidentsSection(community: community),
-            ],
-
-            const SizedBox(height: 32),
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white60,
+          indicatorColor: AppTheme.primaryRed,
+          tabs: const [
+            Tab(text: 'About'),
+            Tab(text: 'Posts'),
+            Tab(text: 'Members'),
           ],
         ),
+        actions: [
+          if (isStaff) ...[
+            if (canEdit)
+              IconButton(
+                icon: const Icon(Icons.edit_outlined),
+                tooltip: 'Edit Community',
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        CreateCommunityScreen(communityToEdit: community),
+                  ),
+                ).then((_) => _loadCommunity()),
+              ),
+            Stack(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.admin_panel_settings),
+                  tooltip: 'Manage Community',
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          CommunityManagerScreen(communityId: widget.communityId),
+                    ),
+                  ).then((_) => _loadCommunity()),
+                ),
+                if (provider.pendingRequests.isNotEmpty)
+                  Positioned(
+                    right: 6,
+                    top: 6,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: const BoxDecoration(
+                        color: AppTheme.primaryRed,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints:
+                          const BoxConstraints(minWidth: 16, minHeight: 16),
+                      child: Text(
+                        '${provider.pendingRequests.length}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            if (canDelete)
+              PopupMenuButton<String>(
+                onSelected: (value) {
+                  if (value == 'delete') _deleteCommunity();
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete_outline,
+                            size: 18, color: AppTheme.primaryRed),
+                        SizedBox(width: 8),
+                        Text('Delete Community',
+                            style: TextStyle(color: AppTheme.primaryRed)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ],
       ),
-      floatingActionButton: null,
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          // ── About tab ──────────────────────────────────────────────────
+          SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _CommunityHeader(community: community),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: _MembershipSection(
+                    membership: membership,
+                    onRequestJoin: _requestToJoin,
+                    onLeave: _leaveCommunity,
+                  ),
+                ),
+                _InfoSection(community: community),
+                const SizedBox(height: 32),
+              ],
+            ),
+          ),
+
+          // ── Posts tab (incidents shared to this community) ─────────────
+          isApprovedMember
+              ? _SharedPostsTab(communityId: widget.communityId, isStaff: isStaff)
+              : const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Text(
+                      'Join this community to see posts',
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+
+          // ── Members tab ────────────────────────────────────────────────
+          isApprovedMember
+              ? _MembersListTab(
+                  communityId: widget.communityId,
+                  isStaff: isStaff,
+                )
+              : const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Text(
+                      'Join this community to see members',
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Posts Tab (incidents shared to this community) ────────────────────────────
+
+class _SharedPostsTab extends StatelessWidget {
+  final String communityId;
+  final bool isStaff;
+
+  const _SharedPostsTab({required this.communityId, required this.isStaff});
+
+  @override
+  Widget build(BuildContext context) {
+    final shared = context
+        .watch<IncidentProvider>()
+        .allIncidents
+        .where((i) => i.communityIds.contains(communityId))
+        .toList();
+
+    if (shared.isEmpty) {
+      return Center(
+        child: _EmptyState(
+          icon: Icons.share_outlined,
+          message:
+              'No incidents shared here yet.\nReport an incident and share it to this community.',
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: shared.length,
+      itemBuilder: (_, i) => _IncidentCard(
+        incident: shared[i],
+        communityId: communityId,
+        isStaff: isStaff,
+      ),
+    );
+  }
+}
+
+// ── Members Tab ───────────────────────────────────────────────────────────────
+
+class _MembersListTab extends StatefulWidget {
+  final String communityId;
+  final bool isStaff;
+
+  const _MembersListTab({
+    required this.communityId,
+    required this.isStaff,
+  });
+
+  @override
+  State<_MembersListTab> createState() => _MembersListTabState();
+}
+
+class _MembersListTabState extends State<_MembersListTab> {
+  List<CommunityMemberModel> _members = [];
+  final Map<String, UserModel?> _users = {};
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final provider = context.read<CommunityProvider>();
+    final members = await provider.getCommunityMembers(widget.communityId);
+    if (!mounted) return;
+
+    // Sort: owner → headMod → moderator → member
+    members.sort((a, b) => a.role.index.compareTo(b.role.index));
+
+    setState(() {
+      _members = members;
+      _isLoading = false;
+    });
+
+    if (members.isNotEmpty) {
+      final ids = members.map((m) => m.userId).toList();
+      context.read<UserProvider>().getUsersByIds(ids).then((fetched) {
+        if (mounted) setState(() => _users.addAll(fetched));
+      });
+    }
+  }
+
+  Color _roleColor(MemberRole role) {
+    switch (role) {
+      case MemberRole.owner:
+        return AppTheme.primaryRed;
+      case MemberRole.headModerator:
+        return AppTheme.warningOrange;
+      case MemberRole.moderator:
+        return AppTheme.successGreen;
+      case MemberRole.member:
+        return AppTheme.textSecondary;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_members.isEmpty) {
+      return Center(
+        child: _EmptyState(
+          icon: Icons.people_outline,
+          message: 'No members found',
+        ),
+      );
+    }
+
+    final currentUserId =
+        context.read<UserProvider>().currentUser?.id ?? '';
+
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      itemCount: _members.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, i) {
+        final member = _members[i];
+        final user = _users[member.userId];
+        final isSelf = member.userId == currentUserId;
+        final roleColor = _roleColor(member.role);
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: AppTheme.cardDecoration,
+          child: Row(
+            children: [
+              UserAvatar(
+                photoUrl: user?.profilePhotoUrl,
+                initials: user?.initials ?? '?',
+                radius: 20,
+                backgroundColor:
+                    member.isStaff ? AppTheme.primaryRed : AppTheme.primaryDark,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            user?.name ?? '...',
+                            style: AppTheme.bodyMedium,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (isSelf) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryRed.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'You',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: AppTheme.primaryRed,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      member.roleLabel,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: roleColor,
+                        fontWeight: member.isStaff
+                            ? FontWeight.w600
+                            : FontWeight.normal,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (member.isStaff)
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: roleColor.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    member.isOwner
+                        ? Icons.star_rounded
+                        : Icons.shield_outlined,
+                    size: 16,
+                    color: roleColor,
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -338,7 +717,7 @@ class _InfoSection extends StatelessWidget {
           _DetailRow(
             icon: Icons.calendar_today,
             label: 'Created',
-            value: community.timeAgo,
+            value: community.createdFormatted,
           ),
           const SizedBox(height: 16),
         ],
@@ -348,94 +727,114 @@ class _InfoSection extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Community shared incidents section
+// Incident card
 // ---------------------------------------------------------------------------
 
-class _CommunitySharedIncidentsSection extends StatelessWidget {
-  final String communityId;
+class _IncidentCard extends StatefulWidget {
+  final IncidentModel incident;
+  final String? communityId;
+  final bool isStaff;
 
-  const _CommunitySharedIncidentsSection({required this.communityId});
+  const _IncidentCard({
+    required this.incident,
+    this.communityId,
+    this.isStaff = false,
+  });
 
   @override
-  Widget build(BuildContext context) {
-    final allIncidents = context.watch<IncidentProvider>().allIncidents;
-    final shared = allIncidents
-        .where((i) => i.communityIds.contains(communityId))
-        .toList();
+  State<_IncidentCard> createState() => _IncidentCardState();
+}
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _SectionHeader(title: 'Posts', count: shared.length),
-          const SizedBox(height: 12),
-          if (shared.isEmpty)
-            _EmptyState(
-              icon: Icons.forum_outlined,
-              message: 'No posts yet. Report an incident and share it here!',
-            )
-          else
-            ...shared.map((i) => _IncidentCard(incident: i)),
+class _IncidentCardState extends State<_IncidentCard> {
+  Future<void> _deleteIncident() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Incident'),
+        content: Text(
+            'Permanently delete "${widget.incident.title}"? This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete',
+                style: TextStyle(color: AppTheme.primaryRed)),
+          ),
         ],
       ),
     );
+    if (confirmed != true || !mounted) return;
+
+    await context.read<IncidentProvider>().deleteIncident(widget.incident.id);
   }
-}
-
-// ---------------------------------------------------------------------------
-// Incidents section
-// ---------------------------------------------------------------------------
-
-class _CommunityIncidentsSection extends StatelessWidget {
-  final CommunityModel community;
-
-  const _CommunityIncidentsSection({required this.community});
 
   @override
   Widget build(BuildContext context) {
-    final allIncidents = context.watch<IncidentProvider>().allIncidents;
-    final nearby = allIncidents
-        .where((i) => community.isLocationWithinRadius(i.latitude, i.longitude))
-        .toList();
+    final incident = widget.incident;
+    final isHigh = incident.severity == SeverityLevel.high;
+    final color = isHigh ? AppTheme.primaryRed : AppTheme.warningOrange;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final cardContent = Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: AppTheme.cardDecoration,
+      child: Row(
         children: [
-          _SectionHeader(title: 'Nearby Incidents', count: nearby.length),
-          const SizedBox(height: 12),
-          if (nearby.isEmpty)
-            _EmptyState(
-              icon: Icons.shield_outlined,
-              message: 'No incidents reported in this area',
-            )
-          else
-            ...nearby.take(5).map((i) => _IncidentCard(incident: i)),
-          if (nearby.length > 5)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                '+ ${nearby.length - 5} more incidents in this area',
-                style: AppTheme.caption,
-              ),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(Icons.warning_amber_rounded, size: 20, color: color),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  incident.title,
+                  style: AppTheme.headingSmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${incident.categoryLabel}  •  ${incident.severityLabel}  •  ${incident.timeAgo}',
+                  style: AppTheme.caption,
+                ),
+              ],
+            ),
+          ),
+          if (widget.isStaff)
+            PopupMenuButton<String>(
+              onSelected: (action) {
+                if (action == 'delete') _deleteIncident();
+              },
+              icon: Icon(Icons.more_vert, size: 18, color: AppTheme.textSecondary),
+              itemBuilder: (_) => [
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete_outline,
+                          size: 16, color: AppTheme.primaryRed),
+                      SizedBox(width: 8),
+                      Text('Delete incident',
+                          style: TextStyle(color: AppTheme.primaryRed)),
+                    ],
+                  ),
+                ),
+              ],
             ),
         ],
       ),
     );
-  }
-}
-
-class _IncidentCard extends StatelessWidget {
-  final IncidentModel incident;
-
-  const _IncidentCard({required this.incident});
-
-  @override
-  Widget build(BuildContext context) {
-    final isHigh = incident.severity == SeverityLevel.high;
-    final color = isHigh ? AppTheme.primaryRed : AppTheme.warningOrange;
 
     return GestureDetector(
       onTap: () => showModalBottomSheet(
@@ -444,43 +843,7 @@ class _IncidentCard extends StatelessWidget {
         backgroundColor: Colors.transparent,
         builder: (_) => IncidentBottomSheet(incidentId: incident.id),
       ),
-      child: Container(
-        width: double.infinity,
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(12),
-        decoration: AppTheme.cardDecoration,
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(Icons.warning_amber_rounded, size: 20, color: color),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    incident.title,
-                    style: AppTheme.headingSmall,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${incident.categoryLabel}  •  ${incident.severityLabel}  •  ${incident.timeAgo}',
-                    style: AppTheme.caption,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+      child: cardContent,
     );
   }
 }
@@ -489,23 +852,6 @@ class _IncidentCard extends StatelessWidget {
 // Shared small widgets
 // ---------------------------------------------------------------------------
 
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  final int count;
-
-  const _SectionHeader({required this.title, required this.count});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Text(title, style: AppTheme.headingSmall),
-        const SizedBox(width: 8),
-        Text('($count)', style: AppTheme.caption),
-      ],
-    );
-  }
-}
 
 class _EmptyState extends StatelessWidget {
   final IconData icon;
@@ -526,7 +872,7 @@ class _EmptyState extends StatelessWidget {
         children: [
           Icon(icon, size: 40, color: AppTheme.textSecondary),
           const SizedBox(height: 8),
-          Text(message, style: AppTheme.caption),
+          Text(message, style: AppTheme.caption, textAlign: TextAlign.center),
         ],
       ),
     );
@@ -562,13 +908,11 @@ class _StatBadge extends StatelessWidget {
 
 class _MembershipSection extends StatelessWidget {
   final CommunityMemberModel? membership;
-  final bool isAdmin;
   final VoidCallback onRequestJoin;
   final VoidCallback onLeave;
 
   const _MembershipSection({
     required this.membership,
-    required this.isAdmin,
     required this.onRequestJoin,
     required this.onLeave,
   });
@@ -627,6 +971,34 @@ class _MembershipSection extends StatelessWidget {
       );
     }
 
+    if (membership!.isBanned) {
+      final until = membership!.bannedUntil;
+      final subtitle = until != null
+          ? 'Banned until ${until.day}/${until.month}/${until.year}'
+          : 'You are permanently banned from this community';
+      return _statusCard(
+        color: AppTheme.primaryRed,
+        child: Row(
+          children: [
+            const Icon(Icons.block, color: AppTheme.primaryRed),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Banned',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primaryRed)),
+                  Text(subtitle, style: const TextStyle(fontSize: 12)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     if (membership!.isRejected) {
       return _statusCard(
         color: AppTheme.primaryRed,
@@ -662,7 +1034,9 @@ class _MembershipSection extends StatelessWidget {
       child: Row(
         children: [
           Icon(
-            isAdmin ? Icons.admin_panel_settings : Icons.verified_user,
+            membership!.isStaff
+                ? Icons.admin_panel_settings
+                : Icons.verified_user,
             color: AppTheme.successGreen,
           ),
           const SizedBox(width: 12),
@@ -671,7 +1045,7 @@ class _MembershipSection extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isAdmin ? 'Admin' : 'Member',
+                  membership!.roleLabel,
                   style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       color: AppTheme.successGreen),
@@ -723,7 +1097,9 @@ class _DetailRow extends StatelessWidget {
         children: [
           Icon(icon, size: 20, color: AppTheme.textSecondary),
           const SizedBox(width: 12),
-          Text(label, style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary)),
+          Text(label,
+              style:
+                  AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary)),
           const Spacer(),
           Text(value, style: AppTheme.bodyMedium),
         ],

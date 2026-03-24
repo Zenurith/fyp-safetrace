@@ -117,7 +117,7 @@ lib/
 ## Key Patterns
 
 - Models use `toMap()`/`fromMap()` for Firestore serialization
-- Enums stored as indices in Firestore
+- Most enums stored as indices in Firestore; `MemberRole` stored as string `.name` for forward compatibility
 - Real-time updates via Firestore `snapshots()` streams
 - Auth gate in `main.dart` handles Firebase Auth state
 - Admin features conditionally rendered based on `UserModel.isAdmin`
@@ -156,12 +156,45 @@ lib/
 ## Known Bugs & Issues
 
 ### Communities Feature
-Communities are **location-based groups** (center point + radius). Membership eligibility uses the **Haversine formula**. Members can create posts/discussions within the community. Joining is currently **auto-approved** (no admin approval) for testing.
+Communities are **location-based groups** (center point + radius). Membership eligibility uses the **Haversine formula**. Members can create posts/discussions within the community. Joining respects the `requiresApproval` flag — public communities default to auto-approve; private communities force `requiresApproval = true`, putting new members in `pending` status until staff (owner/headMod/mod) approves via the community admin screen.
+
+#### Community Role Hierarchy
+```
+owner > headModerator > moderator > member
+```
+
+| Role | Label | Stored as |
+|------|-------|-----------|
+| `MemberRole.owner` | Owner | `"owner"` |
+| `MemberRole.headModerator` | Head Mod | `"headModerator"` |
+| `MemberRole.moderator` | Moderator | `"moderator"` |
+| `MemberRole.member` | Member | `"member"` |
+
+Roles are stored as **string names** in Firestore (migrated from legacy int indices — backward-compat via `_parseRole()`).
+
+#### Permission Matrix
+| Action | Owner | Head Mod | Moderator | Member |
+|--------|:-----:|:--------:|:---------:|:------:|
+| Approve/reject join requests | ✓ | ✓ | ✓ | |
+| Edit community settings | ✓ | ✓ | | |
+| Delete community | ✓ | | | |
+| Promote member → moderator | ✓ | ✓ | | |
+| Promote moderator → head mod | ✓ | | | |
+| Demote head mod → moderator | ✓ | | | |
+| Demote moderator → member | ✓ | ✓ | | |
+| Remove member | ✓ | ✓ | ✓ | |
+| Remove moderator | ✓ | ✓ | | |
+| Remove head mod | ✓ | | | |
+| Transfer ownership | ✓ | | | |
+
+`isStaff` = true for owner, headModerator, moderator (all roles except member).
+
+**Admin management is web-only.** The mobile admin screen has been removed. Access the admin panel via `flutter run -d chrome`.
 
 ### Security Issues (Open)
 - `lib/config/secrets.dart` — API keys committed to repo (geminiApiKey, googleMapsApiKey). Rotate keys and move to environment variables or Firebase Remote Config.
 
-> **Note**: `admin_screen.dart` has no guard inside the screen itself, but access is controlled via `if (user.isAdmin)` in `profile_screen.dart` line 454. `admin_web_shell.dart` and `admin_auth_screen.dart` both **verified** to check `user.isAdmin` — secure.
+> **Note**: Web admin shell access control: `admin_web_shell.dart` and `admin_auth_screen.dart` both **verified** to check `user.isAdmin` — secure. Mobile admin screen removed; system admin is web-only.
 
 ### Design Violations (Open — fix opportunistically)
 - `community_detail_screen.dart`: Hardcoded colors in membership state UI → use AppTheme constants
@@ -169,8 +202,6 @@ Communities are **location-based groups** (center point + radius). Membership el
 - `admin_dashboard_page.dart`: Uses `Colors.teal` and `Colors.amber` in avatar UI
 
 ### Logic Bugs (Open)
-- `community_detail_screen.dart`: `_isAdmin` local state not cleared on pop — stale state on re-entry. Reset `_isAdmin = false` at start of `_loadCommunity()` before async check.
-- Enum serialization: All models store enums as `.index` (integer). If enum order ever changes, Firestore data will deserialize to wrong values. Migrate to `.name` (string) for forward compatibility.
 
 ### Performance Issues (Open)
 - `community_repository.dart`: `getNearbyCommunities()` is O(n) client-side — fetches all communities then filters. Will degrade at scale; consider GeoFlutterFire or geohashing.
@@ -234,8 +265,32 @@ Communities are **location-based groups** (center point + radius). Membership el
 - Use `AppTheme.textSecondary` for grey text, not `Colors.grey`
 
 ### State Management
-- Community joining is currently **auto-approved** (no admin approval needed) for testing
+- Community joining respects `requiresApproval` — private communities require staff approval; public communities auto-approve by default
 - Call `setState()` or reload data after async operations that change UI state
+- **Never call `context.read()` inside `dispose()`** — Flutter invalidates the BuildContext during widget teardown, so the provider lookup silently fails. Cache the provider reference in `initState()` instead:
+  ```dart
+  // WRONG — context may be invalid in dispose()
+  @override
+  void dispose() {
+    context.read<MyProvider>().doSomething(); // silently fails
+    super.dispose();
+  }
+
+  // CORRECT — cache in initState while context is valid
+  late final MyProvider _myProvider;
+
+  @override
+  void initState() {
+    super.initState();
+    _myProvider = context.read<MyProvider>();
+  }
+
+  @override
+  void dispose() {
+    _myProvider.doSomething(); // reliable
+    super.dispose();
+  }
+  ```
 
 ## AppTheme Quick Reference
 

@@ -91,6 +91,8 @@ class IncidentProvider extends ChangeNotifier {
   /// Start listening to recent incidents (last 7 days) - for map/main feed
   void startListening() {
     _incidentsSubscription?.cancel();
+    _incidents = [];
+    notifyListeners();
     _incidentsSubscription = _repository.watchAll().listen(
       (incidents) {
         _incidents = incidents;
@@ -245,17 +247,17 @@ class IncidentProvider extends ChangeNotifier {
     String? verificationNote,
     List<String> communityIds = const [],
     DateTime? incidentTime,
+    String? customCategoryName,
   }) async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      // Determine initial status based on AI verification result
+      // Determine initial status based on AI verification result.
+      // Image verification alone cannot set verified — that requires 2+ community upvotes.
       IncidentStatus initialStatus;
-      if (imageVerified == true && verificationScore != null && verificationScore >= 0.7) {
-        initialStatus = IncidentStatus.verified;    // High confidence pass
-      } else if (imageVerified == true) {
-        initialStatus = IncidentStatus.underReview; // Low confidence pass — skip pending
+      if (imageVerified == true) {
+        initialStatus = IncidentStatus.underReview; // Image passed → awaiting community votes
       } else {
         initialStatus = IncidentStatus.pending;     // Failed or unavailable
       }
@@ -279,6 +281,7 @@ class IncidentProvider extends ChangeNotifier {
         verificationNote: verificationNote,
         communityIds: communityIds,
         incidentTime: incidentTime,
+        customCategoryName: customCategoryName,
       );
       final id = await _repository.add(incident);
 
@@ -326,6 +329,18 @@ class IncidentProvider extends ChangeNotifier {
     } catch (e) {
       _error = e.toString();
       notifyListeners();
+    }
+  }
+
+  /// Remove an incident from a community (community staff action).
+  Future<bool> removeFromCommunity(String incidentId, String communityId) async {
+    try {
+      await _repository.removeFromCommunity(incidentId, communityId);
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
     }
   }
 

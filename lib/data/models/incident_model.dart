@@ -8,6 +8,7 @@ enum IncidentCategory {
   traffic,
   environmental,
   emergency,
+  other, // Admin-created custom categories
 }
 
 enum SeverityLevel { low, moderate, high }
@@ -52,6 +53,9 @@ class IncidentModel {
   // When the incident actually happened (separate from when it was reported)
   final DateTime? incidentTime;
 
+  // Human-readable name for admin-created custom categories (when category == other)
+  final String? customCategoryName;
+
   IncidentModel({
     required this.id,
     required this.title,
@@ -77,6 +81,7 @@ class IncidentModel {
     this.verificationNote,
     this.communityIds = const [],
     this.incidentTime,
+    this.customCategoryName,
   });
 
   int get voteScore => upvotes - downvotes;
@@ -95,6 +100,8 @@ class IncidentModel {
         return 'Environmental';
       case IncidentCategory.emergency:
         return 'Emergency';
+      case IncidentCategory.other:
+        return customCategoryName ?? 'Other';
     }
   }
 
@@ -176,6 +183,8 @@ class IncidentModel {
       'communityIds': communityIds,
       if (incidentTime != null)
         'incidentTime': Timestamp.fromDate(incidentTime!),
+      if (customCategoryName != null)
+        'customCategoryName': customCategoryName,
     };
   }
 
@@ -214,6 +223,7 @@ class IncidentModel {
       incidentTime: map['incidentTime'] is Timestamp
           ? (map['incidentTime'] as Timestamp).toDate()
           : null,
+      customCategoryName: map['customCategoryName'],
     );
   }
 
@@ -242,6 +252,7 @@ class IncidentModel {
     String? verificationNote,
     List<String>? communityIds,
     DateTime? incidentTime,
+    String? customCategoryName,
   }) {
     return IncidentModel(
       id: id ?? this.id,
@@ -268,6 +279,7 @@ class IncidentModel {
       verificationNote: verificationNote ?? this.verificationNote,
       communityIds: communityIds ?? this.communityIds,
       incidentTime: incidentTime ?? this.incidentTime,
+      customCategoryName: customCategoryName ?? this.customCategoryName,
     );
   }
 }

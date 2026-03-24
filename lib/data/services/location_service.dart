@@ -53,6 +53,26 @@ class LocationService {
     );
   }
 
+  /// Returns a short display name like "Setapak, Selangor"
+  Future<String> getShortLocationName(double latitude, double longitude) async {
+    try {
+      final placemarks = await placemarkFromCoordinates(latitude, longitude);
+      if (placemarks.isNotEmpty) {
+        final p = placemarks.first;
+        final parts = <String>[
+          if (p.subLocality != null && p.subLocality!.isNotEmpty) p.subLocality!,
+          if (p.administrativeArea != null && p.administrativeArea!.isNotEmpty) p.administrativeArea!,
+        ];
+        if (parts.isNotEmpty) return parts.join(', ');
+        // fallback to locality
+        if (p.locality != null && p.locality!.isNotEmpty) return p.locality!;
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('Error getting short location name: $e');
+    }
+    return 'Unknown location';
+  }
+
   Future<String> getAddressFromCoordinates(
       double latitude, double longitude) async {
     try {

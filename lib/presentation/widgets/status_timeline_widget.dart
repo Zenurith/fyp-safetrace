@@ -65,14 +65,7 @@ class StatusTimelineWidget extends StatelessWidget {
 
     // Add current status if no history exists
     if (incident.statusHistory.isEmpty) {
-      // Add initial "reported" entry
-      entries.add(StatusHistoryEntry(
-        status: IncidentStatus.pending,
-        timestamp: incident.reportedAt,
-        note: 'Incident reported',
-      ));
-
-      // Add current status if different from pending
+      // Add current status first (newest) if different from pending
       if (incident.status != IncidentStatus.pending) {
         entries.add(StatusHistoryEntry(
           status: incident.status,
@@ -80,6 +73,13 @@ class StatusTimelineWidget extends StatelessWidget {
           note: incident.statusNote,
         ));
       }
+
+      // Add initial "reported" entry last (oldest)
+      entries.add(StatusHistoryEntry(
+        status: IncidentStatus.pending,
+        timestamp: incident.reportedAt,
+        note: 'Incident reported',
+      ));
     } else {
       // Use actual history, sorted by timestamp descending (most recent first)
       entries.addAll(incident.statusHistory.toList()

@@ -13,6 +13,9 @@ class VoteRepository {
   CollectionReference<Map<String, dynamic>> get _incidentsCollection =>
       _firestore.collection('incidents');
 
+  CollectionReference<Map<String, dynamic>> get _postsCollection =>
+      _firestore.collection('posts');
+
   CollectionReference<Map<String, dynamic>> get _usersCollection =>
       _firestore.collection('users');
 
@@ -64,13 +67,10 @@ class VoteRepository {
     return null;
   }
 
-  /// Determines vote weight based on user trust status.
-  /// Trusted users (500+ points) get 2x vote weight.
-  int _getVoteWeight(Map<String, dynamic>? voterData) {
-    if (voterData == null) return 1;
-    final isTrusted = voterData['isTrusted'] ?? false;
-    return isTrusted ? 2 : 1;
-  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // Incident Votes
+  // ══════════════════════════════════════════════════════════════════════════
 
   /// Casts a vote on an incident using a Firestore transaction.
   /// Returns the created vote, or null if the user is trying to vote on their own report.
@@ -110,7 +110,8 @@ class VoteRepository {
 
       final vote = VoteModel(
         id: voteDocId,
-        incidentId: incidentId,
+        targetId: incidentId,
+        targetType: VoteTargetType.incident,
         voterId: voterId,
         type: type,
         votedAt: DateTime.now(),
@@ -125,10 +126,8 @@ class VoteRepository {
       final currentDownvotes = incidentData['downvotes'] ?? 0;
       final currentStatus = IncidentStatus.values[incidentData['status'] ?? 0];
 
-      // Trusted users get 2x vote weight
-      final weight = _getVoteWeight(voterDoc.exists ? voterDoc.data() : null);
-      final newUpvotes = type == VoteType.upvote ? currentUpvotes + weight : currentUpvotes;
-      final newDownvotes = type == VoteType.downvote ? currentDownvotes + weight : currentDownvotes;
+      final newUpvotes = type == VoteType.upvote ? currentUpvotes + 1 : currentUpvotes;
+      final newDownvotes = type == VoteType.downvote ? currentDownvotes + 1 : currentDownvotes;
 
       // Calculate if status should auto-change
       final newStatus = _calculateAutoStatus(
@@ -172,9 +171,12 @@ class VoteRepository {
       return vote;
     });
 
-    // Recalculate reporter's level after transaction completes
+    // Recalculate reporter's level after transaction completes.
+    // Wrapped in try-catch: a failure here must not roll back the committed vote.
     if (result != null) {
-      await _userRepository.recalculateReputation(reporterId);
+      try {
+        await _userRepository.recalculateReputation(reporterId);
+      } catch (_) {}
     }
 
     return result;
@@ -232,20 +234,17 @@ class VoteRepository {
         final currentDownvotes = incidentData['downvotes'] ?? 0;
         final currentStatus = IncidentStatus.values[incidentData['status'] ?? 0];
 
-        // Use voter's current weight so trusted users' vote changes are counted correctly
-        final weight = _getVoteWeight(voterDoc.exists ? voterDoc.data() : null);
-
-        int newUpvotes;
-        int newDownvotes;
+        final int newUpvotes;
+        final int newDownvotes;
 
         if (newType == VoteType.upvote) {
           // Changed from downvote to upvote
-          newUpvotes = currentUpvotes + weight;
-          newDownvotes = (currentDownvotes - weight).clamp(0, double.infinity).toInt();
+          newUpvotes = currentUpvotes + 1;
+          newDownvotes = (currentDownvotes - 1).clamp(0, double.infinity).toInt();
         } else {
           // Changed from upvote to downvote
-          newUpvotes = (currentUpvotes - weight).clamp(0, double.infinity).toInt();
-          newDownvotes = currentDownvotes + weight;
+          newUpvotes = (currentUpvotes - 1).clamp(0, double.infinity).toInt();
+          newDownvotes = currentDownvotes + 1;
         }
 
         // Calculate if status should auto-change
@@ -283,9 +282,12 @@ class VoteRepository {
       return updatedVote;
     });
 
-    // Recalculate reporter's level after transaction completes
+    // Recalculate reporter's level after transaction completes.
+    // Wrapped in try-catch: a failure here must not roll back the committed vote.
     if (result != null) {
-      await _userRepository.recalculateReputation(reporterId);
+      try {
+        await _userRepository.recalculateReputation(reporterId);
+      } catch (_) {}
     }
 
     return result;
@@ -329,18 +331,15 @@ class VoteRepository {
         final currentDownvotes = incidentData['downvotes'] ?? 0;
         final currentStatus = IncidentStatus.values[incidentData['status'] ?? 0];
 
-        // Use voter's current weight to reverse their contribution
-        final weight = _getVoteWeight(voterDoc.exists ? voterDoc.data() : null);
-
-        int newUpvotes;
-        int newDownvotes;
+        final int newUpvotes;
+        final int newDownvotes;
 
         if (existingVote.type == VoteType.upvote) {
-          newUpvotes = (currentUpvotes - weight).clamp(0, double.infinity).toInt();
+          newUpvotes = (currentUpvotes - 1).clamp(0, double.infinity).toInt();
           newDownvotes = currentDownvotes;
         } else {
           newUpvotes = currentUpvotes;
-          newDownvotes = (currentDownvotes - weight).clamp(0, double.infinity).toInt();
+          newDownvotes = (currentDownvotes - 1).clamp(0, double.infinity).toInt();
         }
 
         // Calculate if status should auto-change (e.g., downgrade if upvotes removed)
@@ -386,9 +385,12 @@ class VoteRepository {
       return true;
     });
 
-    // Recalculate reporter's level after transaction completes
+    // Recalculate reporter's level after transaction completes.
+    // Wrapped in try-catch: a failure here must not roll back the committed vote.
     if (result) {
-      await _userRepository.recalculateReputation(reporterId);
+      try {
+        await _userRepository.recalculateReputation(reporterId);
+      } catch (_) {}
     }
 
     return result;
@@ -405,7 +407,7 @@ class VoteRepository {
     return null;
   }
 
-  /// Gets all votes by a user.
+  /// Gets all votes by a user (both incident and post votes).
   Future<List<VoteModel>> getVotesByUser(String voterId) async {
     final snapshot = await _votesCollection
         .where('voterId', isEqualTo: voterId)
@@ -419,11 +421,161 @@ class VoteRepository {
   /// Gets all votes for an incident.
   Future<List<VoteModel>> getVotesForIncident(String incidentId) async {
     final snapshot = await _votesCollection
-        .where('incidentId', isEqualTo: incidentId)
+        .where('targetId', isEqualTo: incidentId)
+        .where('targetType', isEqualTo: VoteTargetType.incident.index)
         .get();
 
     return snapshot.docs
         .map((doc) => VoteModel.fromMap(doc.data(), doc.id))
         .toList();
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // Post Votes
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /// Casts a vote on a post using a Firestore transaction.
+  /// Returns the created vote, or null if the user is trying to vote on their own post.
+  Future<VoteModel?> castPostVote({
+    required String postId,
+    required String voterId,
+    required String authorId,
+    required VoteType type,
+  }) async {
+    if (voterId == authorId) return null;
+
+    final voteDocId = '${postId}_$voterId';
+    final voteRef = _votesCollection.doc(voteDocId);
+    final postRef = _postsCollection.doc(postId);
+
+    return _firestore.runTransaction<VoteModel?>((transaction) async {
+      final existingVoteDoc = await transaction.get(voteRef);
+      final postDoc = await transaction.get(postRef);
+
+      if (existingVoteDoc.exists) return null;
+      if (!postDoc.exists) throw Exception('Post not found');
+
+      final vote = VoteModel(
+        id: voteDocId,
+        targetId: postId,
+        targetType: VoteTargetType.post,
+        voterId: voterId,
+        type: type,
+        votedAt: DateTime.now(),
+      );
+
+      transaction.set(voteRef, vote.toMap());
+
+      final postData = postDoc.data() ?? {};
+      final currentUpvotes = postData['upvotes'] ?? 0;
+      final currentDownvotes = postData['downvotes'] ?? 0;
+
+      transaction.set(postRef, {
+        'upvotes': type == VoteType.upvote ? currentUpvotes + 1 : currentUpvotes,
+        'downvotes': type == VoteType.downvote ? currentDownvotes + 1 : currentDownvotes,
+      }, SetOptions(merge: true));
+
+      return vote;
+    });
+  }
+
+  /// Changes an existing post vote to a different type.
+  Future<VoteModel?> changePostVote({
+    required String postId,
+    required String voterId,
+    required VoteType newType,
+  }) async {
+    final voteDocId = '${postId}_$voterId';
+    final voteRef = _votesCollection.doc(voteDocId);
+    final postRef = _postsCollection.doc(postId);
+
+    return _firestore.runTransaction<VoteModel?>((transaction) async {
+      final existingVoteDoc = await transaction.get(voteRef);
+      final postDoc = await transaction.get(postRef);
+
+      if (!existingVoteDoc.exists) return null;
+
+      final existingVote = VoteModel.fromMap(existingVoteDoc.data()!, existingVoteDoc.id);
+      if (existingVote.type == newType) return existingVote;
+
+      final updatedVote = existingVote.copyWith(type: newType, votedAt: DateTime.now());
+
+      transaction.update(voteRef, {
+        'type': newType.index,
+        'votedAt': Timestamp.fromDate(updatedVote.votedAt),
+      });
+
+      if (postDoc.exists) {
+        final postData = postDoc.data() ?? {};
+        final currentUpvotes = postData['upvotes'] ?? 0;
+        final currentDownvotes = postData['downvotes'] ?? 0;
+
+        final int newUpvotes;
+        final int newDownvotes;
+        if (newType == VoteType.upvote) {
+          newUpvotes = currentUpvotes + 1;
+          newDownvotes = (currentDownvotes - 1).clamp(0, double.infinity).toInt();
+        } else {
+          newUpvotes = (currentUpvotes - 1).clamp(0, double.infinity).toInt();
+          newDownvotes = currentDownvotes + 1;
+        }
+
+        transaction.set(postRef, {
+          'upvotes': newUpvotes,
+          'downvotes': newDownvotes,
+        }, SetOptions(merge: true));
+      }
+
+      return updatedVote;
+    });
+  }
+
+  /// Removes a vote from a post.
+  Future<bool> removePostVote({
+    required String postId,
+    required String voterId,
+  }) async {
+    final voteDocId = '${postId}_$voterId';
+    final voteRef = _votesCollection.doc(voteDocId);
+    final postRef = _postsCollection.doc(postId);
+
+    return _firestore.runTransaction<bool>((transaction) async {
+      final existingVoteDoc = await transaction.get(voteRef);
+      final postDoc = await transaction.get(postRef);
+
+      if (!existingVoteDoc.exists) return false;
+
+      final existingVote = VoteModel.fromMap(existingVoteDoc.data()!, existingVoteDoc.id);
+
+      transaction.delete(voteRef);
+
+      if (postDoc.exists) {
+        final postData = postDoc.data() ?? {};
+        final currentUpvotes = postData['upvotes'] ?? 0;
+        final currentDownvotes = postData['downvotes'] ?? 0;
+
+        transaction.set(postRef, {
+          'upvotes': existingVote.type == VoteType.upvote
+              ? (currentUpvotes - 1).clamp(0, double.infinity).toInt()
+              : currentUpvotes,
+          'downvotes': existingVote.type == VoteType.downvote
+              ? (currentDownvotes - 1).clamp(0, double.infinity).toInt()
+              : currentDownvotes,
+        }, SetOptions(merge: true));
+      }
+
+      return true;
+    });
+  }
+
+  /// Gets the user's vote for a specific post.
+  Future<VoteModel?> getUserPostVote(String postId, String voterId) async {
+    final voteDocId = '${postId}_$voterId';
+    final doc = await _votesCollection.doc(voteDocId).get();
+
+    if (doc.exists && doc.data() != null) {
+      return VoteModel.fromMap(doc.data()!, doc.id);
+    }
+    return null;
   }
 }

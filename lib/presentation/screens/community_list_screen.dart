@@ -81,6 +81,17 @@ class _CommunityListScreenState extends State<CommunityListScreen>
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
+          final user = context.read<UserProvider>().currentUser;
+          if (user == null || user.level < 2) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                    'You need to reach Level 2 (Observer) to create a community.'),
+                backgroundColor: AppTheme.warningOrange,
+              ),
+            );
+            return;
+          }
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -97,61 +108,126 @@ class _CommunityListScreenState extends State<CommunityListScreen>
   }
 }
 
-class _MyCommunities extends StatelessWidget {
+// ── My Communities Tab ───────────────────────────────────────────────────────
+
+class _MyCommunities extends StatefulWidget {
   final Future<void> Function() onRefresh;
 
   const _MyCommunities({required this.onRefresh});
 
   @override
+  State<_MyCommunities> createState() => _MyCommunitiesState();
+}
+
+class _MyCommunitiesState extends State<_MyCommunities> {
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final provider = context.watch<CommunityProvider>();
-    final communities = provider.myCommunities;
+    final allCommunities = provider.myCommunities;
 
-    if (provider.isLoading && communities.isEmpty) {
+    final communities = _searchQuery.isEmpty
+        ? allCommunities
+        : allCommunities
+            .where((c) =>
+                c.name.toLowerCase().contains(_searchQuery) ||
+                c.description.toLowerCase().contains(_searchQuery))
+            .toList();
+
+    if (provider.isLoading && allCommunities.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (communities.isEmpty) {
+    if (allCommunities.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.group_off, size: 64, color: Colors.grey[400]),
+            Icon(Icons.group_off, size: 64, color: AppTheme.textSecondary),
             const SizedBox(height: 16),
             Text(
               'No communities yet',
               style: TextStyle(
                 fontSize: 18,
-                color: Colors.grey[600],
+                color: AppTheme.textSecondary,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'Create one or join an existing community',
-              style: TextStyle(color: Colors.grey[500]),
+              style: TextStyle(color: AppTheme.textSecondary),
             ),
           ],
         ),
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: onRefresh,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: communities.length,
-        itemBuilder: (context, index) {
-          return _CommunityCard(
-            community: communities[index],
-            showJoinButton: false,
-          );
-        },
-      ),
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Search my communities...',
+              prefixIcon: const Icon(Icons.search, size: 20),
+              isDense: true,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: AppTheme.cardBorder),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: AppTheme.cardBorder),
+              ),
+              contentPadding: const EdgeInsets.symmetric(vertical: 10),
+            ),
+            onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
+          ),
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: widget.onRefresh,
+            child: communities.isEmpty
+                ? ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      Center(
+                        child: Text(
+                          'No results for "$_searchQuery"',
+                          style: const TextStyle(color: AppTheme.textSecondary),
+                        ),
+                      ),
+                    ],
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: communities.length,
+                    itemBuilder: (context, index) {
+                      return _CommunityCard(
+                        community: communities[index],
+                        showJoinButton: false,
+                      );
+                    },
+                  ),
+          ),
+        ),
+      ],
     );
   }
 }
 
-class _DiscoverCommunities extends StatelessWidget {
+// ── Discover Tab ─────────────────────────────────────────────────────────────
+
+class _DiscoverCommunities extends StatefulWidget {
   final bool loadingLocation;
   final Future<void> Function() onRefresh;
 
@@ -161,16 +237,39 @@ class _DiscoverCommunities extends StatelessWidget {
   });
 
   @override
+  State<_DiscoverCommunities> createState() => _DiscoverCommunitiesState();
+}
+
+class _DiscoverCommunitiesState extends State<_DiscoverCommunities> {
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final provider = context.watch<CommunityProvider>();
-    final communities = provider.nearbyCommunities;
+    final allNearby = provider.nearbyCommunities;
 
-    // Exclude all communities where user has any membership (approved, pending, or rejected)
-    final discoverCommunities = communities
+    // Exclude communities where user has any membership
+    final eligible = allNearby
         .where((c) => !provider.myMembershipCommunityIds.contains(c.id))
         .toList();
 
-    if (loadingLocation || (provider.isLoading && communities.isEmpty)) {
+    final communities = _searchQuery.isEmpty
+        ? eligible
+        : eligible
+            .where((c) =>
+                c.name.toLowerCase().contains(_searchQuery) ||
+                c.description.toLowerCase().contains(_searchQuery))
+            .toList();
+
+    if (widget.loadingLocation ||
+        (provider.isLoading && allNearby.isEmpty)) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -178,63 +277,112 @@ class _DiscoverCommunities extends StatelessWidget {
             const CircularProgressIndicator(),
             const SizedBox(height: 16),
             Text(
-              loadingLocation
+              widget.loadingLocation
                   ? 'Finding nearby communities...'
                   : 'Loading...',
-              style: TextStyle(color: Colors.grey[600]),
+              style: const TextStyle(color: AppTheme.textSecondary),
             ),
           ],
         ),
       );
     }
 
-    if (discoverCommunities.isEmpty) {
+    if (eligible.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.explore_off, size: 64, color: Colors.grey[400]),
+            Icon(Icons.explore_off, size: 64, color: AppTheme.textSecondary),
             const SizedBox(height: 16),
             Text(
               'No communities nearby',
               style: TextStyle(
                 fontSize: 18,
-                color: Colors.grey[600],
+                color: AppTheme.textSecondary,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'Be the first to create one!',
-              style: TextStyle(color: Colors.grey[500]),
+              style: TextStyle(color: AppTheme.textSecondary),
             ),
           ],
         ),
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: onRefresh,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: discoverCommunities.length,
-        itemBuilder: (context, index) {
-          return _CommunityCard(
-            community: discoverCommunities[index],
-            showJoinButton: true,
-          );
-        },
-      ),
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Search communities...',
+              prefixIcon: const Icon(Icons.search, size: 20),
+              isDense: true,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: AppTheme.cardBorder),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: AppTheme.cardBorder),
+              ),
+              contentPadding: const EdgeInsets.symmetric(vertical: 10),
+            ),
+            onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
+          ),
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: widget.onRefresh,
+            child: communities.isEmpty
+                ? ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      Center(
+                        child: Text(
+                          'No results for "$_searchQuery"',
+                          style: const TextStyle(color: AppTheme.textSecondary),
+                        ),
+                      ),
+                    ],
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: communities.length,
+                    itemBuilder: (context, index) {
+                      final c = communities[index];
+                      final lat = provider.userLat;
+                      final lng = provider.userLng;
+                      return _CommunityCard(
+                        community: c,
+                        showJoinButton: true,
+                        distanceKm: (lat != null && lng != null)
+                            ? c.calculateDistance(lat, lng)
+                            : null,
+                      );
+                    },
+                  ),
+          ),
+        ),
+      ],
     );
   }
 }
 
+// ── Community Card ────────────────────────────────────────────────────────────
+
 class _CommunityCard extends StatelessWidget {
   final CommunityModel community;
   final bool showJoinButton;
+  final double? distanceKm;
 
   const _CommunityCard({
     required this.community,
     required this.showJoinButton,
+    this.distanceKm,
   });
 
   @override
@@ -299,15 +447,15 @@ class _CommunityCard extends StatelessWidget {
                             Icon(
                               Icons.location_on,
                               size: 14,
-                              color: Colors.grey[600],
+                              color: AppTheme.textSecondary,
                             ),
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
                                 community.address,
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontSize: 12,
-                                  color: Colors.grey[600],
+                                  color: AppTheme.textSecondary,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -356,9 +504,9 @@ class _CommunityCard extends StatelessWidget {
               const SizedBox(height: 12),
               Text(
                 community.description,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 14,
-                  color: Colors.grey[700],
+                  color: AppTheme.textSecondary,
                 ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -366,35 +514,55 @@ class _CommunityCard extends StatelessWidget {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Icon(Icons.people, size: 16, color: Colors.grey[600]),
+                  Icon(Icons.people, size: 16, color: AppTheme.textSecondary),
                   const SizedBox(width: 4),
                   Text(
                     '${community.memberCount} members',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 12,
-                      color: Colors.grey[600],
+                      color: AppTheme.textSecondary,
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  Icon(Icons.radar, size: 16, color: Colors.grey[600]),
+                  const SizedBox(width: 12),
+                  Icon(Icons.radar, size: 16, color: AppTheme.textSecondary),
                   const SizedBox(width: 4),
-                  Text(
-                    '${community.radius} km radius',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
+                  Flexible(
+                    child: Text(
+                      '${community.radius} km radius',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   const Spacer(),
                   Text(
                     community.timeAgo,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 11,
-                      color: Colors.grey[500],
+                      color: AppTheme.textSecondary,
                     ),
                   ),
                 ],
               ),
+              if (distanceKm != null) ...[
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(Icons.near_me,
+                        size: 14, color: AppTheme.textSecondary),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${distanceKm!.toStringAsFixed(1)} km away',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),

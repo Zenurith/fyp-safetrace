@@ -153,4 +153,20 @@ class MediaUploadService {
       if (kDebugMode) debugPrint('deleteProfilePhoto (ignored): $e');
     }
   }
+
+  Future<String?> uploadCommunityImage(String communityId, XFile file) async {
+    try {
+      final extension = file.path.split('.').last.toLowerCase();
+      final ref = _storage.ref('communities/$communityId/cover.$extension');
+      final bytes = await file.readAsBytes();
+      final snapshot = await ref.putData(
+        bytes,
+        SettableMetadata(contentType: 'image/$extension'),
+      );
+      return await snapshot.ref.getDownloadURL();
+    } catch (e) {
+      if (kDebugMode) debugPrint('uploadCommunityImage error: $e');
+      return null;
+    }
+  }
 }

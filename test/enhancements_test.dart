@@ -13,7 +13,6 @@ void main() {
         handle: 'test',
         memberSince: DateTime.now(),
         points: 50,
-        level: 1,
       );
       // Level 1: needs 100 points to reach level 2
       expect(user.pointsToNextLevel, 100 - 50);
@@ -26,7 +25,6 @@ void main() {
         handle: 'test',
         memberSince: DateTime.now(),
         points: 2600,
-        level: 7,
       );
       // Level 7: needs 4000 points to reach level 8
       expect(user7.pointsToNextLevel, 4000 - 2600);
@@ -37,7 +35,6 @@ void main() {
         handle: 'test',
         memberSince: DateTime.now(),
         points: 7000,
-        level: 9,
       );
       // Level 9: needs 10000 points to reach level 10
       expect(user9.pointsToNextLevel, 10000 - 7000);
@@ -50,7 +47,6 @@ void main() {
         handle: 'test',
         memberSince: DateTime.now(),
         points: 15000,
-        level: 10,
       );
       expect(user.pointsToNextLevel, 0);
     });
@@ -62,7 +58,6 @@ void main() {
         handle: 'test',
         memberSince: DateTime.now(),
         points: 3250, // Midway between 2500 (level 7) and 4000 (level 8)
-        level: 7,
       );
       // Progress = (3250 - 2500) / (4000 - 2500) = 750 / 1500 = 0.5
       expect(user.levelProgress, 0.5);
@@ -75,7 +70,6 @@ void main() {
         handle: 'test',
         memberSince: DateTime.now(),
         points: 15000,
-        level: 10,
       );
       expect(user.levelProgress, 1.0);
     });

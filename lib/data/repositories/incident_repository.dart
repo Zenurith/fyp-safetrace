@@ -119,6 +119,25 @@ class IncidentRepository {
     await _incidentsCollection.doc(id).delete();
   }
 
+  /// Remove an incident from a specific community (community staff action).
+  /// If this is the only community the incident belongs to, the incident is
+  /// deleted entirely so it does not become a public map entry.
+  Future<void> removeFromCommunity(String incidentId, String communityId) async {
+    final doc = await _incidentsCollection.doc(incidentId).get();
+    if (!doc.exists || doc.data() == null) return;
+
+    final currentIds = List<String>.from(doc.data()!['communityIds'] as List? ?? []);
+    currentIds.remove(communityId);
+
+    if (currentIds.isEmpty) {
+      await _incidentsCollection.doc(incidentId).delete();
+    } else {
+      await _incidentsCollection.doc(incidentId).update({
+        'communityIds': FieldValue.arrayRemove([communityId]),
+      });
+    }
+  }
+
   Future<void> confirm(String id) async {
     await _incidentsCollection.doc(id).update({
       'confirmations': FieldValue.increment(1),

@@ -13,22 +13,20 @@ class CommunityRepository {
 
   // ==================== Community CRUD ====================
 
-  /// Create a new community and automatically add the creator as admin
+  /// Create a new community and automatically add the creator as owner.
   Future<String> createCommunity(CommunityModel community) async {
     final batch = _firestore.batch();
 
-    // Create the community document
     final communityRef = _communitiesCollection.doc();
     batch.set(communityRef, community.toMap());
 
-    // Add creator as admin member
     final memberRef = _membersCollection.doc();
     final creatorMember = CommunityMemberModel(
       id: memberRef.id,
       communityId: communityRef.id,
       userId: community.creatorId,
       status: MemberStatus.approved,
-      role: MemberRole.admin,
+      role: MemberRole.owner,
       requestedAt: DateTime.now(),
       approvedAt: DateTime.now(),
       approvedBy: community.creatorId,
@@ -52,7 +50,6 @@ class CommunityRepository {
   }
 
   Future<void> delete(String id) async {
-    // Delete all members first
     final membersSnapshot =
         await _membersCollection.where('communityId', isEqualTo: id).get();
     final batch = _firestore.batch();
@@ -72,21 +69,17 @@ class CommunityRepository {
             .toList());
   }
 
-  /// Get communities within range of a given location
+  /// Get communities within range of a given location.
   Future<List<CommunityModel>> getNearbyCommunities(
     double latitude,
     double longitude, {
-    double maxDistance = 50, // Default 50km search radius
+    double maxDistance = 50,
   }) async {
-    // Firestore doesn't support geo queries natively, so we fetch all and filter
-    // For production, consider using GeoFlutterFire or geohashing
     final snapshot = await _communitiesCollection.get();
     final communities = snapshot.docs
         .map((doc) => CommunityModel.fromMap(doc.data(), doc.id))
         .toList();
 
-    // Filter communities where the given location is within their radius
-    // OR the community center is within maxDistance of the given location
     return communities.where((community) {
       final distance = community.calculateDistance(latitude, longitude);
       return community.isLocationWithinRadius(latitude, longitude) ||
@@ -94,60 +87,49 @@ class CommunityRepository {
     }).toList();
   }
 
-  /// Get all communities where the user is an approved member
-  Future<List<CommunityModel>> getUserCommunities(String userId) async {
-    // Query by userId only (avoids composite index requirement), filter status client-side
-    final membershipSnapshot = await _membersCollection
-        .where('userId', isEqualTo: userId)
-        .get();
-
-    final approvedDocs = membershipSnapshot.docs
-        .where((doc) => doc.data()['status'] == MemberStatus.approved.index)
-        .toList();
-
-    if (approvedDocs.isEmpty) return [];
-
-    final communityIds = approvedDocs
-        .map((doc) => doc.data()['communityId'] as String)
-        .toList();
-
-    // Batch fetch communities (handle Firestore's 10-item whereIn limit)
-    final communities = <CommunityModel>[];
-    for (var i = 0; i < communityIds.length; i += 10) {
-      final batch = communityIds.skip(i).take(10).toList();
-      final snapshot = await _communitiesCollection
-          .where(FieldPath.documentId, whereIn: batch)
-          .get();
-      communities.addAll(snapshot.docs
-          .map((doc) => CommunityModel.fromMap(doc.data(), doc.id)));
-    }
-
-    return communities;
-  }
-
-  /// Returns ALL community IDs where the user has any membership record
-  /// (approved, pending, or rejected) — used to filter the Discover tab.
-  Future<Set<String>> getUserMembershipCommunityIds(String userId) async {
+  /// Returns all membership records for a user in a single query.
+  Future<List<CommunityMemberModel>> getUserMemberships(String userId) async {
     final snapshot = await _membersCollection
         .where('userId', isEqualTo: userId)
         .get();
     return snapshot.docs
-        .map((doc) => doc.data()['communityId'] as String)
-        .toSet();
+        .map((doc) => CommunityMemberModel.fromMap(doc.data(), doc.id))
+        .toList();
+  }
+
+  /// Batch-fetch communities by IDs (handles Firestore's 10-item whereIn limit).
+  Future<List<CommunityModel>> getCommunitiesByIds(List<String> ids) async {
+    if (ids.isEmpty) return [];
+    final communities = <CommunityModel>[];
+    for (var i = 0; i < ids.length; i += 10) {
+      final batch = ids.skip(i).take(10).toList();
+      final snapshot = await _communitiesCollection
+          .where(FieldPath.documentId, whereIn: batch)
+          .get();
+      communities.addAll(
+          snapshot.docs.map((doc) => CommunityModel.fromMap(doc.data(), doc.id)));
+    }
+    return communities;
+  }
+
+  Future<List<CommunityModel>> getUserCommunities(String userId) async {
+    final memberships = await getUserMemberships(userId);
+    final approvedIds = memberships
+        .where((m) => m.isApproved)
+        .map((m) => m.communityId)
+        .toList();
+    return getCommunitiesByIds(approvedIds);
   }
 
   // ==================== Membership Management ====================
 
   /// Request to join a community.
-  /// Auto-approves if community doesn't require approval, otherwise creates a pending request.
   Future<String> requestToJoin(String communityId, String userId) async {
-    // Check if already a member or has pending request
     final existingMembership = await _membersCollection
         .where('communityId', isEqualTo: communityId)
         .where('userId', isEqualTo: userId)
         .get();
 
-    // Check if community requires approval
     final communityDoc = await _communitiesCollection.doc(communityId).get();
     final requiresApproval = communityDoc.data()?['requiresApproval'] ?? false;
 
@@ -162,15 +144,25 @@ class CommunityRepository {
       if (member.isPending) {
         throw Exception('Join request already pending');
       }
+      if (member.isBanned) {
+        final until = member.bannedUntil;
+        if (until == null) {
+          throw Exception('You are permanently banned from this community.');
+        }
+        if (until.isAfter(DateTime.now())) {
+          final d = until;
+          throw Exception(
+              'You are banned until ${d.day}/${d.month}/${d.year}.');
+        }
+        // Temp ban expired — fall through and allow re-apply
+      }
 
       if (requiresApproval) {
-        // Set to pending for admin approval
         await _membersCollection.doc(existingMembership.docs.first.id).update({
           'status': MemberStatus.pending.index,
           'requestedAt': Timestamp.now(),
         });
       } else {
-        // Auto-approve
         await _membersCollection.doc(existingMembership.docs.first.id).update({
           'status': MemberStatus.approved.index,
           'requestedAt': Timestamp.now(),
@@ -206,46 +198,45 @@ class CommunityRepository {
     return docRef.id;
   }
 
-  /// Approve a membership request (admin only)
-  Future<void> approveRequest(String memberId, String approvedBy) async {
+  /// Approve a membership request (staff only).
+  Future<void> approveRequest(
+      String memberId, String communityId, String approvedBy) async {
     await _membersCollection.doc(memberId).update({
       'status': MemberStatus.approved.index,
       'approvedAt': Timestamp.now(),
       'approvedBy': approvedBy,
     });
-
-    // Increment community member count
-    final memberDoc = await _membersCollection.doc(memberId).get();
-    if (memberDoc.exists) {
-      final communityId = memberDoc.data()!['communityId'] as String;
-      await _communitiesCollection.doc(communityId).update({
-        'memberCount': FieldValue.increment(1),
-      });
-    }
+    await _communitiesCollection.doc(communityId).update({
+      'memberCount': FieldValue.increment(1),
+    });
   }
 
-  /// Reject a membership request (admin only)
+  /// Reject a membership request (staff only).
   Future<void> rejectRequest(String memberId) async {
     await _membersCollection.doc(memberId).update({
       'status': MemberStatus.rejected.index,
     });
   }
 
-  /// Get all pending requests for a community (for admin view)
+  /// Get all pending requests for a community (for staff view).
   Future<List<CommunityMemberModel>> getPendingRequests(
       String communityId) async {
+    // Avoid .orderBy() here — combining two .where() clauses with .orderBy()
+    // on a third field requires a Firestore composite index. Sort client-side.
     final snapshot = await _membersCollection
         .where('communityId', isEqualTo: communityId)
         .where('status', isEqualTo: MemberStatus.pending.index)
-        .orderBy('requestedAt', descending: true)
         .get();
 
-    return snapshot.docs
+    final results = snapshot.docs
         .map((doc) => CommunityMemberModel.fromMap(doc.data(), doc.id))
         .toList();
+
+    results.sort((a, b) => b.requestedAt.compareTo(a.requestedAt));
+    return results;
   }
 
-  /// Get all members of a community
+  /// Get all approved members of a community.
   Future<List<CommunityMemberModel>> getCommunityMembers(
       String communityId) async {
     final snapshot = await _membersCollection
@@ -258,7 +249,7 @@ class CommunityRepository {
         .toList();
   }
 
-  /// Check if a user is an approved member of a community
+  /// Check if a user is an approved member of a community.
   Future<bool> isMember(String communityId, String userId) async {
     final snapshot = await _membersCollection
         .where('communityId', isEqualTo: communityId)
@@ -269,19 +260,19 @@ class CommunityRepository {
     return snapshot.docs.isNotEmpty;
   }
 
-  /// Check if a user is an admin of a community
-  Future<bool> isAdmin(String communityId, String userId) async {
-    final snapshot = await _membersCollection
-        .where('communityId', isEqualTo: communityId)
-        .where('userId', isEqualTo: userId)
-        .where('status', isEqualTo: MemberStatus.approved.index)
-        .where('role', isEqualTo: MemberRole.admin.index)
-        .get();
-
-    return snapshot.docs.isNotEmpty;
+  /// Check if a user holds a staff role (owner, headModerator, or moderator).
+  Future<bool> isStaff(String communityId, String userId) async {
+    final membership = await getUserMembership(communityId, userId);
+    return membership != null && membership.isApproved && membership.isStaff;
   }
 
-  /// Get user's membership for a specific community
+  /// Check if a user is the owner of a community.
+  Future<bool> isOwnerOf(String communityId, String userId) async {
+    final membership = await getUserMembership(communityId, userId);
+    return membership != null && membership.isApproved && membership.isOwner;
+  }
+
+  /// Get user's membership for a specific community.
   Future<CommunityMemberModel?> getUserMembership(
       String communityId, String userId) async {
     final snapshot = await _membersCollection
@@ -298,28 +289,17 @@ class CommunityRepository {
     return null;
   }
 
-  /// Leave a community
+  /// Leave a community. Throws if the user is the owner.
   Future<void> leaveCommunity(String communityId, String userId) async {
     final membership = await getUserMembership(communityId, userId);
     if (membership == null) return;
 
-    // Prevent admin from leaving if they're the only admin
-    if (membership.isAdmin) {
-      final admins = await _membersCollection
-          .where('communityId', isEqualTo: communityId)
-          .where('role', isEqualTo: MemberRole.admin.index)
-          .where('status', isEqualTo: MemberStatus.approved.index)
-          .get();
-
-      if (admins.docs.length <= 1) {
-        throw Exception(
-            'Cannot leave community. You are the only admin. Transfer admin role first.');
-      }
+    if (membership.isOwner) {
+      throw Exception('Transfer ownership before leaving.');
     }
 
     await _membersCollection.doc(membership.id).delete();
 
-    // Decrement member count if was approved
     if (membership.isApproved) {
       await _communitiesCollection.doc(communityId).update({
         'memberCount': FieldValue.increment(-1),
@@ -327,28 +307,97 @@ class CommunityRepository {
     }
   }
 
-  /// Promote a member to admin
-  Future<void> promoteToAdmin(String memberId) async {
+  /// Promote a member to moderator.
+  Future<void> promoteToModerator(String memberId) async {
     await _membersCollection.doc(memberId).update({
-      'role': MemberRole.admin.index,
+      'role': MemberRole.moderator.name,
     });
   }
 
-  /// Demote an admin to regular member
-  Future<void> demoteToMember(String memberId, String communityId) async {
-    // Check if there are other admins
-    final admins = await _membersCollection
-        .where('communityId', isEqualTo: communityId)
-        .where('role', isEqualTo: MemberRole.admin.index)
-        .where('status', isEqualTo: MemberStatus.approved.index)
-        .get();
+  /// Promote a moderator to head moderator.
+  Future<void> promoteToHeadModerator(String memberId) async {
+    await _membersCollection.doc(memberId).update({
+      'role': MemberRole.headModerator.name,
+    });
+  }
 
-    if (admins.docs.length <= 1) {
-      throw Exception('Cannot demote. Community must have at least one admin.');
-    }
+  /// Demote a staff member to regular member. Throws if target is owner.
+  Future<void> demoteToMember(String memberId, String communityId) async {
+    final doc = await _membersCollection.doc(memberId).get();
+    if (!doc.exists) throw Exception('Member not found.');
+    final member = CommunityMemberModel.fromMap(doc.data()!, doc.id);
+    if (member.isOwner) throw Exception('Cannot demote the community owner.');
 
     await _membersCollection.doc(memberId).update({
-      'role': MemberRole.member.index,
+      'role': MemberRole.member.name,
     });
+  }
+
+  /// Ban a member from the community.
+  /// [bannedUntil] = null → permanent ban; non-null → temporary ban.
+  /// Throws if target is owner.
+  Future<void> banMember(
+      String memberId, String communityId, {DateTime? bannedUntil}) async {
+    final doc = await _membersCollection.doc(memberId).get();
+    if (!doc.exists) throw Exception('Member not found.');
+    final member = CommunityMemberModel.fromMap(doc.data()!, doc.id);
+    if (member.isOwner) throw Exception('Cannot ban the community owner.');
+
+    final wasApproved = member.isApproved;
+    await _membersCollection.doc(memberId).update({
+      'status': MemberStatus.banned.index,
+      'bannedUntil':
+          bannedUntil != null ? Timestamp.fromDate(bannedUntil) : null,
+    });
+
+    if (wasApproved) {
+      await _communitiesCollection.doc(communityId).update({
+        'memberCount': FieldValue.increment(-1),
+      });
+    }
+  }
+
+  /// Remove a member by their membership document ID. Throws if target is owner.
+  Future<void> removeMemberById(String memberId, String communityId) async {
+    final doc = await _membersCollection.doc(memberId).get();
+    if (!doc.exists) return;
+    final member = CommunityMemberModel.fromMap(doc.data()!, doc.id);
+    if (member.isOwner) throw Exception('Cannot remove the community owner.');
+
+    await _membersCollection.doc(memberId).delete();
+
+    if (member.isApproved) {
+      await _communitiesCollection.doc(communityId).update({
+        'memberCount': FieldValue.increment(-1),
+      });
+    }
+  }
+
+  /// Transfer ownership. Old owner becomes headModerator; new member becomes owner.
+  Future<void> transferOwnership(
+      String communityId, String currentOwnerId, String newOwnerId) async {
+    final ownerMembership =
+        await getUserMembership(communityId, currentOwnerId);
+    final newOwnerMembership =
+        await getUserMembership(communityId, newOwnerId);
+
+    if (ownerMembership == null) {
+      throw Exception('Current owner membership not found.');
+    }
+    if (newOwnerMembership == null) {
+      throw Exception('Target member not found in community.');
+    }
+    if (newOwnerMembership.isOwner) {
+      throw Exception('Target is already the owner.');
+    }
+
+    final batch = _firestore.batch();
+    batch.update(_membersCollection.doc(ownerMembership.id), {
+      'role': MemberRole.headModerator.name,
+    });
+    batch.update(_membersCollection.doc(newOwnerMembership.id), {
+      'role': MemberRole.owner.name,
+    });
+    await batch.commit();
   }
 }

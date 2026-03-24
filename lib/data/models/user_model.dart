@@ -6,8 +6,6 @@ class UserModel {
   final int reports;
   final int votes;
   final int points;
-  final int level;
-  final String levelTitle;
   final bool isTrusted;
   final String role;
   final String? profilePhotoUrl;
@@ -28,8 +26,6 @@ class UserModel {
     this.reports = 0,
     this.votes = 0,
     this.points = 0,
-    this.level = 1,
-    this.levelTitle = 'Newcomer',
     this.isTrusted = false,
     this.role = 'user',
     this.profilePhotoUrl,
@@ -43,7 +39,9 @@ class UserModel {
     this.alertSettings,
   });
 
-  bool get isAdmin => role == 'admin';
+  bool get isAdmin => role == 'admin' || role == 'superadmin';
+
+  bool get isSuperAdmin => role == 'superadmin';
 
   bool get isActivelyBanned => isBanned;
 
@@ -66,8 +64,6 @@ class UserModel {
       reports: map['reports'] ?? 0,
       votes: map['votes'] ?? 0,
       points: map['points'] ?? 0,
-      level: map['level'] ?? 1,
-      levelTitle: map['levelTitle'] ?? 'Newcomer',
       isTrusted: map['isTrusted'] ?? false,
       role: map['role'] ?? 'user',
       profilePhotoUrl: map['profilePhotoUrl'],
@@ -92,8 +88,6 @@ class UserModel {
       'reports': reports,
       'votes': votes,
       'points': points,
-      'level': level,
-      'levelTitle': levelTitle,
       'isTrusted': isTrusted,
       'role': role,
       'profilePhotoUrl': profilePhotoUrl,
@@ -116,8 +110,6 @@ class UserModel {
     int? reports,
     int? votes,
     int? points,
-    int? level,
-    String? levelTitle,
     bool? isTrusted,
     String? role,
     String? profilePhotoUrl,
@@ -141,8 +133,6 @@ class UserModel {
       reports: reports ?? this.reports,
       votes: votes ?? this.votes,
       points: points ?? this.points,
-      level: level ?? this.level,
-      levelTitle: levelTitle ?? this.levelTitle,
       isTrusted: isTrusted ?? this.isTrusted,
       role: role ?? this.role,
       profilePhotoUrl: clearProfilePhoto ? null : (profilePhotoUrl ?? this.profilePhotoUrl),
@@ -165,19 +155,27 @@ class UserModel {
     return name.isNotEmpty ? name[0].toUpperCase() : '?';
   }
 
-  int get pointsToNextLevel {
-    const thresholds = [0, 100, 300, 600, 1000, 1500, 2500, 4000, 6000, 10000];
-    if (level < thresholds.length) {
-      return thresholds[level] - points;
+  static const _levelThresholds = [0, 100, 300, 600, 1000, 1500, 2500, 4000, 6000, 10000];
+  static const _levelTitles = ['Newcomer', 'Observer', 'Reporter', 'Contributor', 'Guardian', 'Protector', 'Sentinel', 'Champion', 'Hero', 'Legend'];
+
+  int get level {
+    for (int i = _levelThresholds.length - 1; i >= 0; i--) {
+      if (points >= _levelThresholds[i]) return i + 1;
     }
-    return 0;
+    return 1;
+  }
+
+  String get levelTitle => _levelTitles[(level - 1).clamp(0, _levelTitles.length - 1)];
+
+  int get pointsToNextLevel {
+    if (level >= _levelThresholds.length) return 0;
+    return _levelThresholds[level] - points;
   }
 
   double get levelProgress {
-    const thresholds = [0, 100, 300, 600, 1000, 1500, 2500, 4000, 6000, 10000];
-    if (level >= thresholds.length) return 1.0;
-    final prev = level > 0 ? thresholds[level - 1] : 0;
-    final next = thresholds[level];
+    if (level >= _levelThresholds.length) return 1.0;
+    final prev = _levelThresholds[level - 1];
+    final next = _levelThresholds[level];
     final range = next - prev;
     if (range <= 0) return 1.0;
     return ((points - prev) / range).clamp(0.0, 1.0);

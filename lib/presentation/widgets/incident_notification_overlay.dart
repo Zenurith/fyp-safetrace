@@ -79,6 +79,8 @@ class _IncidentNotificationOverlayState
         return 'assets/icon/warning.png';
       case IncidentCategory.emergency:
         return 'assets/icon/warning.png';
+      case IncidentCategory.other:
+        return 'assets/icon/warning.png';
     }
   }
 

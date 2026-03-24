@@ -9,6 +9,7 @@ import '../../data/services/location_service.dart';
 import '../../data/services/heatmap_service.dart';
 import '../../utils/app_theme.dart';
 import '../providers/incident_provider.dart';
+import '../providers/community_provider.dart';
 import '../widgets/incident_bottom_sheet.dart';
 import '../widgets/incident_search_delegate.dart';
 
@@ -26,11 +27,24 @@ class _MapScreenState extends State<MapScreen> {
   bool _showHeatmap = false;
   final Map<IncidentCategory, BitmapDescriptor> _markerIconCache = {};
   String? _lastCenteredIncidentId;
+  String _currentLocationName = 'Locating...';
 
   @override
   void initState() {
     super.initState();
     _loadMarkerIcons();
+    _loadLocationName();
+  }
+
+  Future<void> _loadLocationName() async {
+    final position = await _locationService.getQuickPosition();
+    if (position != null && mounted) {
+      final name = await _locationService.getShortLocationName(
+        position.latitude,
+        position.longitude,
+      );
+      if (mounted) setState(() => _currentLocationName = name);
+    }
   }
 
   Future<void> _loadMarkerIcons() async {
@@ -118,6 +132,8 @@ class _MapScreenState extends State<MapScreen> {
         return Colors.green[700]!;
       case IncidentCategory.suspicious:
         return Colors.deepPurple;
+      case IncidentCategory.other:
+        return Colors.grey;
     }
   }
 
@@ -135,6 +151,8 @@ class _MapScreenState extends State<MapScreen> {
         return Icons.eco;
       case IncidentCategory.emergency:
         return Icons.local_hospital;
+      case IncidentCategory.other:
+        return Icons.category;
     }
   }
 
@@ -377,9 +395,15 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<IncidentProvider>(
-      builder: (context, provider, _) {
-        final incidents = provider.incidents;
+    return Consumer2<IncidentProvider, CommunityProvider>(
+      builder: (context, provider, communityProvider, _) {
+        final myApprovedIds = communityProvider.myApprovedCommunityIds;
+        // Show public incidents + community-only incidents the user is an approved member of
+        final incidents = provider.incidents
+            .where((i) =>
+                i.communityIds.isEmpty ||
+                i.communityIds.any((id) => myApprovedIds.contains(id)))
+            .toList();
         // Center camera on a selected incident (set by "View on Map" from other screens)
         final selectedIncident = provider.selectedIncident;
         if (selectedIncident != null && selectedIncident.id != _lastCenteredIncidentId) {
@@ -425,7 +449,7 @@ class _MapScreenState extends State<MapScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      'Setapak, Selangor',
+                      _currentLocationName,
                       style: TextStyle(
                         fontFamily: AppTheme.fontFamily,
                         fontSize: 16,

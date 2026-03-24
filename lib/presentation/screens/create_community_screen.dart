@@ -1,13 +1,19 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import '../../data/models/community_model.dart';
 import '../../data/services/location_service.dart';
+import '../../data/services/media_upload_service.dart';
 import '../../config/app_constants.dart';
 import '../../utils/app_theme.dart';
 import '../providers/community_provider.dart';
 import '../providers/user_provider.dart';
 
 class CreateCommunityScreen extends StatefulWidget {
-  const CreateCommunityScreen({super.key});
+  final CommunityModel? communityToEdit;
+
+  const CreateCommunityScreen({super.key, this.communityToEdit});
 
   @override
   State<CreateCommunityScreen> createState() => _CreateCommunityScreenState();
@@ -19,6 +25,7 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
   final _descriptionController = TextEditingController();
   final _radiusController = TextEditingController(text: '2.0');
   final _locationService = LocationService();
+  final _mediaUploadService = MediaUploadService();
 
   double _latitude = AppConstants.defaultLat;
   double _longitude = AppConstants.defaultLng;
@@ -28,10 +35,29 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
   bool _isPublic = true;
   bool _requiresApproval = false;
 
+  XFile? _pickedImageFile;
+  Uint8List? _pickedImageBytes;
+  String? _existingImageUrl;
+
+  bool get _isEditMode => widget.communityToEdit != null;
+
   @override
   void initState() {
     super.initState();
-    _detectLocation();
+    final c = widget.communityToEdit;
+    if (c != null) {
+      _nameController.text = c.name;
+      _descriptionController.text = c.description;
+      _radiusController.text = c.radius.toString();
+      _latitude = c.latitude;
+      _longitude = c.longitude;
+      _address = c.address;
+      _isPublic = c.isPublic;
+      _requiresApproval = c.requiresApproval;
+      _existingImageUrl = c.imageUrl;
+    } else {
+      _detectLocation();
+    }
   }
 
   @override
@@ -63,6 +89,17 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
     if (mounted) setState(() => _loadingLocation = false);
   }
 
+  Future<void> _pickImage() async {
+    final file = await _mediaUploadService.pickImage();
+    if (file != null && mounted) {
+      final bytes = await file.readAsBytes();
+      setState(() {
+        _pickedImageFile = file;
+        _pickedImageBytes = bytes;
+      });
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -73,7 +110,7 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
 
     if (userId == null) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('You must be logged in to create a community')),
+        const SnackBar(content: Text('You must be logged in')),
       );
       return;
     }
@@ -81,24 +118,56 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      final communityId = await provider.createCommunity(
-        name: _nameController.text.trim(),
-        description: _descriptionController.text.trim(),
-        creatorId: userId,
-        latitude: _latitude,
-        longitude: _longitude,
-        radius: double.tryParse(_radiusController.text) ?? 2.0,
-        address: _address,
-        isPublic: _isPublic,
-        requiresApproval: _requiresApproval,
-      );
+      String? imageUrl = _existingImageUrl;
+      if (_pickedImageFile != null) {
+        final tempId = 'community_${DateTime.now().millisecondsSinceEpoch}';
+        imageUrl = await _mediaUploadService.uploadCommunityImage(
+            tempId, _pickedImageFile!);
+      }
 
-      if (communityId != null && mounted) {
-        await provider.loadMyCommunities(userId);
-        navigator.pop();
-        messenger.showSnackBar(
-          const SnackBar(content: Text('Community created successfully!')),
+      if (_isEditMode) {
+        final updated = widget.communityToEdit!.copyWith(
+          name: _nameController.text.trim(),
+          description: _descriptionController.text.trim(),
+          radius: double.tryParse(_radiusController.text) ??
+              widget.communityToEdit!.radius,
+          isPublic: _isPublic,
+          requiresApproval: _requiresApproval,
+          imageUrl: imageUrl,
         );
+        final success = await provider.updateCommunity(updated);
+        if (mounted) {
+          if (success) {
+            navigator.pop();
+            messenger.showSnackBar(
+              const SnackBar(content: Text('Community updated!')),
+            );
+          } else {
+            messenger.showSnackBar(
+              SnackBar(content: Text(provider.error ?? 'Failed to update')),
+            );
+          }
+        }
+      } else {
+        final communityId = await provider.createCommunity(
+          name: _nameController.text.trim(),
+          description: _descriptionController.text.trim(),
+          creatorId: userId,
+          latitude: _latitude,
+          longitude: _longitude,
+          radius: double.tryParse(_radiusController.text) ?? 2.0,
+          address: _address,
+          isPublic: _isPublic,
+          requiresApproval: _requiresApproval,
+          imageUrl: imageUrl,
+        );
+        if (communityId != null && mounted) {
+          await provider.loadMyCommunities(userId);
+          navigator.pop();
+          messenger.showSnackBar(
+            const SnackBar(content: Text('Community created successfully!')),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -115,7 +184,7 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create Community'),
+        title: Text(_isEditMode ? 'Edit Community' : 'Create Community'),
       ),
       body: Stack(
         children: [
@@ -126,6 +195,41 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Community image picker
+                  Center(
+                    child: Column(
+                      children: [
+                        GestureDetector(
+                          onTap: _isSubmitting ? null : _pickImage,
+                          child: CircleAvatar(
+                            radius: 44,
+                            backgroundColor: AppTheme.backgroundGrey,
+                            backgroundImage: _pickedImageBytes != null
+                                ? MemoryImage(_pickedImageBytes!)
+                                    as ImageProvider
+                                : (_existingImageUrl != null
+                                    ? NetworkImage(_existingImageUrl!)
+                                    : null),
+                            child: (_pickedImageBytes == null &&
+                                    _existingImageUrl == null)
+                                ? const Icon(
+                                    Icons.add_a_photo,
+                                    color: AppTheme.textSecondary,
+                                    size: 32,
+                                  )
+                                : null,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Tap to ${(_pickedImageBytes != null || _existingImageUrl != null) ? 'change' : 'add'} community photo',
+                          style: AppTheme.caption,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
                   // Community Name
                   const Text(
                     'Community Name',
@@ -191,7 +295,7 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE8F0FE),
+                      color: AppTheme.backgroundGrey,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(
@@ -214,28 +318,30 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
                           const SizedBox(height: 4),
                           Text(
                             '${_latitude.toStringAsFixed(4)}, ${_longitude.toStringAsFixed(4)}',
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 12,
-                              color: Colors.grey[600],
+                              color: AppTheme.textSecondary,
                             ),
                           ),
                         ],
                       ],
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: _loadingLocation ? null : _detectLocation,
-                    icon: const Icon(Icons.my_location, size: 16),
-                    label: const Text('Update Location'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
+                  if (!_isEditMode) ...[
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: _loadingLocation ? null : _detectLocation,
+                      icon: const Icon(Icons.my_location, size: 16),
+                      label: const Text('Update Location'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                   const SizedBox(height: 20),
 
                   // Coverage Radius
@@ -271,11 +377,11 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
                     },
                   ),
                   const SizedBox(height: 8),
-                  Text(
+                  const Text(
                     'Members within this radius can be part of your community',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey[600],
+                      color: AppTheme.textSecondary,
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -284,7 +390,7 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.grey[50],
+                      color: AppTheme.backgroundGrey,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: AppTheme.cardBorder),
                     ),
@@ -302,7 +408,9 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                _isPublic ? 'Public Community' : 'Private Community',
+                                _isPublic
+                                    ? 'Public Community'
+                                    : 'Private Community',
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -310,10 +418,10 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
                               Text(
                                 _isPublic
                                     ? 'Anyone can discover and request to join'
-                                    : 'Only invited users can join',
-                                style: TextStyle(
+                                    : 'Anyone can request — admin must approve',
+                                style: const TextStyle(
                                   fontSize: 12,
-                                  color: Colors.grey[600],
+                                  color: AppTheme.textSecondary,
                                 ),
                               ),
                             ],
@@ -322,55 +430,66 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
                         Switch(
                           value: _isPublic,
                           activeTrackColor: AppTheme.successGreen,
-                          onChanged: (v) => setState(() => _isPublic = v),
+                          onChanged: (v) => setState(() {
+                            _isPublic = v;
+                            if (!v) _requiresApproval = true;
+                          }),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-
-                  // Requires Approval Toggle
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[50],
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.cardBorder),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          _requiresApproval ? Icons.admin_panel_settings : Icons.how_to_reg,
-                          color: _requiresApproval
-                              ? AppTheme.warningOrange
-                              : AppTheme.successGreen,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _requiresApproval ? 'Admin Approval Required' : 'Auto-Approve Members',
-                                style: const TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              Text(
-                                _requiresApproval
-                                    ? 'New members need admin approval to join'
-                                    : 'Anyone can join instantly',
-                                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                              ),
-                            ],
+                  if (_isPublic) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppTheme.backgroundGrey,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.cardBorder),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _requiresApproval
+                                ? Icons.admin_panel_settings
+                                : Icons.how_to_reg,
+                            color: _requiresApproval
+                                ? AppTheme.warningOrange
+                                : AppTheme.successGreen,
                           ),
-                        ),
-                        Switch(
-                          value: _requiresApproval,
-                          activeTrackColor: AppTheme.warningOrange,
-                          onChanged: (v) => setState(() => _requiresApproval = v),
-                        ),
-                      ],
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _requiresApproval
+                                      ? 'Admin Approval Required'
+                                      : 'Auto-Approve Members',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                Text(
+                                  _requiresApproval
+                                      ? 'New members need admin approval to join'
+                                      : 'Anyone can join instantly',
+                                  style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppTheme.textSecondary),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Switch(
+                            value: _requiresApproval,
+                            activeTrackColor: AppTheme.warningOrange,
+                            onChanged: (v) =>
+                                setState(() => _requiresApproval = v),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
                   const SizedBox(height: 32),
 
                   // Buttons
@@ -396,7 +515,9 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
                                     color: Colors.white,
                                   ),
                                 )
-                              : const Text('Create Community'),
+                              : Text(_isEditMode
+                                  ? 'Save Changes'
+                                  : 'Create Community'),
                         ),
                       ),
                     ],
@@ -409,16 +530,18 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
           if (_isSubmitting)
             Container(
               color: Colors.black.withValues(alpha: 0.3),
-              child: const Center(
+              child: Center(
                 child: Card(
                   child: Padding(
-                    padding: EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(20),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        CircularProgressIndicator(),
-                        SizedBox(height: 16),
-                        Text('Creating community...'),
+                        const CircularProgressIndicator(),
+                        const SizedBox(height: 16),
+                        Text(_isEditMode
+                            ? 'Saving changes...'
+                            : 'Creating community...'),
                       ],
                     ),
                   ),

@@ -1,25 +1,32 @@
 // ignore_for_file: deprecated_member_use
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../../config/app_constants.dart';
 import '../../data/models/incident_model.dart';
 import '../../data/models/image_verification_result.dart';
 import '../../data/services/location_service.dart';
 import '../../data/services/media_upload_service.dart';
 import '../../data/services/image_verification_service.dart';
-import '../../config/app_constants.dart';
+import '../../data/services/report_draft_service.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/incident_enum_helpers.dart';
 import '../providers/incident_provider.dart';
 import '../providers/user_provider.dart';
-import '../providers/category_provider.dart';
 import '../providers/community_provider.dart';
+import '../widgets/report/report_location_section.dart';
+import '../widgets/report/community_selector_field.dart';
+import '../widgets/report/report_category_grid.dart';
+import '../widgets/report/report_severity_selector.dart';
+import '../widgets/report/incident_time_picker_tile.dart';
+import '../widgets/report/category_suggestion_banner.dart';
+import '../widgets/report/report_media_section.dart';
+import '../widgets/report/report_confirm_sheet.dart';
+import 'full_screen_map_picker_screen.dart';
 
 class ReportIncidentScreen extends StatefulWidget {
   const ReportIncidentScreen({super.key});
@@ -36,11 +43,11 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
   final _addressFocusNode = FocusNode();
   final _locationService = LocationService();
   final _mediaService = MediaUploadService();
+  final _draftService = ReportDraftService();
   final _verificationService = ImageVerificationService(
     apiKey: AppConstants.geminiApiKey,
   );
 
-  // Maximum allowed distance in meters (5 km)
   static const double _maxReportDistanceMeters = 5000;
   static const int _maxTitleLength = 100;
   static const int _maxDescriptionLength = 500;
@@ -48,6 +55,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
   static const int _maxMediaFiles = 5;
 
   IncidentCategory _selectedCategory = IncidentCategory.crime;
+  String? _selectedCategoryName; // Non-null only for admin-created custom categories
   SeverityLevel _selectedSeverity = SeverityLevel.high;
   bool _isAnonymous = true;
   double _latitude = AppConstants.defaultLat;
@@ -58,45 +66,34 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
   bool _isVerifying = false;
   ImageVerificationResult? _verificationResult;
 
-  // Enhancement 1: Incident time
   DateTime? _incidentTime;
 
-  // Enhancement 5: AI category suggestion
   IncidentCategory? _suggestedCategory;
   Timer? _suggestionDebounceTimer;
-
-  // Enhancement 6: Draft auto-save
   Timer? _draftSaveTimer;
 
-  // User's actual current position (for distance validation)
   double? _userCurrentLat;
   double? _userCurrentLng;
   bool _locationTooFar = false;
 
-  // Community sharing
-  final Set<String> _selectedCommunityIds = {};
+  String? _selectedCommunityId;
 
-  // Address autocomplete state
   List<PlaceSuggestion> _suggestions = [];
   Timer? _debounceTimer;
   bool _showSuggestions = false;
 
-  // Map controller
   GoogleMapController? _mapController;
-
   final List<XFile> _selectedMedia = [];
+
+  ScaffoldMessengerState? _scaffoldMessenger;
 
   @override
   void initState() {
     super.initState();
     _addressController.addListener(_onAddressChanged);
     _addressFocusNode.addListener(_onAddressFocusChanged);
-
-    // Enhancement 5: Listeners for AI category suggestion
     _titleController.addListener(_onTextChangedForSuggestion);
     _descriptionController.addListener(_onTextChangedForSuggestion);
-
-    // Enhancement 6: Listeners for draft auto-save
     _titleController.addListener(_onTextChangedForDraft);
     _descriptionController.addListener(_onTextChangedForDraft);
 
@@ -110,7 +107,27 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     });
   }
 
-  // ─── Enhancement 5: AI Category Suggestion ───────────────────────────────
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _scaffoldMessenger = ScaffoldMessenger.of(context);
+  }
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    _suggestionDebounceTimer?.cancel();
+    _draftSaveTimer?.cancel();
+    _scaffoldMessenger?.clearSnackBars();
+    _titleController.dispose();
+    _descriptionController.dispose();
+    _addressController.dispose();
+    _addressFocusNode.dispose();
+    _mapController?.dispose();
+    super.dispose();
+  }
+
+  // ─── AI Category Suggestion ───────────────────────────────────────────────
 
   void _onTextChangedForSuggestion() {
     _suggestionDebounceTimer?.cancel();
@@ -206,7 +223,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     if (mounted) setState(() => _suggestedCategory = cat);
   }
 
-  // ─── Enhancement 6: Draft Auto-Save ──────────────────────────────────────
+  // ─── Draft Auto-Save ──────────────────────────────────────────────────────
 
   void _onTextChangedForDraft() {
     _draftSaveTimer?.cancel();
@@ -216,59 +233,32 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
   }
 
   Future<void> _saveDraft() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('report_draft_title', _titleController.text);
-    await prefs.setString('report_draft_description', _descriptionController.text);
-    await prefs.setInt('report_draft_category', _selectedCategory.index);
-    await prefs.setInt('report_draft_severity', _selectedSeverity.index);
-    await prefs.setString('report_draft_address', _address);
-    await prefs.setDouble('report_draft_lat', _latitude);
-    await prefs.setDouble('report_draft_lng', _longitude);
-  }
-
-  Future<void> _clearDraft() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('report_draft_title');
-    await prefs.remove('report_draft_description');
-    await prefs.remove('report_draft_category');
-    await prefs.remove('report_draft_severity');
-    await prefs.remove('report_draft_address');
-    await prefs.remove('report_draft_lat');
-    await prefs.remove('report_draft_lng');
-  }
-
-  Future<bool> _loadDraft() async {
-    final prefs = await SharedPreferences.getInstance();
-    final title = prefs.getString('report_draft_title');
-    if (title == null || title.isEmpty) return false;
-    return true;
+    await _draftService.save(
+      title: _titleController.text,
+      description: _descriptionController.text,
+      categoryIndex: _selectedCategory.index,
+      severityIndex: _selectedSeverity.index,
+      address: _address,
+      latitude: _latitude,
+      longitude: _longitude,
+    );
   }
 
   Future<void> _checkForDraft() async {
-    final hasDraft = await _loadDraft();
-    if (!hasDraft || !mounted) return;
-
-    final prefs = await SharedPreferences.getInstance();
-    final draftTitle = prefs.getString('report_draft_title') ?? '';
-    final draftDescription = prefs.getString('report_draft_description') ?? '';
-    final draftCategoryIdx = prefs.getInt('report_draft_category');
-    final draftSeverityIdx = prefs.getInt('report_draft_severity');
-    final draftAddress = prefs.getString('report_draft_address') ?? '';
-    final draftLat = prefs.getDouble('report_draft_lat');
-    final draftLng = prefs.getDouble('report_draft_lng');
-
-    if (!mounted) return;
+    final draft = await _draftService.load();
+    if (draft == null || !mounted) return;
 
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Restore Draft?'),
-        content: const Text('You have an unsaved draft. Would you like to restore it?'),
+        content: const Text(
+            'You have an unsaved draft. Would you like to restore it?'),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
-              _clearDraft();
+              _draftService.clear();
             },
             child: const Text('Discard'),
           ),
@@ -277,23 +267,23 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
               Navigator.pop(ctx);
               if (!mounted) return;
               setState(() {
-                _titleController.text = draftTitle;
-                _descriptionController.text = draftDescription;
-                if (draftCategoryIdx != null &&
-                    draftCategoryIdx < IncidentCategory.values.length) {
-                  _selectedCategory = IncidentCategory.values[draftCategoryIdx];
+                _titleController.text = draft.title;
+                _descriptionController.text = draft.description;
+                if (draft.categoryIndex < IncidentCategory.values.length) {
+                  _selectedCategory =
+                      IncidentCategory.values[draft.categoryIndex];
                 }
-                if (draftSeverityIdx != null &&
-                    draftSeverityIdx < SeverityLevel.values.length) {
-                  _selectedSeverity = SeverityLevel.values[draftSeverityIdx];
+                if (draft.severityIndex < SeverityLevel.values.length) {
+                  _selectedSeverity =
+                      SeverityLevel.values[draft.severityIndex];
                 }
-                if (draftAddress.isNotEmpty) {
-                  _address = draftAddress;
-                  _addressController.text = draftAddress;
+                if (draft.address.isNotEmpty) {
+                  _address = draft.address;
+                  _addressController.text = draft.address;
                 }
-                if (draftLat != null && draftLng != null) {
-                  _latitude = draftLat;
-                  _longitude = draftLng;
+                if (draft.latitude != null && draft.longitude != null) {
+                  _latitude = draft.latitude!;
+                  _longitude = draft.longitude!;
                 }
               });
             },
@@ -309,7 +299,6 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
 
   void _onAddressChanged() {
     if (!_addressFocusNode.hasFocus) return;
-
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 400), () {
       _fetchSuggestions(_addressController.text);
@@ -334,7 +323,6 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
       });
       return;
     }
-
     final suggestions = await _locationService.getAddressSuggestions(
       query,
       latitude: _userCurrentLat,
@@ -374,6 +362,8 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     }
   }
 
+  // ─── Location ─────────────────────────────────────────────────────────────
+
   Future<void> _detectLocation() async {
     setState(() => _loadingLocation = true);
     try {
@@ -394,7 +384,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
           CameraUpdate.newLatLng(LatLng(pos.latitude, pos.longitude)),
         );
       } else if (mounted) {
-        if (kDebugMode) debugPrint('Location detection returned null - check permissions');
+        if (kDebugMode) debugPrint('Location detection returned null');
       }
     } catch (e) {
       if (kDebugMode) debugPrint('Error detecting location: $e');
@@ -415,7 +405,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     final result = await Navigator.push<LatLng>(
       context,
       MaterialPageRoute(
-        builder: (_) => _FullScreenMapPicker(
+        builder: (_) => FullScreenMapPickerScreen(
           initialPosition: LatLng(_latitude, _longitude),
         ),
       ),
@@ -425,9 +415,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
         _latitude = result.latitude;
         _longitude = result.longitude;
       });
-      _mapController?.animateCamera(
-        CameraUpdate.newLatLng(result),
-      );
+      _mapController?.animateCamera(CameraUpdate.newLatLng(result));
       final addr = await _locationService.getAddressFromCoordinates(
           result.latitude, result.longitude);
       if (mounted) {
@@ -441,9 +429,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
   }
 
   double _calculateDistance() {
-    if (_userCurrentLat == null || _userCurrentLng == null) {
-      return 0;
-    }
+    if (_userCurrentLat == null || _userCurrentLng == null) return 0;
     return Geolocator.distanceBetween(
       _userCurrentLat!,
       _userCurrentLng!,
@@ -461,35 +447,11 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
   }
 
   String _formatDistance(double meters) {
-    if (meters < 1000) {
-      return '${meters.round()} m';
-    }
+    if (meters < 1000) return '${meters.round()} m';
     return '${(meters / 1000).toStringAsFixed(1)} km';
   }
 
-  ScaffoldMessengerState? _scaffoldMessenger;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _scaffoldMessenger = ScaffoldMessenger.of(context);
-  }
-
-  @override
-  void dispose() {
-    _debounceTimer?.cancel();
-    _suggestionDebounceTimer?.cancel();
-    _draftSaveTimer?.cancel();
-    _scaffoldMessenger?.clearSnackBars();
-    _titleController.dispose();
-    _descriptionController.dispose();
-    _addressController.dispose();
-    _addressFocusNode.dispose();
-    _mapController?.dispose();
-    super.dispose();
-  }
-
-  // ─── Enhancement 1: Incident Time Picker ─────────────────────────────────
+  // ─── Incident Time ─────────────────────────────────────────────────────────
 
   Future<void> _pickIncidentTime() async {
     final now = DateTime.now();
@@ -520,7 +482,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     });
   }
 
-  // ─── Media Picker ─────────────────────────────────────────────────────────
+  // ─── Media ────────────────────────────────────────────────────────────────
 
   Future<void> _pickMedia() async {
     showModalBottomSheet(
@@ -541,24 +503,22 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                     color: AppTheme.primaryDark.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.camera_alt, color: AppTheme.primaryDark),
+                  child: const Icon(Icons.camera_alt,
+                      color: AppTheme.primaryDark),
                 ),
                 title: const Text('Take Photo'),
                 onTap: () async {
                   Navigator.pop(context);
                   if (_selectedMedia.length >= _maxMediaFiles) {
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                            content:
-                                Text('Maximum $_maxMediaFiles files allowed.')),
-                      );
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text(
+                              'Maximum $_maxMediaFiles files allowed.')));
                     }
                     return;
                   }
                   final image = await _mediaService.pickImage(
-                    source: ImageSource.camera,
-                  );
+                      source: ImageSource.camera);
                   if (image != null && mounted) {
                     setState(() => _selectedMedia.add(image));
                   }
@@ -571,24 +531,22 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                     color: AppTheme.primaryDark.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.videocam, color: AppTheme.primaryDark),
+                  child: const Icon(Icons.videocam,
+                      color: AppTheme.primaryDark),
                 ),
                 title: const Text('Record Video'),
                 onTap: () async {
                   Navigator.pop(context);
                   if (_selectedMedia.length >= _maxMediaFiles) {
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                            content:
-                                Text('Maximum $_maxMediaFiles files allowed.')),
-                      );
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text(
+                              'Maximum $_maxMediaFiles files allowed.')));
                     }
                     return;
                   }
                   final video = await _mediaService.pickVideo(
-                    source: ImageSource.camera,
-                  );
+                      source: ImageSource.camera);
                   if (video != null && mounted) {
                     setState(() => _selectedMedia.add(video));
                   }
@@ -601,7 +559,8 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                     color: AppTheme.primaryDark.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.photo_library, color: AppTheme.primaryDark),
+                  child: const Icon(Icons.photo_library,
+                      color: AppTheme.primaryDark),
                 ),
                 title: const Text('Choose from Gallery'),
                 onTap: () async {
@@ -615,13 +574,11 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                     final truncated = images.length > remaining;
                     setState(() => _selectedMedia.addAll(toAdd));
                     if (truncated) {
-                      messenger.showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Only $remaining more file(s) added. Maximum $_maxMediaFiles files allowed.',
-                          ),
+                      messenger.showSnackBar(SnackBar(
+                        content: Text(
+                          'Only $remaining more file(s) added. Maximum $_maxMediaFiles files allowed.',
                         ),
-                      );
+                      ));
                     }
                   }
                 },
@@ -637,11 +594,9 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     setState(() => _selectedMedia.removeAt(index));
   }
 
-  // ─── Enhancement 3 & 4: Submit Flow ──────────────────────────────────────
+  // ─── Submit Flow ──────────────────────────────────────────────────────────
 
-  /// New _submit() entry point: validates form, then shows confirm dialog.
   Future<void> _submit() async {
-    // Enhancement 3: Inline form validation first
     final isValid = _formKey.currentState!.validate();
     if (!isValid) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -652,195 +607,37 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
       );
       return;
     }
-
-    // Enhancement 4: Show confirmation dialog before submitting
     await _showConfirmDialog();
   }
 
-  /// Enhancement 4: Show bottom sheet summary before submitting.
   Future<void> _showConfirmDialog() async {
     final addressToShow = _addressController.text.trim().isNotEmpty
         ? _addressController.text.trim()
         : _address;
 
-    await showModalBottomSheet(
+    String? communityName;
+    if (_selectedCommunityId != null) {
+      final communities = context.read<CommunityProvider>().myCommunities;
+      final match = communities.where((c) => c.id == _selectedCommunityId);
+      if (match.isNotEmpty) communityName = match.first.name;
+    }
+
+    final confirmed = await showReportConfirmSheet(
       context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const Text(
-                  'Confirm Report',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: AppTheme.fontFamily,
-                    color: AppTheme.primaryDark,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Title
-                Text(
-                  _titleController.text.trim(),
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: AppTheme.fontFamily,
-                    color: AppTheme.primaryDark,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // Category chip
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    Chip(
-                      label: Text(
-                        _categoryLabel(_selectedCategory),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontFamily: AppTheme.fontFamily,
-                        ),
-                      ),
-                      backgroundColor:
-                          AppTheme.categoryColor(_categoryLabel(_selectedCategory)),
-                      padding: EdgeInsets.zero,
-                    ),
-                    Chip(
-                      label: Text(
-                        _severityLabel(_selectedSeverity),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontFamily: AppTheme.fontFamily,
-                        ),
-                      ),
-                      backgroundColor: _severityColor(_selectedSeverity),
-                      padding: EdgeInsets.zero,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                // Location
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.location_on_outlined,
-                        size: 16, color: AppTheme.textSecondary),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        addressToShow,
-                        style: AppTheme.caption,
-                      ),
-                    ),
-                  ],
-                ),
-                // Incident time
-                if (_incidentTime != null) ...[
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      const Icon(Icons.schedule,
-                          size: 16, color: AppTheme.textSecondary),
-                      const SizedBox(width: 4),
-                      Text(
-                        'When: ${DateFormat('dd MMM yyyy, h:mm a').format(_incidentTime!)}',
-                        style: AppTheme.caption,
-                      ),
-                    ],
-                  ),
-                ],
-                // Media count
-                if (_selectedMedia.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      const Icon(Icons.photo_library_outlined,
-                          size: 16, color: AppTheme.textSecondary),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${_selectedMedia.length} media file(s) attached',
-                        style: AppTheme.caption,
-                      ),
-                    ],
-                  ),
-                ],
-                // Anonymous
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Icon(
-                      _isAnonymous
-                          ? Icons.visibility_off_outlined
-                          : Icons.person_outline,
-                      size: 16,
-                      color: AppTheme.textSecondary,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      _isAnonymous ? 'Submitted anonymously' : 'Submitted with your name',
-                      style: AppTheme.caption,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                // Buttons
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(sheetContext),
-                        child: const Text('Edit'),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pop(sheetContext);
-                          _submitFinal();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryRed,
-                        ),
-                        child: const Text('Submit'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+      title: _titleController.text.trim(),
+      category: _selectedCategory,
+      severity: _selectedSeverity,
+      address: addressToShow,
+      incidentTime: _incidentTime,
+      mediaCount: _selectedMedia.length,
+      isAnonymous: _isAnonymous,
+      communityName: communityName,
     );
+
+    if (confirmed) _submitFinal();
   }
 
-  /// Enhancement 2 & 4: The actual submit logic (renamed from _submit).
   Future<void> _submitFinal() async {
-    // Block banned or suspended users
     final currentUser = context.read<UserProvider>().currentUser;
     if (currentUser == null || !currentUser.canAccessApp) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -852,7 +649,6 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
       return;
     }
 
-    // Validate title
     final title = _titleController.text.trim();
     if (title.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -866,14 +662,14 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     if (title.length > _maxTitleLength) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Title is too long (max $_maxTitleLength characters).'),
+          content:
+              Text('Title is too long (max $_maxTitleLength characters).'),
           backgroundColor: AppTheme.primaryRed,
         ),
       );
       return;
     }
 
-    // Validate description length
     final description = _descriptionController.text.trim();
     if (description.length > _maxDescriptionLength) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -886,7 +682,6 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
       return;
     }
 
-    // Validate distance before submission
     if (_userCurrentLat != null && _userCurrentLng != null) {
       final distance = _calculateDistance();
       if (distance > _maxReportDistanceMeters) {
@@ -894,7 +689,8 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
           SnackBar(
             content: Text(
               'Location is too far (${_formatDistance(distance)}). '
-              'You can only report incidents within ${_formatDistance(_maxReportDistanceMeters)} of your current location.',
+              'You can only report incidents within '
+              '${_formatDistance(_maxReportDistanceMeters)} of your current location.',
             ),
             backgroundColor: AppTheme.primaryRed,
             duration: const Duration(seconds: 4),
@@ -925,41 +721,31 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
 
     setState(() => _isSubmitting = true);
 
-    // Enhancement 2: Verify ALL selected images
-    if (kDebugMode) debugPrint('Report: Media count=${_selectedMedia.length}, isConfigured=${_verificationService.isConfigured}');
     if (_selectedMedia.isNotEmpty && _verificationService.isConfigured) {
-      if (kDebugMode) debugPrint('Report: Starting image verification for all images...');
+      if (kDebugMode) debugPrint('Report: Starting image verification...');
       setState(() => _isVerifying = true);
-
       try {
         ImageVerificationResult? worstResult;
-
         for (final media in _selectedMedia) {
           final ext = media.path.split('.').last.toLowerCase();
-          final isVideo = ['mp4', 'mov', 'avi', 'mkv'].contains(ext);
-          if (isVideo) continue; // Skip videos
+          if (['mp4', 'mov', 'avi', 'mkv'].contains(ext)) continue;
 
           final imageBytes = await media.readAsBytes();
-          if (kDebugMode) debugPrint('Report: Read ${imageBytes.length} bytes from image');
           final result = await _verificationService.verifyImage(
             imageBytes: imageBytes,
-            categoryName: _categoryLabel(_selectedCategory),
+            categoryName: _selectedCategoryName ?? categoryLabel(_selectedCategory),
             description: _descriptionController.text.trim(),
           );
-
-          // Keep the worst (lowest confidence) result
           if (worstResult == null ||
               result.confidenceScore < worstResult.confidenceScore) {
             worstResult = result;
           }
         }
-
         if (worstResult != null) {
           setState(() {
             _verificationResult = worstResult;
             _isVerifying = false;
           });
-
           if (!worstResult.isValid || worstResult.isLowConfidence) {
             if (mounted) {
               final shouldContinue =
@@ -976,14 +762,11 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
       } catch (e) {
         if (kDebugMode) debugPrint('Image verification error: $e');
         setState(() => _isVerifying = false);
-        // Continue with submission even if verification fails
       }
     }
 
     String? incidentId;
-
     try {
-      // Create incident first to get the ID (with timeout)
       incidentId = await provider.reportIncident(
         title: _titleController.text.trim(),
         category: _selectedCategory,
@@ -999,8 +782,10 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
         imageVerified: _verificationResult?.isValid,
         verificationScore: _verificationResult?.confidenceScore,
         verificationNote: _verificationResult?.explanation,
-        communityIds: _selectedCommunityIds.toList(),
+        communityIds:
+            _selectedCommunityId != null ? [_selectedCommunityId!] : [],
         incidentTime: _incidentTime,
+        customCategoryName: _selectedCategoryName,
       ).timeout(
         const Duration(seconds: 30),
         onTimeout: () {
@@ -1022,33 +807,19 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
         return;
       }
 
-      // Upload media if any
       if (_selectedMedia.isNotEmpty) {
-        if (kDebugMode) debugPrint('Report: Starting media upload for ${_selectedMedia.length} files');
         try {
           final mediaUrls = await _mediaService.uploadMultipleFiles(
-            _selectedMedia,
-            incidentId,
-          );
-
-          if (kDebugMode) debugPrint('Report: Got ${mediaUrls.length} URLs back');
+              _selectedMedia, incidentId);
           if (mediaUrls.isNotEmpty) {
-            if (kDebugMode) debugPrint('Report: Updating incident with media URLs');
             await provider.updateIncidentMedia(incidentId, mediaUrls);
-            if (kDebugMode) debugPrint('Report: Media URLs updated successfully');
-          } else {
-            if (kDebugMode) debugPrint('Report: WARNING - No media URLs returned, skipping update');
           }
         } catch (mediaError) {
-          if (kDebugMode) debugPrint('Report: Media upload failed: $mediaError');
+          if (kDebugMode) debugPrint('Media upload failed: $mediaError');
         }
-      } else {
-        if (kDebugMode) debugPrint('Report: No media selected, skipping upload');
       }
 
-      // Enhancement 6: Clear draft on successful submit
-      await _clearDraft();
-
+      await _draftService.clear();
       if (!mounted) return;
 
       final wasAutoApproved = _verificationResult != null &&
@@ -1056,9 +827,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
           _verificationResult!.isHighConfidence;
 
       setState(() => _isSubmitting = false);
-
       await Future.delayed(const Duration(milliseconds: 100));
-
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1072,11 +841,9 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  wasAutoApproved
-                      ? 'Report verified and published!'
-                      : 'Report submitted for review',
-                ),
+                child: Text(wasAutoApproved
+                    ? 'Report verified and published!'
+                    : 'Report submitted for review'),
               ),
             ],
           ),
@@ -1111,7 +878,9 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
             title: Row(
               children: [
                 Icon(
-                  result.isValid ? Icons.warning_amber : Icons.error_outline,
+                  result.isValid
+                      ? Icons.warning_amber
+                      : Icons.error_outline,
                   color: result.isValid
                       ? AppTheme.warningOrange
                       : AppTheme.primaryRed,
@@ -1124,10 +893,8 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  result.explanation,
-                  style: const TextStyle(fontSize: 14),
-                ),
+                Text(result.explanation,
+                    style: const TextStyle(fontSize: 14)),
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -1146,7 +913,8 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          '${(result.confidenceScore * 100).toInt()}% (${result.confidenceLabel})',
+                          '${(result.confidenceScore * 100).toInt()}% '
+                          '(${result.confidenceLabel})',
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
@@ -1159,15 +927,13 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                 ),
                 if (result.concerns.isNotEmpty) ...[
                   const SizedBox(height: 12),
-                  const Text(
-                    'Concerns:',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
+                  const Text('Concerns:',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
                   ...result.concerns.map((c) => Padding(
                         padding: const EdgeInsets.only(left: 8),
-                        child:
-                            Text('• $c', style: const TextStyle(fontSize: 13)),
+                        child: Text('• $c',
+                            style: const TextStyle(fontSize: 13)),
                       )),
                 ],
                 const SizedBox(height: 16),
@@ -1175,10 +941,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                   result.isValid
                       ? 'The image may not clearly match your report. Do you want to submit anyway?'
                       : 'The image does not appear to match your selected category. Please review your submission.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[700],
-                  ),
+                  style: TextStyle(fontSize: 13, color: Colors.grey[700]),
                 ),
               ],
             ),
@@ -1212,10 +975,10 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final myCommunities = context.watch<CommunityProvider>().myCommunities;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Report Incident'),
-      ),
+      appBar: AppBar(title: const Text('Report Incident')),
       body: Stack(
         children: [
           SingleChildScrollView(
@@ -1225,379 +988,105 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Location section ──────────────────────────────────
-                  const Text(
-                    'Location',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.primaryRed,
-                    ),
+                  // ── Location ──────────────────────────────────────────
+                  ReportLocationSection(
+                    latitude: _latitude,
+                    longitude: _longitude,
+                    addressController: _addressController,
+                    addressFocusNode: _addressFocusNode,
+                    loadingLocation: _loadingLocation,
+                    locationTooFar: _locationTooFar,
+                    userCurrentLat: _userCurrentLat,
+                    userCurrentLng: _userCurrentLng,
+                    suggestions: _suggestions,
+                    showSuggestions: _showSuggestions,
+                    formattedDistance: _userCurrentLat != null
+                        ? _formatDistance(_calculateDistance())
+                        : '',
+                    onMapCreated: (c) => _mapController = c,
+                    onMapTap: (latLng) {
+                      setState(() {
+                        _latitude = latLng.latitude;
+                        _longitude = latLng.longitude;
+                      });
+                      _locationService
+                          .getAddressFromCoordinates(
+                              latLng.latitude, latLng.longitude)
+                          .then((addr) {
+                        if (mounted) {
+                          setState(() {
+                            _address = addr;
+                            _addressController.text = addr;
+                          });
+                          _validateDistance();
+                        }
+                      });
+                    },
+                    onDetectLocation: _detectLocation,
+                    onOpenFullScreenMap: _openFullScreenMap,
+                    onSuggestionSelected: _selectSuggestion,
+                    onClearAddress: () {
+                      _addressController.clear();
+                      setState(() {
+                        _suggestions = [];
+                        _showSuggestions = false;
+                      });
+                    },
                   ),
-                  const SizedBox(height: 8),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: 180,
-                      child: Stack(
-                        children: [
-                          GoogleMap(
-                            initialCameraPosition: CameraPosition(
-                              target: LatLng(_latitude, _longitude),
-                              zoom: 15,
-                            ),
-                            onMapCreated: (controller) {
-                              _mapController = controller;
-                            },
-                            markers: {
-                              Marker(
-                                markerId: const MarkerId('incident_location'),
-                                position: LatLng(_latitude, _longitude),
-                                icon: BitmapDescriptor.defaultMarkerWithHue(
-                                  BitmapDescriptor.hueRed,
-                                ),
-                              ),
-                            },
-                            onTap: (latLng) {
-                              setState(() {
-                                _latitude = latLng.latitude;
-                                _longitude = latLng.longitude;
-                              });
-                              _locationService
-                                  .getAddressFromCoordinates(
-                                      latLng.latitude, latLng.longitude)
-                                  .then((addr) {
-                                if (mounted) {
-                                  setState(() {
-                                    _address = addr;
-                                    _addressController.text = addr;
-                                  });
-                                  _validateDistance();
-                                }
-                              });
-                            },
-                            zoomControlsEnabled: false,
-                            myLocationEnabled: true,
-                            myLocationButtonEnabled: false,
-                          ),
-                          if (_loadingLocation)
-                            Container(
-                              color: Colors.white.withValues(alpha: 0.7),
-                              child: const Center(
-                                child: CircularProgressIndicator(),
-                              ),
-                            ),
-                          Positioned(
-                            bottom: 8,
-                            left: 8,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.6),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Text(
-                                'Tap map to adjust location',
-                                style: TextStyle(
-                                    color: Colors.white, fontSize: 11),
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            top: 8,
-                            right: 8,
-                            child: GestureDetector(
-                              onTap: _openFullScreenMap,
-                              child: Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.6),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: const Icon(
-                                  Icons.fullscreen,
-                                  color: Colors.white,
-                                  size: 18,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  // Address input with autocomplete
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      TextField(
-                        controller: _addressController,
-                        focusNode: _addressFocusNode,
-                        decoration: InputDecoration(
-                          labelText: 'Address',
-                          hintText: 'Type to search address...',
-                          prefixIcon: const Icon(Icons.search),
-                          suffixIcon: _addressController.text.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear),
-                                  onPressed: () {
-                                    _addressController.clear();
-                                    setState(() {
-                                      _suggestions = [];
-                                      _showSuggestions = false;
-                                    });
-                                  },
-                                )
-                              : null,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        onSubmitted: (value) {
-                          if (value.isNotEmpty) {
-                            _address = value;
-                            setState(() => _showSuggestions = false);
-                          }
-                        },
-                      ),
-                      if (_showSuggestions && _suggestions.isNotEmpty)
-                        Container(
-                          margin: const EdgeInsets.only(top: 4),
-                          constraints: const BoxConstraints(maxHeight: 200),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.1),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: ListView.builder(
-                            shrinkWrap: true,
-                            itemCount: _suggestions.length,
-                            itemBuilder: (context, index) {
-                              final suggestion = _suggestions[index];
-                              return ListTile(
-                                leading: const Icon(
-                                    Icons.location_on_outlined,
-                                    color: AppTheme.primaryRed),
-                                title: Text(
-                                  suggestion.description,
-                                  style: const TextStyle(fontSize: 14),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                onTap: () => _selectSuggestion(suggestion),
-                              );
-                            },
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed:
-                            _loadingLocation ? null : _detectLocation,
-                        icon: const Icon(Icons.my_location, size: 16),
-                        label: const Text('Use Current Location'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                        ),
-                      ),
-                      if (_userCurrentLat != null &&
-                          !_locationTooFar &&
-                          !_loadingLocation) ...[
-                        const SizedBox(width: 8),
-                        Text(
-                          _formatDistance(_calculateDistance()),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  if (_locationTooFar)
-                    Container(
-                      margin: const EdgeInsets.only(top: 8),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryRed.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                            color:
-                                AppTheme.primaryRed.withValues(alpha: 0.3)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.warning_amber_rounded,
-                              color: AppTheme.primaryRed, size: 20),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Location is ${_formatDistance(_calculateDistance())} away. '
-                              'You can only report incidents within ${_formatDistance(_maxReportDistanceMeters)} of your current location.',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppTheme.primaryRed,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
 
-                  // ── Category section ──────────────────────────────────
-                  const Text(
-                    'Category',
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildCategoryGrid(),
-                  const SizedBox(height: 24),
-
-                  // ── Severity section ──────────────────────────────────
-                  const Text(
-                    'Severity Level',
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: SeverityLevel.values.map((level) {
-                      final selected = _selectedSeverity == level;
-                      final color = _severityColor(level);
-                      return GestureDetector(
-                        onTap: () =>
-                            setState(() => _selectedSeverity = level),
-                        child: Column(
-                          children: [
-                            Container(
-                              width: selected ? 56 : 44,
-                              height: selected ? 56 : 44,
-                              decoration: BoxDecoration(
-                                color: color,
-                                shape: BoxShape.circle,
-                                border: selected
-                                    ? Border.all(
-                                        color: Colors.white, width: 3)
-                                    : null,
-                                boxShadow: selected
-                                    ? [
-                                        BoxShadow(
-                                          color:
-                                              color.withValues(alpha: 0.5),
-                                          blurRadius: 8,
-                                          spreadRadius: 2,
-                                        )
-                                      ]
-                                    : null,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              _severityLabel(level),
-                              style: TextStyle(
-                                fontWeight: selected
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                                color: selected
-                                    ? AppTheme.primaryDark
-                                    : Colors.grey,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
+                  // ── Community ─────────────────────────────────────────
+                  CommunitySelectorField(
+                    communities: myCommunities,
+                    selectedCommunityId: _selectedCommunityId,
+                    onCommunitySelected: (id) =>
+                        setState(() => _selectedCommunityId = id),
                   ),
                   const SizedBox(height: 24),
 
-                  // ── Enhancement 1: When did this happen ───────────────
-                  const Text(
-                    'When did this happen?',
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold),
+                  // ── Category ──────────────────────────────────────────
+                  const Text('Category',
+                      style: TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  ReportCategoryGrid(
+                    selectedCategory: _selectedCategory,
+                    selectedCategoryName: _selectedCategoryName,
+                    onCategorySelected: (cat, customName) => setState(() {
+                      _selectedCategory = cat;
+                      _selectedCategoryName = customName;
+                    }),
                   ),
+                  const SizedBox(height: 24),
+
+                  // ── Severity ──────────────────────────────────────────
+                  const Text('Severity Level',
+                      style: TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  ReportSeveritySelector(
+                    selectedSeverity: _selectedSeverity,
+                    onSeverityChanged: (level) =>
+                        setState(() => _selectedSeverity = level),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // ── Incident time ─────────────────────────────────────
+                  const Text('When did this happen?',
+                      style: TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
-                  InkWell(
+                  IncidentTimePickerTile(
+                    incidentTime: _incidentTime,
                     onTap: _pickIncidentTime,
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: AppTheme.cardBorder),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.schedule,
-                              color: AppTheme.primaryRed, size: 20),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _incidentTime == null
-                                      ? 'Just now'
-                                      : DateFormat('dd MMM yyyy, h:mm a')
-                                          .format(_incidentTime!),
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    color: _incidentTime == null
-                                        ? AppTheme.textSecondary
-                                        : AppTheme.primaryDark,
-                                    fontFamily: AppTheme.fontFamily,
-                                  ),
-                                ),
-                                if (_incidentTime != null)
-                                  Text(
-                                    'Tap to change',
-                                    style: AppTheme.caption,
-                                  ),
-                              ],
-                            ),
-                          ),
-                          if (_incidentTime != null)
-                            IconButton(
-                              icon: const Icon(Icons.close, size: 18),
-                              color: AppTheme.textSecondary,
-                              onPressed: () =>
-                                  setState(() => _incidentTime = null),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                            ),
-                        ],
-                      ),
-                    ),
+                    onClear: () => setState(() => _incidentTime = null),
                   ),
                   const SizedBox(height: 24),
 
                   // ── Title ─────────────────────────────────────────────
-                  const Text(
-                    'Title',
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
+                  const Text('Title',
+                      style: TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   TextFormField(
                     controller: _titleController,
@@ -1617,84 +1106,23 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                   ),
                   const SizedBox(height: 8),
 
-                  // ── AI Suggestion Banner ───────────────────────────────
-                  if (_suggestedCategory != null)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: _suggestedCategory == _selectedCategory
-                            ? AppTheme.successGreen.withValues(alpha: 0.1)
-                            : AppTheme.warningOrange.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: _suggestedCategory == _selectedCategory
-                              ? AppTheme.successGreen.withValues(alpha: 0.4)
-                              : AppTheme.warningOrange.withValues(alpha: 0.4),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            _suggestedCategory == _selectedCategory
-                                ? Icons.check_circle_outline
-                                : Icons.lightbulb_outline,
-                            color: _suggestedCategory == _selectedCategory
-                                ? AppTheme.successGreen
-                                : AppTheme.warningOrange,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              _suggestedCategory == _selectedCategory
-                                  ? 'Category looks correct: ${_categoryLabel(_suggestedCategory!)}'
-                                  : 'Suggested: ${_categoryLabel(_suggestedCategory!)}',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: AppTheme.primaryDark,
-                                fontFamily: AppTheme.fontFamily,
-                              ),
-                            ),
-                          ),
-                          if (_suggestedCategory != _selectedCategory)
-                            TextButton(
-                              onPressed: () => setState(() {
-                                _selectedCategory = _suggestedCategory!;
-                                _suggestedCategory = null;
-                              }),
-                              style: TextButton.styleFrom(
-                                foregroundColor: AppTheme.warningOrange,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 4),
-                                minimumSize: Size.zero,
-                                tapTargetSize:
-                                    MaterialTapTargetSize.shrinkWrap,
-                              ),
-                              child: const Text('Apply',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold)),
-                            ),
-                          IconButton(
-                            icon: const Icon(Icons.close, size: 16),
-                            color: AppTheme.textSecondary,
-                            onPressed: () =>
-                                setState(() => _suggestedCategory = null),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                          ),
-                        ],
-                      ),
-                    ),
+                  // ── AI Suggestion Banner ──────────────────────────────
+                  CategorySuggestionBanner(
+                    suggestedCategory: _suggestedCategory,
+                    selectedCategory: _selectedCategory,
+                    onApply: (cat) => setState(() {
+                      _selectedCategory = cat;
+                      _suggestedCategory = null;
+                    }),
+                    onDismiss: () =>
+                        setState(() => _suggestedCategory = null),
+                  ),
                   const SizedBox(height: 8),
 
                   // ── Description ───────────────────────────────────────
-                  const Text(
-                    'Description (Optional)',
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
+                  const Text('Description (Optional)',
+                      style: TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   TextFormField(
                     controller: _descriptionController,
@@ -1709,62 +1137,24 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // ── Media section ─────────────────────────────────────
-                  const Text(
-                    'Photo/Video Evidence',
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
+                  // ── Media ─────────────────────────────────────────────
+                  const Text('Photo/Video Evidence',
+                      style: TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
-                  if (_selectedMedia.isNotEmpty) ...[
-                    SizedBox(
-                      height: 100,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: _selectedMedia.length + 1,
-                        itemBuilder: (context, index) {
-                          if (index == _selectedMedia.length) {
-                            return _buildAddMediaButton();
-                          }
-                          return _buildMediaPreview(index);
-                        },
-                      ),
-                    ),
-                  ] else ...[
-                    GestureDetector(
-                      onTap: _pickMedia,
-                      child: Container(
-                        width: double.infinity,
-                        height: 100,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey[300]!),
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.add_a_photo,
-                                size: 32, color: Colors.grey[600]),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Add Photo/Video',
-                              style: TextStyle(color: Colors.grey[600]),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
+                  ReportMediaSection(
+                    selectedMedia: _selectedMedia,
+                    maxMediaFiles: _maxMediaFiles,
+                    onAddMedia: _pickMedia,
+                    onRemoveMedia: _removeMedia,
+                  ),
                   const SizedBox(height: 16),
 
                   // ── Anonymous toggle ──────────────────────────────────
                   Row(
                     children: [
-                      const Text(
-                        'Report anonymously',
-                        style: TextStyle(fontSize: 15),
-                      ),
+                      const Text('Report anonymously',
+                          style: TextStyle(fontSize: 15)),
                       const Spacer(),
                       Switch(
                         value: _isAnonymous,
@@ -1774,10 +1164,6 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
-
-                  // ── Community sharing section ──────────────────────────
-                  _buildCommunitySelector(),
                   const SizedBox(height: 24),
 
                   // ── Buttons ───────────────────────────────────────────
@@ -1794,14 +1180,12 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                       const SizedBox(width: 16),
                       Expanded(
                         child: ElevatedButton(
-                          onPressed:
-                              (_isSubmitting || _locationTooFar)
-                                  ? null
-                                  : _submit,
+                          onPressed: (_isSubmitting || _locationTooFar)
+                              ? null
+                              : _submit,
                           style: _locationTooFar
                               ? ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.grey,
-                                )
+                                  backgroundColor: Colors.grey)
                               : null,
                           child: _isSubmitting
                               ? const SizedBox(
@@ -1845,452 +1229,6 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                 ),
               ),
             ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMediaPreview(int index) {
-    final file = _selectedMedia[index];
-    final isVideo = ['mp4', 'mov', 'avi', 'mkv']
-        .contains(file.path.split('.').last.toLowerCase());
-
-    return Container(
-      width: 100,
-      height: 100,
-      margin: const EdgeInsets.only(right: 8),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        image: isVideo
-            ? null
-            : DecorationImage(
-                image: FileImage(File(file.path)),
-                fit: BoxFit.cover,
-              ),
-        color: isVideo ? Colors.grey[800] : null,
-      ),
-      child: Stack(
-        children: [
-          if (isVideo)
-            const Center(
-              child: Icon(Icons.videocam, color: Colors.white, size: 32),
-            ),
-          Positioned(
-            top: 4,
-            right: 4,
-            child: GestureDetector(
-              onTap: () => _removeMedia(index),
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: const BoxDecoration(
-                  color: Colors.red,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.close, color: Colors.white, size: 16),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAddMediaButton() {
-    return GestureDetector(
-      onTap: _pickMedia,
-      child: Container(
-        width: 100,
-        height: 100,
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey[300]!),
-        ),
-        child: const Icon(Icons.add, size: 32, color: Colors.grey),
-      ),
-    );
-  }
-
-  Widget _buildCommunitySelector() {
-    final myCommunities = context.watch<CommunityProvider>().myCommunities;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Text(
-              'Share to Communities',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              '(optional)',
-              style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Leave unselected to post publicly only.',
-          style: AppTheme.caption,
-        ),
-        const SizedBox(height: 12),
-        if (myCommunities.isEmpty)
-          Text(
-            'You are not a member of any community.',
-            style: AppTheme.caption,
-          )
-        else
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: myCommunities.map((community) {
-              final selected = _selectedCommunityIds.contains(community.id);
-              return FilterChip(
-                label: Text(community.name),
-                selected: selected,
-                onSelected: (val) {
-                  setState(() {
-                    if (val) {
-                      _selectedCommunityIds.add(community.id);
-                    } else {
-                      _selectedCommunityIds.remove(community.id);
-                    }
-                  });
-                },
-                selectedColor: AppTheme.primaryRed.withValues(alpha: 0.15),
-                checkmarkColor: AppTheme.primaryRed,
-                labelStyle: TextStyle(
-                  color: selected ? AppTheme.primaryRed : AppTheme.primaryDark,
-                  fontWeight:
-                      selected ? FontWeight.bold : FontWeight.normal,
-                ),
-                side: BorderSide(
-                  color: selected ? AppTheme.primaryRed : AppTheme.cardBorder,
-                ),
-                backgroundColor: Colors.white,
-                showCheckmark: true,
-              );
-            }).toList(),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildCategoryGrid() {
-    final categoryProvider = context.watch<CategoryProvider>();
-    final enabledCategories = categoryProvider.enabledCategories;
-
-    final availableCategories = enabledCategories.where((cat) {
-      return _getIncidentCategoryFromName(cat.name) != null;
-    }).toList();
-
-    if (availableCategories.isEmpty) {
-      return GridView.count(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        crossAxisCount: 3,
-        mainAxisSpacing: 10,
-        crossAxisSpacing: 10,
-        childAspectRatio: 1.1,
-        children: IncidentCategory.values.map((cat) {
-          final selected = _selectedCategory == cat;
-          return _buildCategoryItem(
-            label: _categoryLabel(cat),
-            icon: _categoryIcon(cat),
-            color: AppTheme.categoryColor(_categoryLabel(cat)),
-            selected: selected,
-            onTap: () => setState(() => _selectedCategory = cat),
-          );
-        }).toList(),
-      );
-    }
-
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 3,
-      mainAxisSpacing: 10,
-      crossAxisSpacing: 10,
-      childAspectRatio: 1.1,
-      children: availableCategories.map((cat) {
-        final incidentCat = _getIncidentCategoryFromName(cat.name);
-        if (incidentCat == null) return const SizedBox.shrink();
-
-        final selected = _selectedCategory == incidentCat;
-        return _buildCategoryItem(
-          label: cat.name,
-          icon: cat.icon,
-          color: cat.color,
-          selected: selected,
-          onTap: () => setState(() => _selectedCategory = incidentCat),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildCategoryItem({
-    required String label,
-    required IconData icon,
-    required Color color,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: selected ? Colors.white : Colors.grey[50],
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: selected ? AppTheme.primaryRed : Colors.grey[300]!,
-            width: selected ? 2 : 1,
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 32,
-              color: selected ? color : Colors.grey[600],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight:
-                    selected ? FontWeight.bold : FontWeight.normal,
-                color: selected ? AppTheme.primaryDark : Colors.grey[600],
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  IncidentCategory? _getIncidentCategoryFromName(String name) {
-    switch (name.toLowerCase()) {
-      case 'crime':
-        return IncidentCategory.crime;
-      case 'infrastructure':
-        return IncidentCategory.infrastructure;
-      case 'suspicious':
-        return IncidentCategory.suspicious;
-      case 'traffic':
-        return IncidentCategory.traffic;
-      case 'environmental':
-        return IncidentCategory.environmental;
-      case 'emergency':
-        return IncidentCategory.emergency;
-      default:
-        return null;
-    }
-  }
-
-  IconData _categoryIcon(IncidentCategory cat) {
-    switch (cat) {
-      case IncidentCategory.crime:
-        return Icons.shield;
-      case IncidentCategory.infrastructure:
-        return Icons.construction;
-      case IncidentCategory.suspicious:
-        return Icons.visibility;
-      case IncidentCategory.traffic:
-        return Icons.directions_car;
-      case IncidentCategory.environmental:
-        return Icons.eco;
-      case IncidentCategory.emergency:
-        return Icons.local_hospital;
-    }
-  }
-
-  String _categoryLabel(IncidentCategory cat) {
-    switch (cat) {
-      case IncidentCategory.crime:
-        return 'Crime';
-      case IncidentCategory.infrastructure:
-        return 'Infrastructure';
-      case IncidentCategory.suspicious:
-        return 'Suspicious';
-      case IncidentCategory.traffic:
-        return 'Traffic';
-      case IncidentCategory.environmental:
-        return 'Environmental';
-      case IncidentCategory.emergency:
-        return 'Emergency';
-    }
-  }
-
-  String _severityLabel(SeverityLevel level) {
-    switch (level) {
-      case SeverityLevel.low:
-        return 'Low';
-      case SeverityLevel.moderate:
-        return 'Moderate';
-      case SeverityLevel.high:
-        return 'High';
-    }
-  }
-
-  Color _severityColor(SeverityLevel level) {
-    switch (level) {
-      case SeverityLevel.low:
-        return AppTheme.severityLow;
-      case SeverityLevel.moderate:
-        return AppTheme.severityModerate;
-      case SeverityLevel.high:
-        return AppTheme.severityHigh;
-    }
-  }
-}
-
-// ─── Full-Screen Map Picker ───────────────────────────────────────────────────
-
-class _FullScreenMapPicker extends StatefulWidget {
-  final LatLng initialPosition;
-
-  const _FullScreenMapPicker({required this.initialPosition});
-
-  @override
-  State<_FullScreenMapPicker> createState() => _FullScreenMapPickerState();
-}
-
-class _FullScreenMapPickerState extends State<_FullScreenMapPicker> {
-  late LatLng _selected;
-  GoogleMapController? _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _selected = widget.initialPosition;
-  }
-
-  @override
-  void dispose() {
-    _controller?.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: GestureDetector(
-          onTap: () => Navigator.pop(context),
-          child: Container(
-            margin: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.6),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.close, color: Colors.white, size: 20),
-          ),
-        ),
-        title: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.6),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: const Text(
-            'Tap to set location',
-            style: TextStyle(color: Colors.white, fontSize: 13),
-          ),
-        ),
-        centerTitle: true,
-      ),
-      body: Stack(
-        children: [
-          GoogleMap(
-            initialCameraPosition: CameraPosition(
-              target: _selected,
-              zoom: 16,
-            ),
-            onMapCreated: (c) => _controller = c,
-            markers: {
-              Marker(
-                markerId: const MarkerId('pick'),
-                position: _selected,
-                icon: BitmapDescriptor.defaultMarkerWithHue(
-                  BitmapDescriptor.hueRed,
-                ),
-              ),
-            },
-            onTap: (latLng) => setState(() => _selected = latLng),
-            myLocationEnabled: true,
-            myLocationButtonEnabled: true,
-            zoomControlsEnabled: true,
-          ),
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(20)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 12,
-                    offset: const Offset(0, -4),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on,
-                          color: AppTheme.primaryRed, size: 16),
-                      const SizedBox(width: 6),
-                      Text(
-                        '${_selected.latitude.toStringAsFixed(5)}, '
-                        '${_selected.longitude.toStringAsFixed(5)}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppTheme.textSecondary,
-                          fontFamily: AppTheme.fontFamily,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  ElevatedButton(
-                    onPressed: () => Navigator.pop(context, _selected),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryRed,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Confirm Location',
-                      style: TextStyle(
-                        fontFamily: AppTheme.fontFamily,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
         ],
       ),
     );

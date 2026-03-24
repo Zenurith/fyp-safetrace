@@ -571,6 +571,8 @@ class _CategoryFilterGrid extends StatelessWidget {
         return 'Environmental';
       case IncidentCategory.emergency:
         return 'Emergency';
+      case IncidentCategory.other:
+        return 'Other';
     }
   }
 }
