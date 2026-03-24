@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/vote_model.dart';
 import '../models/incident_model.dart';
 import 'user_repository.dart';
+import 'system_config_repository.dart';
 
 class VoteRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -153,7 +154,10 @@ class VoteRepository {
       if (reporterDoc.exists) {
         final reporterData = reporterDoc.data() ?? {};
         final currentPoints = reporterData['points'] ?? 0;
-        final pointsDelta = type == VoteType.upvote ? 5 : -3;
+        final config = SystemConfigRepository.cached;
+        final pointsDelta = type == VoteType.upvote
+            ? config.pointsForUpvoteReceived
+            : config.pointsForDownvoteReceived;
         transaction.set(reporterRef, {
           'points': currentPoints + pointsDelta,
         }, SetOptions(merge: true));
@@ -272,8 +276,11 @@ class VoteRepository {
       if (reporterDoc.exists) {
         final reporterData = reporterDoc.data() ?? {};
         final currentPoints = reporterData['points'] ?? 0;
-        // Reverse old vote and apply new: upvote(+5) to downvote(-3) = -8, downvote(-3) to upvote(+5) = +8
-        final pointsDelta = newType == VoteType.upvote ? 8 : -8;
+        final config = SystemConfigRepository.cached;
+        // Reverse old vote and apply new vote
+        final pointsDelta = newType == VoteType.upvote
+            ? config.pointsForUpvoteReceived - config.pointsForDownvoteReceived
+            : config.pointsForDownvoteReceived - config.pointsForUpvoteReceived;
         transaction.set(reporterRef, {
           'points': currentPoints + pointsDelta,
         }, SetOptions(merge: true));
@@ -367,7 +374,11 @@ class VoteRepository {
       if (reporterDoc.exists) {
         final reporterData = reporterDoc.data() ?? {};
         final currentPoints = reporterData['points'] ?? 0;
-        final pointsDelta = existingVote.type == VoteType.upvote ? -5 : 3;
+        final config = SystemConfigRepository.cached;
+        // Reverse the points that were originally awarded
+        final pointsDelta = existingVote.type == VoteType.upvote
+            ? -config.pointsForUpvoteReceived
+            : -config.pointsForDownvoteReceived;
         transaction.set(reporterRef, {
           'points': currentPoints + pointsDelta,
         }, SetOptions(merge: true));

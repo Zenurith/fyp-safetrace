@@ -16,6 +16,7 @@ import 'presentation/providers/community_provider.dart';
 import 'presentation/providers/category_provider.dart';
 import 'presentation/providers/comment_provider.dart';
 import 'presentation/providers/flag_provider.dart';
+import 'presentation/providers/system_config_provider.dart';
 import 'presentation/screens/home_screen.dart';
 import 'presentation/screens/auth_screen.dart';
 import 'presentation/screens/community_detail_screen.dart';
@@ -64,6 +65,7 @@ class SafeTraceApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => CategoryProvider()..initialize()),
         ChangeNotifierProvider(create: (_) => CommentProvider()),
         ChangeNotifierProvider(create: (_) => FlagProvider()),
+        ChangeNotifierProvider(create: (_) => SystemConfigProvider()),
       ],
       child: MaterialApp(
         title: 'SafeTrace',

@@ -284,6 +284,18 @@ class CommunityProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> demoteToModerator(String memberId) async {
+    try {
+      await _repository.demoteToModerator(memberId);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<bool> demoteToMember(String memberId, String communityId) async {
     try {
       await _repository.demoteToMember(memberId, communityId);

@@ -707,7 +707,8 @@ class _ActionsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
+    final currentUser = context.watch<UserProvider>().currentUser;
+    final isSelf = currentUser != null && user.id == currentUser.id;
 
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 150),
@@ -741,33 +742,36 @@ class _ActionsSection extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 12),
 
-          // Promote/Demote button
-          _CardActionButton(
-            icon: user.isAdmin ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
-            label: user.isAdmin ? 'Demote' : 'Promote',
-            color: user.isAdmin ? AppTheme.warningOrange : AppTheme.successGreen,
-            onPressed: () async {
-              final newRole = user.isAdmin ? 'user' : 'admin';
-              await context.read<UserProvider>().setUserRole(user.id, newRole);
-              onRefresh();
-            },
-          ),
-          const SizedBox(width: 8),
+          if (!isSelf) ...[
+            const SizedBox(width: 12),
 
-          // Moderate button
-          _CardActionButton(
-            icon: Icons.gavel_rounded,
-            label: 'Moderate',
-            color: AppTheme.primaryRed,
-            onPressed: () async {
-              final result = await UserModerationDialog.show(context, user);
-              if (result == true) {
+            // Promote/Demote button
+            _CardActionButton(
+              icon: user.isAdmin ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+              label: user.isAdmin ? 'Demote' : 'Promote',
+              color: user.isAdmin ? AppTheme.warningOrange : AppTheme.successGreen,
+              onPressed: () async {
+                final newRole = user.isAdmin ? 'user' : 'admin';
+                await context.read<UserProvider>().setUserRole(user.id, newRole);
                 onRefresh();
-              }
-            },
-          ),
+              },
+            ),
+            const SizedBox(width: 8),
+
+            // Moderate button
+            _CardActionButton(
+              icon: Icons.gavel_rounded,
+              label: 'Moderate',
+              color: AppTheme.primaryRed,
+              onPressed: () async {
+                final result = await UserModerationDialog.show(context, user);
+                if (result == true) {
+                  onRefresh();
+                }
+              },
+            ),
+          ],
         ],
       ),
     );

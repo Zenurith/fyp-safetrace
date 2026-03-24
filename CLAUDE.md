@@ -60,18 +60,28 @@ lib/
 
 - `IncidentModel`: Core entity with category (enum), severity, status workflow, location, and voting
 - `CommunityModel`: Location-based groups with radius using Haversine formula for membership
+- `CommunityMemberModel`: Membership record linking user to community with role and status (pending/approved/rejected)
 - `UserModel`: User profile with gamification (points, levels, trusted status) and role-based access
 - `CategoryModel`: Admin-configurable incident categories with icons and colors
+- `AlertSettingsModel`: Per-user proximity alert preferences (radius, enabled categories)
+- `CommentModel`: User comment on an incident
+- `FlagModel`: User-submitted flag/report on an incident or post
+- `PostModel`: Community discussion post
+- `StatusHistoryModel`: Audit log entry for incident status transitions
+- `VoteModel`: User upvote/downvote record on an incident or post
 
 ### Firebase Collections
 
 - `incidents` - Incident reports
 - `users` - User profiles
 - `communities` - Location-based communities
-- `members` (subcollection) - Community membership
-- `posts` (subcollection) - Community posts
-- `votes` - User votes on incidents
+- `community_members` - Community membership records (top-level, not subcollection)
+- `posts` - Community discussion posts (top-level, not subcollection)
+- `votes` - User votes on incidents and posts
 - `categories` - Configurable incident categories
+- `comments` - User comments on incidents
+- `flags` - User-submitted flags/reports on content
+- `system_config` - App-wide admin settings (`app_settings` document)
 
 ### Services
 
@@ -79,6 +89,11 @@ lib/
 - `IncidentNotificationService`: Stream-based proximity alerts using user's alert settings
 - `MediaUploadService`: Firebase Storage image uploads
 - `ImageVerificationService` (`data/services/image_verification_service.dart`): Gemini AI image verification called during incident reporting. Checks that uploaded photos match the reported category before submission. API key from `AppConstants.geminiApiKey`. If unconfigured or API fails, defaults to `serviceUnavailable()` (isValid=false, sent for manual review). **Working model: `gemini-3.1-flash-lite-preview`** — do NOT change this model name, other names cause 503 errors.
+- `AnalyticsService`: Client-side aggregation of incident data into trend/category/severity summaries for the admin dashboard charts
+- `HeatmapService`: Converts incident list into weighted `HeatmapPoint` clusters for the Google Maps heatmap layer
+- `ExportService`: Exports incident lists to CSV or PDF; delegates file-saving to `ExportFileSaver` (platform-specific: web vs native)
+- `PushNotificationService`: Singleton wrapping Firebase Messaging + flutter_local_notifications; handles FCM token registration and foreground notification display
+- `ReportDraftService`: Persists an in-progress report form to `SharedPreferences` so users can resume after backgrounding the app
 
 ## Reputation System
 
@@ -128,11 +143,11 @@ lib/
 - Font family: **Avenir** (registered in `pubspec.yaml` under `assets/font/`)
   - Weights: Light (300), Book (400), Regular (500), Heavy (700), Black (900)
 - Custom PNG icons in `assets/icon/` — prefer these over Material Icons where available:
-  - `map.png`, `community.png`, `warning.png`, `report.png`, `user.png`, `eye.png`
+  - `map.png`, `community.png`, `warning.png`, `report.png`, `user.png`, `eye.png`, `encrypted.png`, `view.png`
 
 ### Design Principles
 - **Minimal info density**: Show only the 2–3 most important data points on a card. Secondary details belong in a detail screen or expandable section.
-- **One card style**: Use border-only cards (`Border.all(color: AppTheme.cardBorder)`) with **no** `BoxShadow`. Do not mix shadows + borders.
+- **One card style**: Use border-only cards (`AppTheme.cardDecoration`) with **no** `BoxShadow`. Do not mix shadows + borders.
 - **Consistent spacing**: 16px horizontal padding on all screens, 12px gap between list cards.
 - **Two accent colors max**: `AppTheme.primaryRed` is the primary accent. Use `AppTheme.successGreen` and `AppTheme.warningOrange` only for semantic states (success/warning), never decoration.
 - Avoid using `profilePurple` and `accentBlue` for new UI work — use `primaryDark` for AppBars/headers instead.
@@ -140,7 +155,7 @@ lib/
 ### Typography (Avenir)
 - Headings: Avenir Heavy (700)
 - Body text: Avenir Book (400)
-- Captions / metadata: Avenir Light (300), `Colors.grey[500]`
+- Captions / metadata: Avenir Light (300), `AppTheme.textSecondary`
 - Never use more than 3 font weights on a single screen.
 
 ### Navigation
@@ -192,7 +207,7 @@ Roles are stored as **string names** in Firestore (migrated from legacy int indi
 **Admin management is web-only.** The mobile admin screen has been removed. Access the admin panel via `flutter run -d chrome`.
 
 ### Security Issues (Open)
-- `lib/config/secrets.dart` — API keys committed to repo (geminiApiKey, googleMapsApiKey). Rotate keys and move to environment variables or Firebase Remote Config.
+- `lib/config/secrets.dart` — API keys committed to repo (geminiApiKey, googleMapsApiKey). Rotate keys and move to environment variables or Firebase Remote Config. A `secrets.template.dart` already exists showing the expected structure — `secrets.dart` should be gitignored and each developer copies the template locally.
 
 > **Note**: Web admin shell access control: `admin_web_shell.dart` and `admin_auth_screen.dart` both **verified** to check `user.isAdmin` — secure. Mobile admin screen removed; system admin is web-only.
 
@@ -200,8 +215,6 @@ Roles are stored as **string names** in Firestore (migrated from legacy int indi
 - `community_detail_screen.dart`: Hardcoded colors in membership state UI → use AppTheme constants
 - `admin_auth_screen.dart`: Uses `BoxShadow` on login card → replace with `AppTheme.cardDecoration`
 - `admin_dashboard_page.dart`: Uses `Colors.teal` and `Colors.amber` in avatar UI
-
-### Logic Bugs (Open)
 
 ### Performance Issues (Open)
 - `community_repository.dart`: `getNearbyCommunities()` is O(n) client-side — fetches all communities then filters. Will degrade at scale; consider GeoFlutterFire or geohashing.

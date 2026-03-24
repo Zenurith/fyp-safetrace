@@ -147,6 +147,18 @@ class AdminSidebar extends StatelessWidget {
                   expanded: expanded,
                   onTap: () => onItemSelected(6),
                 ),
+                if (expanded) ...[
+                  const SizedBox(height: 10),
+                  const _SectionLabel('SYSTEM'),
+                ],
+                _NavItem(
+                  icon: Icons.tune_outlined,
+                  activeIcon: Icons.tune_rounded,
+                  label: 'System Config',
+                  isSelected: selectedIndex == 7,
+                  expanded: expanded,
+                  onTap: () => onItemSelected(7),
+                ),
               ],
             ),
           ),

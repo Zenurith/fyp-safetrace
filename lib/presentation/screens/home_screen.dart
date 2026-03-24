@@ -12,6 +12,7 @@ import '../providers/incident_provider.dart';
 import '../providers/vote_provider.dart';
 import '../providers/alert_settings_provider.dart';
 import '../providers/community_provider.dart';
+import '../providers/system_config_provider.dart';
 import '../widgets/incident_bottom_sheet.dart';
 import '../widgets/incident_notification_overlay.dart';
 import 'map_screen.dart';
@@ -47,6 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<IncidentProvider>().startListening();
+      context.read<SystemConfigProvider>().startListening();
       _loadUserVotesIfNeeded();
       _initNotifications();
       _wireUpAlertSettings();
@@ -268,6 +270,10 @@ class _HomeScreenState extends State<HomeScreen> {
         currentScreen = const MapScreen();
     }
 
+    final sysConfig = context.watch<SystemConfigProvider>().config;
+    final showBanner = sysConfig.announcementEnabled &&
+        sysConfig.announcementMessage.isNotEmpty;
+
     return Scaffold(
       appBar: _currentIndex == 0
           ? AppBar(
@@ -292,9 +298,14 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             )
           : null,
-      body: Stack(
-        fit: StackFit.expand,
+      body: Column(
         children: [
+          if (showBanner)
+            _AnnouncementBanner(message: sysConfig.announcementMessage),
+          Expanded(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
           // Main content
           currentScreen,
           // Notification overlay
@@ -318,6 +329,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                 ),
             ),
+              ],
+            ),
+          ),
         ],
       ),
       bottomNavigationBar: Container(
@@ -382,6 +396,38 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _AnnouncementBanner extends StatelessWidget {
+  final String message;
+
+  const _AnnouncementBanner({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: AppTheme.primaryDark,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          const Icon(Icons.campaign_outlined, color: Colors.white, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                fontFamily: AppTheme.fontFamily,
+                fontSize: 13,
+                color: Colors.white,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -461,7 +461,8 @@ class _MembersTabState extends State<_MembersTab> {
         ? _members
         : _members.where((m) {
             final name = _users[m.userId]?.name.toLowerCase() ?? '';
-            return name.contains(_searchQuery);
+            final handle = _users[m.userId]?.handle.toLowerCase() ?? '';
+            return name.contains(_searchQuery) || handle.contains(_searchQuery);
           }).toList();
 
     return Column(
@@ -471,7 +472,7 @@ class _MembersTabState extends State<_MembersTab> {
           child: TextField(
             controller: _searchController,
             decoration: InputDecoration(
-              hintText: 'Search members...',
+              hintText: 'Search by name or @handle...',
               prefixIcon: const Icon(Icons.search, size: 20),
               suffixIcon: _searchQuery.isNotEmpty
                   ? IconButton(
@@ -723,7 +724,7 @@ class _MemberListItemState extends State<_MemberListItem> {
           successMsg = 'Promoted to Head Moderator';
           break;
         case 'demote_mod':
-          success = await provider.promoteToModerator(widget.member.id);
+          success = await provider.demoteToModerator(widget.member.id);
           successMsg = 'Demoted to Moderator';
           break;
         case 'demote_member':
@@ -753,7 +754,16 @@ class _MemberListItemState extends State<_MemberListItem> {
           successMsg = 'Member removed';
           break;
       }
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        messenger.showSnackBar(SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: AppTheme.primaryRed,
+        ));
+      }
+      return;
+    }
 
     if (mounted) {
       setState(() => _isProcessing = false);
@@ -791,12 +801,26 @@ class _MemberListItemState extends State<_MemberListItem> {
             member.isStaff ? AppTheme.primaryRed : AppTheme.primaryDark,
       ),
       title: Text(user?.name ?? '...'),
-      subtitle: Text(
-        member.roleLabel,
-        style: TextStyle(
-          color: badgeColor,
-          fontWeight: member.isStaff ? FontWeight.w500 : FontWeight.normal,
-        ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (user != null)
+            Text(
+              user.handle,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppTheme.textSecondary,
+              ),
+            ),
+          Text(
+            member.roleLabel,
+            style: TextStyle(
+              fontSize: 12,
+              color: badgeColor,
+              fontWeight: member.isStaff ? FontWeight.w500 : FontWeight.normal,
+            ),
+          ),
+        ],
       ),
       trailing: _isProcessing
           ? const SizedBox(

@@ -1,17 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
+import 'system_config_repository.dart';
 
 class UserRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   CollectionReference<Map<String, dynamic>> get _usersCollection =>
       _firestore.collection('users');
-
-  // Points awarded for actions
-  static const int pointsForReport = 10;
-  static const int pointsForUpvoteReceived = 5;
-  static const int pointsForDownvoteReceived = -3;
-  static const int trustedThreshold = 500; // Points needed to become trusted
 
   Future<void> createUser(String uid, String name, String handle) async {
     final user = UserModel(
@@ -85,15 +80,16 @@ class UserRepository {
     if (!doc.exists) return;
 
     final data = doc.data()!;
+    final config = SystemConfigRepository.cached;
     final currentPoints = data['points'] ?? 0;
     final currentReports = data['reports'] ?? 0;
-    final newPoints = currentPoints + pointsForReport;
+    final newPoints = currentPoints + config.pointsForReport;
     final newReports = currentReports + 1;
 
     await _usersCollection.doc(uid).update({
       'reports': newReports,
       'points': newPoints,
-      'isTrusted': newPoints >= trustedThreshold,
+      'isTrusted': newPoints >= config.trustedThreshold,
     });
   }
 
@@ -104,9 +100,10 @@ class UserRepository {
 
     final data = doc.data()!;
     final points = data['points'] ?? 0;
+    final threshold = SystemConfigRepository.cached.trustedThreshold;
 
     await _usersCollection.doc(uid).update({
-      'isTrusted': points >= trustedThreshold,
+      'isTrusted': points >= threshold,
     });
   }
 
@@ -118,10 +115,11 @@ class UserRepository {
     final data = doc.data()!;
     final currentPoints = data['points'] ?? 0;
     final newPoints = (currentPoints + pointsDelta).clamp(0, double.infinity).toInt();
+    final threshold = SystemConfigRepository.cached.trustedThreshold;
 
     await _usersCollection.doc(uid).update({
       'points': newPoints,
-      'isTrusted': newPoints >= trustedThreshold,
+      'isTrusted': newPoints >= threshold,
     });
   }
 
