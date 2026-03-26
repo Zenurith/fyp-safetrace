@@ -186,5 +186,20 @@ service cloud.firestore {
       // Any authenticated user can submit a flag/report
       allow create: if isAuth();
     }
+
+    // ─── Admin Audit Log ────────────────────────────────────────────────────
+
+    match /admin_audit_log/{entryId} {
+      // Only admins can read the audit log
+      allow read: if isAdmin();
+
+      // Any authenticated user can write — entries are created by admin actions
+      // running under the admin's own auth token. isAdmin() check is enforced
+      // at the app layer before any audit write is triggered.
+      allow create: if isAuth();
+
+      // Audit entries are immutable — no updates or deletes allowed.
+      allow update, delete: if false;
+    }
   }
 }

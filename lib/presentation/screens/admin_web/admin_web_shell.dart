@@ -16,6 +16,7 @@ import 'categories_management_page.dart';
 import 'communities_management_page.dart';
 import 'flags_management_page.dart';
 import 'analytics_page.dart';
+import 'audit_log_page.dart';
 import 'system_config_page.dart';
 
 class AdminWebShell extends StatefulWidget {
@@ -37,6 +38,7 @@ class _AdminWebShellState extends State<AdminWebShell> {
     'Community Management',
     'Flag Management',
     'Analytics',
+    'Audit Log',
     'System Configuration',
   ];
 
@@ -118,6 +120,7 @@ class _AdminWebShellState extends State<AdminWebShell> {
                       const CommunitiesManagementPage(),
                       const FlagsManagementPage(),
                       const AnalyticsPage(),
+                      AuditLogPage(isActive: _selectedIndex == 7),
                       const SystemConfigPage(),
                     ],
                   ),

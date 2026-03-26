@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import '../../../data/models/audit_log_model.dart';
 import '../../../data/models/system_config_model.dart';
+import '../../../data/repositories/audit_log_repository.dart';
 import '../../../utils/app_theme.dart';
 import '../../providers/system_config_provider.dart';
 import '../../providers/user_provider.dart';
@@ -66,6 +68,22 @@ class _SystemConfigPageState extends State<SystemConfigPage> {
   String get _adminName =>
       context.read<UserProvider>().currentUser?.name ?? 'admin';
 
+  String get _adminId =>
+      context.read<UserProvider>().currentUser?.id ?? '';
+
+  void _logConfigChange(String action, String detail) {
+    AuditLogRepository().create(AuditLogModel(
+      id: '',
+      adminId: _adminId,
+      adminName: _adminName,
+      action: action,
+      targetType: 'config',
+      targetId: 'app_settings',
+      detail: detail,
+      timestamp: DateTime.now(),
+    ));
+  }
+
   Future<void> _toggleAnnouncement(bool value) async {
     await _configProvider.updateFields(
         {'announcementEnabled': value}, _adminName);
@@ -81,6 +99,7 @@ class _SystemConfigPageState extends State<SystemConfigPage> {
     final ok = await _configProvider.updateFields(
         {'announcementMessage': msg}, _adminName);
     setState(() => _announcementSaving = false);
+    if (ok) _logConfigChange('Updated announcement', msg.length > 80 ? '${msg.substring(0, 80)}…' : msg);
     _showSnack(ok ? 'Announcement saved.' : 'Failed to save. Try again.');
   }
 
@@ -113,6 +132,10 @@ class _SystemConfigPageState extends State<SystemConfigPage> {
       _adminName,
     );
     setState(() => _reputationSaving = false);
+    if (ok) {
+      _logConfigChange('Updated reputation settings',
+          'Report:+$pointsForReport, Upvote:+$pointsForUpvote, Downvote:$pointsForDownvote, Trusted≥$trustedThreshold');
+    }
     _showSnack(
         ok ? 'Reputation settings saved.' : 'Failed to save. Try again.');
   }
@@ -135,6 +158,7 @@ class _SystemConfigPageState extends State<SystemConfigPage> {
       _adminName,
     );
     setState(() => _notificationSaving = false);
+    if (ok) _logConfigChange('Updated notification defaults', 'Radius: ${radius}km, Max/hr: $maxAlerts');
     _showSnack(ok
         ? 'Notification defaults saved.'
         : 'Failed to save. Try again.');
