@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../data/models/audit_log_model.dart';
 import '../../../data/models/flag_model.dart';
+import '../../../data/repositories/audit_log_repository.dart';
 import '../../../utils/app_theme.dart';
 import '../../providers/flag_provider.dart';
 import '../../providers/user_provider.dart';
@@ -445,6 +447,20 @@ class _FlagCard extends StatelessWidget {
                         : noteController.text.trim(),
                   );
               if (success && context.mounted) {
+                if (currentUser != null) {
+                  AuditLogRepository().create(AuditLogModel(
+                    id: '',
+                    adminId: currentUser.id,
+                    adminName: currentUser.name,
+                    action: 'Resolved flag',
+                    targetType: 'flag',
+                    targetId: flag.id,
+                    detail: noteController.text.trim().isEmpty
+                        ? 'Reason: ${flag.reason}'
+                        : noteController.text.trim(),
+                    timestamp: DateTime.now(),
+                  ));
+                }
                 Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(

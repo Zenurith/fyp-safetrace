@@ -18,6 +18,9 @@ class AppTheme {
   static const Color severityModerate = Color(0xFFF6AD55);
   static const Color severityHigh = Color(0xFFE53E3E);
 
+  // Gamification color
+  static const Color reputationGold = Color(0xFFFFB800);
+
   // Neutral colors
   static const Color backgroundGrey = Color(0xFFF7FAFC);
   static const Color cardBorder = Color(0xFFE2E8F0);

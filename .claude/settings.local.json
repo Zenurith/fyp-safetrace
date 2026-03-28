@@ -37,7 +37,12 @@
       "Bash(gcloud auth:*)",
       "Bash(git check-ignore:*)",
       "Bash(grep:*)",
-      "Bash(xargs cat:*)"
+      "Bash(xargs cat:*)",
+      "Bash(git log:*)",
+      "Bash(npx firebase:*)",
+      "Bash(npm --version)",
+      "Bash(npx --version)",
+      "Bash(npx firebase-tools:*)"
     ]
   }
 }

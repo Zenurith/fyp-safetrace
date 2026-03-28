@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import '../../data/models/audit_log_model.dart';
 import '../../data/models/user_model.dart';
+import '../../data/repositories/audit_log_repository.dart';
 import '../../data/repositories/user_repository.dart';
 import '../../utils/app_theme.dart';
+import '../providers/user_provider.dart';
 
 class UserModerationDialog extends StatefulWidget {
   final UserModel user;
@@ -23,8 +27,24 @@ class UserModerationDialog extends StatefulWidget {
 class _UserModerationDialogState extends State<UserModerationDialog> {
   final _reasonController = TextEditingController();
   final _repository = UserRepository();
+  final _auditRepository = AuditLogRepository();
   bool _isLoading = false;
   int _suspensionDays = 7;
+
+  void _logAction(String action, String detail) {
+    final admin = context.read<UserProvider>().currentUser;
+    if (admin == null) return;
+    _auditRepository.create(AuditLogModel(
+      id: '',
+      adminId: admin.id,
+      adminName: admin.name,
+      action: action,
+      targetType: 'user',
+      targetId: widget.user.id,
+      detail: detail,
+      timestamp: DateTime.now(),
+    ));
+  }
 
   @override
   void dispose() {
@@ -47,6 +67,8 @@ class _UserModerationDialogState extends State<UserModerationDialog> {
 
     try {
       await _repository.banUser(widget.user.id, _reasonController.text.trim());
+      _logAction('Banned user: ${widget.user.name}',
+          'Reason: ${_reasonController.text.trim()}');
       if (mounted) {
         Navigator.pop(context, true);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -72,6 +94,8 @@ class _UserModerationDialogState extends State<UserModerationDialog> {
     try {
       final until = DateTime.now().add(Duration(days: _suspensionDays));
       await _repository.suspendUser(widget.user.id, until);
+      _logAction('Suspended user: ${widget.user.name}',
+          'Suspended until ${DateFormat('MMM d, y').format(until)}');
       if (mounted) {
         Navigator.pop(context, true);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -98,6 +122,7 @@ class _UserModerationDialogState extends State<UserModerationDialog> {
 
     try {
       await _repository.unbanUser(widget.user.id);
+      _logAction('Unbanned user: ${widget.user.name}', '');
       if (mounted) {
         Navigator.pop(context, true);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -122,6 +147,7 @@ class _UserModerationDialogState extends State<UserModerationDialog> {
 
     try {
       await _repository.unsuspendUser(widget.user.id);
+      _logAction('Lifted suspension: ${widget.user.name}', '');
       if (mounted) {
         Navigator.pop(context, true);
         ScaffoldMessenger.of(context).showSnackBar(

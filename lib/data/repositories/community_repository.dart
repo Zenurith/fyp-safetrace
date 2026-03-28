@@ -218,6 +218,37 @@ class CommunityRepository {
     });
   }
 
+  /// Approve multiple membership requests in one Firestore batch.
+  Future<void> approveBulkRequests(
+      List<String> memberIds, String communityId, String approvedBy) async {
+    if (memberIds.isEmpty) return;
+    final batch = _firestore.batch();
+    final now = Timestamp.now();
+    for (final id in memberIds) {
+      batch.update(_membersCollection.doc(id), {
+        'status': MemberStatus.approved.index,
+        'approvedAt': now,
+        'approvedBy': approvedBy,
+      });
+    }
+    batch.update(_communitiesCollection.doc(communityId), {
+      'memberCount': FieldValue.increment(memberIds.length),
+    });
+    await batch.commit();
+  }
+
+  /// Reject multiple membership requests in one Firestore batch.
+  Future<void> rejectBulkRequests(List<String> memberIds) async {
+    if (memberIds.isEmpty) return;
+    final batch = _firestore.batch();
+    for (final id in memberIds) {
+      batch.update(_membersCollection.doc(id), {
+        'status': MemberStatus.rejected.index,
+      });
+    }
+    await batch.commit();
+  }
+
   /// Get all pending requests for a community (for staff view).
   Future<List<CommunityMemberModel>> getPendingRequests(
       String communityId) async {

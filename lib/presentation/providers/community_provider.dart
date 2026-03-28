@@ -232,6 +232,33 @@ class CommunityProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> approveBulkRequests(
+      List<String> memberIds, String communityId, String approvedBy) async {
+    try {
+      await _repository.approveBulkRequests(memberIds, communityId, approvedBy);
+      _pendingRequests.removeWhere((m) => memberIds.contains(m.id));
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> rejectBulkRequests(List<String> memberIds) async {
+    try {
+      await _repository.rejectBulkRequests(memberIds);
+      _pendingRequests.removeWhere((m) => memberIds.contains(m.id));
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<bool> updateCommunity(CommunityModel community) async {
     try {
       await _repository.update(community);

@@ -36,6 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _notificationService = IncidentNotificationService();
   final _locationService = LocationService();
   StreamSubscription? _notificationSubscription;
+  late final IncidentProvider _incidentProvider;
 
   // Current notification to display
   IncidentNotification? _currentNotification;
@@ -46,18 +47,19 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _incidentProvider = context.read<IncidentProvider>();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<IncidentProvider>().startListening();
+      _incidentProvider.startListening();
       context.read<SystemConfigProvider>().startListening();
       _loadUserVotesIfNeeded();
       _initNotifications();
       _wireUpAlertSettings();
-      context.read<IncidentProvider>().addListener(_onIncidentProviderChanged);
+      _incidentProvider.addListener(_onIncidentProviderChanged);
     });
   }
 
   void _onIncidentProviderChanged() {
-    final provider = context.read<IncidentProvider>();
+    final provider = _incidentProvider;
     if (provider.mapTabRequested) {
       provider.acknowledgeMapTabRequest();
       if (mounted) setState(() => _currentIndex = 0);
@@ -220,7 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
-    context.read<IncidentProvider>().removeListener(_onIncidentProviderChanged);
+    _incidentProvider.removeListener(_onIncidentProviderChanged);
     _notificationSubscription?.cancel();
     _notificationService.dispose();
     super.dispose();
