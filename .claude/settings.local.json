@@ -42,7 +42,8 @@
       "Bash(npx firebase:*)",
       "Bash(npm --version)",
       "Bash(npx --version)",
-      "Bash(npx firebase-tools:*)"
+      "Bash(npx firebase-tools:*)",
+      "Bash(git diff:*)"
     ]
   }
 }

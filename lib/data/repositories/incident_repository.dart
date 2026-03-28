@@ -54,6 +54,18 @@ class IncidentRepository {
             .toList());
   }
 
+  /// Stream of pending incidents for a community — for the manager review queue.
+  Stream<List<IncidentModel>> watchPendingCommunityIncidents(String communityId) {
+    return _incidentsCollection
+        .where('communityIds', arrayContains: communityId)
+        .where('status', isEqualTo: IncidentStatus.pending.index)
+        .orderBy('reportedAt', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => IncidentModel.fromMap(doc.data(), doc.id))
+            .toList());
+  }
+
   /// Get recent incidents only (last 3 days)
   Future<List<IncidentModel>> getAll() async {
     final cutoff = DateTime.now().subtract(const Duration(days: maxIncidentAgeDays));

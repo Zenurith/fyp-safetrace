@@ -11,7 +11,6 @@ import '../../widgets/admin_web/admin_header.dart';
 import '../../widgets/admin_web/responsive_layout.dart';
 import 'admin_dashboard_page.dart';
 import 'users_management_page.dart';
-import 'incidents_management_page.dart';
 import 'categories_management_page.dart';
 import 'communities_management_page.dart';
 import 'flags_management_page.dart';
@@ -33,7 +32,6 @@ class _AdminWebShellState extends State<AdminWebShell> {
   final List<String> _pageTitles = [
     'Dashboard',
     'User Management',
-    'Incident Management',
     'Category Management',
     'Community Management',
     'Flag Management',
@@ -115,12 +113,11 @@ class _AdminWebShellState extends State<AdminWebShell> {
                         onNavigate: (index) => setState(() => _selectedIndex = index),
                       ),
                       const UsersManagementPage(),
-                      const IncidentsManagementPage(),
                       const CategoriesManagementPage(),
                       const CommunitiesManagementPage(),
                       const FlagsManagementPage(),
                       const AnalyticsPage(),
-                      AuditLogPage(isActive: _selectedIndex == 7),
+                      AuditLogPage(isActive: _selectedIndex == 6),
                       const SystemConfigPage(),
                     ],
                   ),

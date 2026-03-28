@@ -273,9 +273,6 @@ class _CommunityManageDialogState extends State<_CommunityManageDialog>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<CommunityProvider>().loadPendingRequests(widget.community.id);
-    });
   }
 
   @override
@@ -302,7 +299,7 @@ class _CommunityManageDialogState extends State<_CommunityManageDialog>
                       style: AppTheme.headingMedium.copyWith(color: AppTheme.primaryDark),
                     ),
                     Text(
-                      'Community Management',
+                      'System Administration',
                       style: AppTheme.caption.copyWith(color: AppTheme.textSecondary),
                     ),
                   ],
@@ -324,8 +321,8 @@ class _CommunityManageDialogState extends State<_CommunityManageDialog>
           indicatorColor: AppTheme.primaryRed,
           labelStyle: AppTheme.bodyMedium.copyWith(fontWeight: FontWeight.w700),
           tabs: const [
-            Tab(text: 'Pending Requests'),
             Tab(text: 'Members'),
+            Tab(text: 'Danger Zone'),
           ],
         ),
         // Tab content
@@ -333,8 +330,8 @@ class _CommunityManageDialogState extends State<_CommunityManageDialog>
           child: TabBarView(
             controller: _tabController,
             children: [
-              _PendingRequestsContent(communityId: widget.community.id),
-              _MembersContent(communityId: widget.community.id),
+              _AdminMembersContent(communityId: widget.community.id),
+              _DangerZoneContent(community: widget.community),
             ],
           ),
         ),
@@ -343,239 +340,18 @@ class _CommunityManageDialogState extends State<_CommunityManageDialog>
   }
 }
 
-// ── Pending Requests Content ───────────────────────────────────────────────────
+// ── Admin Members Content ──────────────────────────────────────────────────────
 
-class _PendingRequestsContent extends StatefulWidget {
+class _AdminMembersContent extends StatefulWidget {
   final String communityId;
 
-  const _PendingRequestsContent({required this.communityId});
+  const _AdminMembersContent({required this.communityId});
 
   @override
-  State<_PendingRequestsContent> createState() => _PendingRequestsContentState();
+  State<_AdminMembersContent> createState() => _AdminMembersContentState();
 }
 
-class _PendingRequestsContentState extends State<_PendingRequestsContent> {
-  final Set<String> _requestedIds = {};
-  final Map<String, UserModel?> _users = {};
-
-  void _loadMissingUsers(List<CommunityMemberModel> requests) {
-    final missing = requests
-        .map((r) => r.userId)
-        .where((id) => !_requestedIds.contains(id))
-        .toList();
-    if (missing.isEmpty) return;
-    for (final id in missing) {
-      _requestedIds.add(id);
-    }
-    context.read<UserProvider>().getUsersByIds(missing).then((fetched) {
-      if (mounted) setState(() => _users.addAll(fetched));
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final provider = context.watch<CommunityProvider>();
-    final requests = provider.pendingRequests;
-
-    if (requests.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _loadMissingUsers(requests);
-      });
-    }
-
-    if (provider.isLoading && requests.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (requests.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.inbox_outlined, size: 48, color: AppTheme.textSecondary.withValues(alpha: 0.5)),
-            const SizedBox(height: 12),
-            Text(
-              'No pending requests',
-              style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: requests.length,
-      itemBuilder: (context, index) {
-        final request = requests[index];
-        return _PendingRequestItem(
-          request: request,
-          communityId: widget.communityId,
-          user: _users[request.userId],
-        );
-      },
-    );
-  }
-}
-
-class _PendingRequestItem extends StatefulWidget {
-  final CommunityMemberModel request;
-  final String communityId;
-  final UserModel? user;
-
-  const _PendingRequestItem({
-    required this.request,
-    required this.communityId,
-    required this.user,
-  });
-
-  @override
-  State<_PendingRequestItem> createState() => _PendingRequestItemState();
-}
-
-class _PendingRequestItemState extends State<_PendingRequestItem> {
-  bool _isProcessing = false;
-
-  Future<void> _approve() async {
-    setState(() => _isProcessing = true);
-    final currentUserId = context.read<UserProvider>().currentUser?.id ?? '';
-    final success = await context.read<CommunityProvider>().approveRequest(
-      widget.request.id, widget.communityId, currentUserId,
-    );
-    if (mounted) {
-      setState(() => _isProcessing = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(success ? 'Request approved' : 'Failed to approve'),
-        backgroundColor: success ? AppTheme.successGreen : AppTheme.primaryRed,
-      ));
-    }
-  }
-
-  Future<void> _reject() async {
-    final provider = context.read<CommunityProvider>();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Reject Request'),
-        content: const Text('Are you sure you want to reject this request?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Reject', style: TextStyle(color: AppTheme.primaryRed)),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-
-    setState(() => _isProcessing = true);
-    final success = await provider.rejectRequest(widget.request.id);
-    if (mounted) {
-      setState(() => _isProcessing = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(success ? 'Request rejected' : 'Failed to reject'),
-        backgroundColor: success ? AppTheme.warningOrange : AppTheme.primaryRed,
-      ));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final user = widget.user;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.cardBorder),
-      ),
-      child: Row(
-        children: [
-          UserAvatar(
-            photoUrl: user?.profilePhotoUrl,
-            initials: user?.initials ?? '?',
-            radius: 22,
-            backgroundColor: AppTheme.primaryDark,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  user?.name ?? '...',
-                  style: AppTheme.bodyMedium.copyWith(
-                    color: AppTheme.primaryDark,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                if (user != null)
-                  Text(
-                    user.handle,
-                    style: AppTheme.caption.copyWith(color: AppTheme.textSecondary),
-                  ),
-              ],
-            ),
-          ),
-          Text(
-            widget.request.timeAgo,
-            style: AppTheme.caption.copyWith(color: AppTheme.textSecondary),
-          ),
-          const SizedBox(width: 12),
-          if (_isProcessing)
-            const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          else ...[
-            OutlinedButton(
-              onPressed: _reject,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppTheme.primaryRed,
-                side: const BorderSide(color: AppTheme.primaryRed),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: const Text('Reject'),
-            ),
-            const SizedBox(width: 8),
-            ElevatedButton(
-              onPressed: _approve,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.successGreen,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: const Text('Approve'),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-// ── Members Content ────────────────────────────────────────────────────────────
-
-class _MembersContent extends StatefulWidget {
-  final String communityId;
-
-  const _MembersContent({required this.communityId});
-
-  @override
-  State<_MembersContent> createState() => _MembersContentState();
-}
-
-class _MembersContentState extends State<_MembersContent> {
+class _AdminMembersContentState extends State<_AdminMembersContent> {
   List<CommunityMemberModel> _members = [];
   bool _isLoading = true;
   final Map<String, UserModel?> _users = {};
@@ -604,18 +380,8 @@ class _MembersContentState extends State<_MembersContent> {
     }
   }
 
-  void _reload() {
-    setState(() {
-      _isLoading = true;
-      _users.clear();
-    });
-    _loadMembers();
-  }
-
   @override
   Widget build(BuildContext context) {
-    final currentUserId = context.read<UserProvider>().currentUser?.id ?? '';
-
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -642,54 +408,80 @@ class _MembersContentState extends State<_MembersContent> {
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final member = _members[index];
-        return _MemberItem(
+        return _AdminMemberItem(
           member: member,
           user: _users[member.userId],
           communityId: widget.communityId,
-          currentUserId: currentUserId,
-          onChanged: _reload,
+          onChanged: _loadMembers,
         );
       },
     );
   }
 }
 
-class _MemberItem extends StatefulWidget {
+class _AdminMemberItem extends StatefulWidget {
   final CommunityMemberModel member;
   final UserModel? user;
   final String communityId;
-  final String currentUserId;
   final VoidCallback onChanged;
 
-  const _MemberItem({
+  const _AdminMemberItem({
     required this.member,
     required this.user,
     required this.communityId,
-    required this.currentUserId,
     required this.onChanged,
   });
 
   @override
-  State<_MemberItem> createState() => _MemberItemState();
+  State<_AdminMemberItem> createState() => _AdminMemberItemState();
 }
 
-class _MemberItemState extends State<_MemberItem> {
+class _AdminMemberItemState extends State<_AdminMemberItem> {
   bool _isProcessing = false;
 
   Future<void> _handleAction(String action) async {
     final provider = context.read<CommunityProvider>();
+    final userName = widget.user?.name ?? 'this member';
+
+    DateTime? tempBanUntil;
+
+    if (action == 'temp_ban') {
+      final duration = await showDialog<int>(
+        context: context,
+        builder: (ctx) => _TempBanDurationDialog(userName: userName),
+      );
+      if (duration == null) return;
+      tempBanUntil = DateTime.now().add(Duration(days: duration));
+    }
+
+    if (action == 'ban') {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Permanent Ban'),
+          content: Text(
+            'Permanently ban $userName from this community? They will not be able to rejoin.',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Ban', style: TextStyle(color: AppTheme.primaryRed)),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+    }
 
     if (action == 'remove') {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('Remove Member'),
-          content: Text('Remove ${widget.user?.name ?? 'this member'} from the community?'),
+          content: Text('Remove $userName from this community?'),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
-            ),
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
             TextButton(
               onPressed: () => Navigator.pop(ctx, true),
               child: const Text('Remove', style: TextStyle(color: AppTheme.primaryRed)),
@@ -707,13 +499,14 @@ class _MemberItemState extends State<_MemberItem> {
 
     try {
       switch (action) {
-        case 'promote':
-          success = await provider.promoteToModerator(widget.member.id);
-          successMsg = 'Promoted to Moderator';
+        case 'temp_ban':
+          success = await provider.banMember(widget.member.id, widget.communityId,
+              bannedUntil: tempBanUntil);
+          successMsg = 'Member temporarily banned';
           break;
-        case 'demote':
-          success = await provider.demoteToMember(widget.member.id, widget.communityId);
-          successMsg = 'Demoted to member';
+        case 'ban':
+          success = await provider.banMember(widget.member.id, widget.communityId);
+          successMsg = 'Member permanently banned';
           break;
         case 'remove':
           success = await provider.removeMember(widget.member.id, widget.communityId);
@@ -743,14 +536,16 @@ class _MemberItemState extends State<_MemberItem> {
   Widget build(BuildContext context) {
     final member = widget.member;
     final user = widget.user;
-    final isSelf = member.userId == widget.currentUserId;
+    final isBanned = member.isBanned;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isBanned ? AppTheme.primaryRed.withValues(alpha: 0.04) : Colors.white,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppTheme.cardBorder),
+        border: Border.all(
+          color: isBanned ? AppTheme.primaryRed.withValues(alpha: 0.3) : AppTheme.cardBorder,
+        ),
       ),
       child: Row(
         children: [
@@ -799,6 +594,26 @@ class _MemberItemState extends State<_MemberItem> {
               ),
             ),
           ),
+          // Ban status badge
+          if (isBanned) ...[
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryRed.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                member.statusLabel,
+                style: const TextStyle(
+                  fontFamily: AppTheme.fontFamily,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.primaryRed,
+                ),
+              ),
+            ),
+          ],
           const SizedBox(width: 8),
           if (_isProcessing)
             const SizedBox(
@@ -806,63 +621,337 @@ class _MemberItemState extends State<_MemberItem> {
               height: 24,
               child: CircularProgressIndicator(strokeWidth: 2),
             )
-          else if (isSelf)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: AppTheme.primaryRed.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Text(
-                'You',
-                style: TextStyle(
-                  fontFamily: AppTheme.fontFamily,
-                  fontSize: 11,
-                  color: AppTheme.primaryRed,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            )
-          else
+          else if (!member.isOwner)
             PopupMenuButton<String>(
               onSelected: _handleAction,
               icon: Icon(Icons.more_vert, size: 18, color: AppTheme.textSecondary),
-              itemBuilder: (context) => [
-                if (!member.isStaff)
-                  const PopupMenuItem(
-                    value: 'promote',
-                    child: Row(
-                      children: [
-                        Icon(Icons.arrow_upward, size: 16),
-                        SizedBox(width: 8),
-                        Text('Promote to Moderator'),
-                      ],
-                    ),
+              itemBuilder: (_) => [
+                const PopupMenuItem(
+                  value: 'temp_ban',
+                  child: Row(
+                    children: [
+                      Icon(Icons.timer_outlined, size: 16, color: AppTheme.warningOrange),
+                      SizedBox(width: 8),
+                      Text('Temp Ban', style: TextStyle(color: AppTheme.warningOrange)),
+                    ],
                   ),
-                if (member.isStaff)
-                  const PopupMenuItem(
-                    value: 'demote',
-                    child: Row(
-                      children: [
-                        Icon(Icons.arrow_downward, size: 16),
-                        SizedBox(width: 8),
-                        Text('Demote to Member'),
-                      ],
-                    ),
+                ),
+                const PopupMenuItem(
+                  value: 'ban',
+                  child: Row(
+                    children: [
+                      Icon(Icons.block, size: 16, color: AppTheme.primaryRed),
+                      SizedBox(width: 8),
+                      Text('Permanent Ban', style: TextStyle(color: AppTheme.primaryRed)),
+                    ],
                   ),
+                ),
                 const PopupMenuItem(
                   value: 'remove',
                   child: Row(
                     children: [
-                      Icon(Icons.remove_circle_outline, size: 16, color: AppTheme.primaryRed),
+                      Icon(Icons.remove_circle_outline, size: 16),
                       SizedBox(width: 8),
-                      Text('Remove', style: TextStyle(color: AppTheme.primaryRed)),
+                      Text('Remove from Community'),
                     ],
                   ),
                 ),
               ],
+            )
+          else
+            // Owner — no actions
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppTheme.backgroundGrey,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'Protected',
+                style: TextStyle(
+                  fontFamily: AppTheme.fontFamily,
+                  fontSize: 11,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Temp Ban Duration Picker ───────────────────────────────────────────────────
+
+class _TempBanDurationDialog extends StatefulWidget {
+  final String userName;
+
+  const _TempBanDurationDialog({required this.userName});
+
+  @override
+  State<_TempBanDurationDialog> createState() => _TempBanDurationDialogState();
+}
+
+class _TempBanDurationDialogState extends State<_TempBanDurationDialog> {
+  int _selectedDays = 7;
+
+  static const _options = [
+    (label: '1 day', days: 1),
+    (label: '3 days', days: 3),
+    (label: '7 days', days: 7),
+    (label: '30 days', days: 30),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Temp Ban Duration'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'How long should ${widget.userName} be banned from this community?',
+            style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
+          ),
+          const SizedBox(height: 16),
+          ..._options.map((opt) => RadioListTile<int>(
+                title: Text(opt.label, style: AppTheme.bodyMedium),
+                value: opt.days,
+                groupValue: _selectedDays,
+                activeColor: AppTheme.primaryRed,
+                contentPadding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+                onChanged: (v) => setState(() => _selectedDays = v!),
+              )),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, _selectedDays),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.warningOrange,
+            foregroundColor: Colors.white,
+          ),
+          child: const Text('Apply Ban'),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Danger Zone Content ────────────────────────────────────────────────────────
+
+class _DangerZoneContent extends StatefulWidget {
+  final CommunityModel community;
+
+  const _DangerZoneContent({required this.community});
+
+  @override
+  State<_DangerZoneContent> createState() => _DangerZoneContentState();
+}
+
+class _DangerZoneContentState extends State<_DangerZoneContent> {
+  bool _isDeleting = false;
+
+  Future<void> _deleteCommunity() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Community'),
+        content: Text(
+          'Permanently delete "${widget.community.name}"? This will remove all members and cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryRed,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isDeleting = true);
+    final success = await context
+        .read<CommunityProvider>()
+        .deleteCommunity(widget.community.id);
+
+    if (!mounted) return;
+    setState(() => _isDeleting = false);
+
+    if (success) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('"${widget.community.name}" has been deleted'),
+        backgroundColor: AppTheme.primaryRed,
+      ));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Failed to delete community'),
+        backgroundColor: AppTheme.primaryRed,
+      ));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final community = widget.community;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Community info card
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.backgroundGrey,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.cardBorder),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  community.name,
+                  style: AppTheme.headingSmall.copyWith(color: AppTheme.primaryDark),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Icon(Icons.location_on_outlined, size: 14, color: AppTheme.textSecondary),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        community.address,
+                        style: AppTheme.caption.copyWith(color: AppTheme.textSecondary),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    _InfoChip(label: '${community.memberCount} members'),
+                    const SizedBox(width: 8),
+                    _InfoChip(label: '${community.radius.toStringAsFixed(1)} km radius'),
+                    const SizedBox(width: 8),
+                    _InfoChip(label: community.isPublic ? 'Public' : 'Private'),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Danger zone header
+          Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, size: 18, color: AppTheme.primaryRed),
+              const SizedBox(width: 6),
+              Text(
+                'Danger Zone',
+                style: AppTheme.headingSmall.copyWith(color: AppTheme.primaryRed),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Delete community action
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppTheme.primaryRed.withValues(alpha: 0.3)),
+              borderRadius: BorderRadius.circular(12),
+              color: AppTheme.primaryRed.withValues(alpha: 0.03),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Delete this community',
+                        style: AppTheme.bodyMedium.copyWith(
+                          color: AppTheme.primaryDark,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Permanently removes the community and all membership records. This cannot be undone.',
+                        style: AppTheme.caption.copyWith(color: AppTheme.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                _isDeleting
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppTheme.primaryRed,
+                        ),
+                      )
+                    : ElevatedButton.icon(
+                        onPressed: _deleteCommunity,
+                        icon: const Icon(Icons.delete_forever_outlined, size: 16),
+                        label: const Text('Delete Community'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryRed,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        ),
+                      ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  final String label;
+
+  const _InfoChip({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryDark.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: AppTheme.fontFamily,
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+          color: AppTheme.primaryDark,
+        ),
       ),
     );
   }

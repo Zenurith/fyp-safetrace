@@ -34,12 +34,55 @@ class PostRepository {
     await _postsCollection.doc(id).delete();
   }
 
+  // ==================== Moderation ====================
+
+  Future<void> approvePost(String id) async {
+    await _postsCollection.doc(id).update({'status': PostStatus.approved.index});
+  }
+
+  Future<void> rejectPost(String id) async {
+    await _postsCollection.doc(id).update({'status': PostStatus.rejected.index});
+  }
+
   // ==================== Post Queries ====================
+
+  /// Stream of posts from a specific community.
+  ///
+  /// [staffView] = true → all statuses visible (for staff moderation).
+  /// [staffView] = false → only approved posts (for regular members).
+  Stream<List<PostModel>> watchCommunityPosts(String communityId, {bool staffView = false}) {
+    Query<Map<String, dynamic>> query = _postsCollection
+        .where('communityId', isEqualTo: communityId);
+
+    if (!staffView) {
+      query = query.where('status', isEqualTo: PostStatus.approved.index);
+    }
+
+    return query
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => PostModel.fromMap(doc.data(), doc.id))
+            .toList());
+  }
+
+  /// Stream of pending posts for a community (for staff review queue).
+  Stream<List<PostModel>> watchPendingPosts(String communityId) {
+    return _postsCollection
+        .where('communityId', isEqualTo: communityId)
+        .where('status', isEqualTo: PostStatus.pending.index)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => PostModel.fromMap(doc.data(), doc.id))
+            .toList());
+  }
 
   /// Get all public posts from all communities
   Future<List<PostModel>> getPublicPosts({int? limit}) async {
     Query<Map<String, dynamic>> query = _postsCollection
         .where('visibility', isEqualTo: PostVisibility.public.index)
+        .where('status', isEqualTo: PostStatus.approved.index)
         .orderBy('createdAt', descending: true);
 
     if (limit != null) {
@@ -52,10 +95,11 @@ class PostRepository {
         .toList();
   }
 
-  /// Stream of public posts
+  /// Stream of public approved posts
   Stream<List<PostModel>> watchPublicPosts() {
     return _postsCollection
         .where('visibility', isEqualTo: PostVisibility.public.index)
+        .where('status', isEqualTo: PostStatus.approved.index)
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs
@@ -67,6 +111,7 @@ class PostRepository {
   Future<List<PostModel>> getCommunityPosts(String communityId) async {
     final snapshot = await _postsCollection
         .where('communityId', isEqualTo: communityId)
+        .where('status', isEqualTo: PostStatus.approved.index)
         .orderBy('createdAt', descending: true)
         .get();
 
@@ -75,22 +120,10 @@ class PostRepository {
         .toList();
   }
 
-  /// Stream of posts from a specific community
-  Stream<List<PostModel>> watchCommunityPosts(String communityId) {
-    return _postsCollection
-        .where('communityId', isEqualTo: communityId)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => PostModel.fromMap(doc.data(), doc.id))
-            .toList());
-  }
-
-  /// Get posts viewable by a user:
-  /// - All public posts
-  /// - Private posts from communities where user is an approved member
+  /// Get posts viewable by a user (approved only):
+  /// - All public approved posts
+  /// - Private approved posts from communities where user is an approved member
   Future<List<PostModel>> getViewablePosts(String userId) async {
-    // Get user's approved community memberships
     final membershipSnapshot = await _membersCollection
         .where('userId', isEqualTo: userId)
         .where('status', isEqualTo: MemberStatus.approved.index)
@@ -100,9 +133,9 @@ class PostRepository {
         .map((doc) => doc.data()['communityId'] as String)
         .toList();
 
-    // Get all public posts
     final publicPostsSnapshot = await _postsCollection
         .where('visibility', isEqualTo: PostVisibility.public.index)
+        .where('status', isEqualTo: PostStatus.approved.index)
         .orderBy('createdAt', descending: true)
         .get();
 
@@ -110,30 +143,25 @@ class PostRepository {
         .map((doc) => PostModel.fromMap(doc.data(), doc.id))
         .toList();
 
-    // Get private posts from user's communities (batch to handle whereIn limit)
     if (userCommunityIds.isNotEmpty) {
       final privatePosts = await _getPrivatePostsFromCommunities(userCommunityIds);
       posts.addAll(privatePosts);
     }
 
-    // Sort combined posts by createdAt descending
     posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
     return posts;
   }
 
-  /// Helper method to batch fetch private posts from multiple communities
-  /// Handles Firestore's 10-item whereIn limit
   Future<List<PostModel>> _getPrivatePostsFromCommunities(
       List<String> communityIds) async {
     final posts = <PostModel>[];
 
-    // Process in batches of 10 due to Firestore whereIn limit
     for (var i = 0; i < communityIds.length; i += 10) {
       final batch = communityIds.skip(i).take(10).toList();
       final snapshot = await _postsCollection
           .where('communityId', whereIn: batch)
           .where('visibility', isEqualTo: PostVisibility.private.index)
+          .where('status', isEqualTo: PostStatus.approved.index)
           .get();
 
       posts.addAll(
@@ -155,7 +183,6 @@ class PostRepository {
         .toList();
   }
 
-  /// Stream of posts by a specific author
   Stream<List<PostModel>> watchPostsByAuthor(String authorId) {
     return _postsCollection
         .where('authorId', isEqualTo: authorId)
@@ -176,13 +203,11 @@ class PostRepository {
 
   // ==================== Feed Helpers ====================
 
-  /// Get paginated viewable posts for infinite scroll
   Future<List<PostModel>> getViewablePostsPaginated(
     String userId, {
     int limit = 20,
     DocumentSnapshot? lastDocument,
   }) async {
-    // Get user's approved community memberships
     final membershipSnapshot = await _membersCollection
         .where('userId', isEqualTo: userId)
         .where('status', isEqualTo: MemberStatus.approved.index)
@@ -192,7 +217,6 @@ class PostRepository {
         .map((doc) => doc.data()['communityId'] as String)
         .toSet();
 
-    // Build query for public posts
     Query<Map<String, dynamic>> query = _postsCollection
         .orderBy('createdAt', descending: true);
 
@@ -200,15 +224,15 @@ class PostRepository {
       query = query.startAfterDocument(lastDocument);
     }
 
-    query = query.limit(limit * 2); // Fetch extra to filter private posts
+    query = query.limit(limit * 2);
 
     final snapshot = await query.get();
 
-    // Filter posts: public OR (private AND user is member of community)
     final posts = snapshot.docs
         .map((doc) => PostModel.fromMap(doc.data(), doc.id))
         .where((post) =>
-            post.isPublic || userCommunityIds.contains(post.communityId))
+            post.isApproved &&
+            (post.isPublic || userCommunityIds.contains(post.communityId)))
         .take(limit)
         .toList();
 

@@ -2,12 +2,14 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../utils/share_utils.dart';
+import '../../data/models/flag_model.dart';
 import '../../data/models/incident_model.dart';
 import '../../data/repositories/incident_repository.dart';
 import '../../utils/app_theme.dart';
 import '../providers/incident_provider.dart';
 import '../providers/user_provider.dart';
 import 'comments_section.dart';
+import 'flag_dialog.dart';
 import 'photo_gallery_viewer.dart';
 import 'status_timeline_widget.dart';
 import 'vote_buttons.dart';
@@ -361,6 +363,27 @@ class _IncidentBottomSheetState extends State<IncidentBottomSheet> {
               ),
             ],
           ),
+          // Report button — only shown for incidents reported by others
+          if (context.read<UserProvider>().currentUser?.id != incident.reporterId)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => FlagDialog.show(
+                  context,
+                  targetType: FlagTargetType.incident,
+                  targetId: incident.id,
+                ),
+                icon: const Icon(Icons.flag_outlined, size: 16),
+                label: const Text('Report'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppTheme.textSecondary,
+                  textStyle: const TextStyle(
+                    fontFamily: AppTheme.fontFamily,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
           const SizedBox(height: 8),
         ],
       ),

@@ -24,6 +24,8 @@ class IncidentProvider extends ChangeNotifier {
   List<IncidentModel> _communityIncidents = [];
   String? _activeCommunityId;
   StreamSubscription? _communitySubscription;
+  List<IncidentModel> _pendingCommunityIncidents = [];
+  StreamSubscription? _pendingCommunitySubscription;
 
   List<IncidentModel> get incidents {
     if (_filteredCache != null) return _filteredCache!;
@@ -80,6 +82,7 @@ class IncidentProvider extends ChangeNotifier {
 
   List<IncidentModel> get myReports => _myReports;
   List<IncidentModel> get communityIncidents => _communityIncidents;
+  List<IncidentModel> get pendingCommunityIncidents => _pendingCommunityIncidents;
   Set<String> get activeFilters => _activeFilters;
   Set<SeverityLevel> get severityFilters => _severityFilters;
   Set<IncidentStatus> get statusFilters => _statusFilters;
@@ -161,11 +164,73 @@ class IncidentProvider extends ChangeNotifier {
     );
   }
 
+  void watchPendingCommunityIncidents(String communityId) {
+    _pendingCommunitySubscription?.cancel();
+    _pendingCommunityIncidents = [];
+    notifyListeners();
+
+    _pendingCommunitySubscription =
+        _repository.watchPendingCommunityIncidents(communityId).listen(
+      (incidents) {
+        _pendingCommunityIncidents = incidents;
+        notifyListeners();
+      },
+      onError: (e) {
+        _error = e.toString();
+        notifyListeners();
+      },
+    );
+  }
+
+  void stopWatchingCommunityIncidents() {
+    _activeCommunityId = null;
+    _communitySubscription?.cancel();
+    _communityIncidents = [];
+  }
+
+  void stopWatchingPendingCommunityIncidents() {
+    _pendingCommunitySubscription?.cancel();
+    _pendingCommunityIncidents = [];
+  }
+
+  Future<bool> approveCommunityIncident(String id, String staffId) async {
+    try {
+      await _repository.updateStatus(
+        id,
+        IncidentStatus.underReview,
+        updatedBy: staffId,
+        note: 'Approved by community manager',
+      );
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> rejectCommunityIncident(String id, String staffId) async {
+    try {
+      await _repository.updateStatus(
+        id,
+        IncidentStatus.dismissed,
+        updatedBy: staffId,
+        note: 'Rejected by community manager',
+      );
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
   @override
   void dispose() {
     _incidentsSubscription?.cancel();
     _myReportsSubscription?.cancel();
     _communitySubscription?.cancel();
+    _pendingCommunitySubscription?.cancel();
     super.dispose();
   }
 

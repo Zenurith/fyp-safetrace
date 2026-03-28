@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../data/models/comment_model.dart';
+import '../../data/models/flag_model.dart';
 import '../../utils/app_theme.dart';
 import '../providers/comment_provider.dart';
 import '../providers/user_provider.dart';
+import 'flag_dialog.dart';
 import 'user_avatar.dart';
 
 class CommentsSection extends StatefulWidget {
@@ -373,19 +375,31 @@ class _CommentTile extends StatelessWidget {
             ],
           ),
         ),
-        if (isOwner)
-          PopupMenuButton<String>(
-            icon: Icon(
-              Icons.more_vert,
-              size: 18,
-              color: AppTheme.textSecondary,
-            ),
-            onSelected: (value) {
-              if (value == 'delete') {
-                _confirmDelete(context);
-              }
-            },
-            itemBuilder: (context) => [
+        PopupMenuButton<String>(
+          icon: Icon(
+            Icons.more_vert,
+            size: 18,
+            color: AppTheme.textSecondary,
+          ),
+          onSelected: (value) {
+            if (value == 'delete') {
+              _confirmDelete(context);
+            } else if (value == 'report_comment') {
+              FlagDialog.show(
+                context,
+                targetType: FlagTargetType.comment,
+                targetId: comment.id,
+              );
+            } else if (value == 'report_user') {
+              FlagDialog.show(
+                context,
+                targetType: FlagTargetType.user,
+                targetId: comment.authorId,
+              );
+            }
+          },
+          itemBuilder: (context) => [
+            if (isOwner)
               const PopupMenuItem(
                 value: 'delete',
                 child: Row(
@@ -396,8 +410,30 @@ class _CommentTile extends StatelessWidget {
                   ],
                 ),
               ),
+            if (!isOwner) ...[
+              const PopupMenuItem(
+                value: 'report_comment',
+                child: Row(
+                  children: [
+                    Icon(Icons.flag_outlined, size: 18, color: AppTheme.warningOrange),
+                    SizedBox(width: 8),
+                    Text('Report comment'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'report_user',
+                child: Row(
+                  children: [
+                    Icon(Icons.person_off_outlined, size: 18, color: AppTheme.primaryRed),
+                    SizedBox(width: 8),
+                    Text('Report user'),
+                  ],
+                ),
+              ),
             ],
-          ),
+          ],
+        ),
       ],
     );
   }

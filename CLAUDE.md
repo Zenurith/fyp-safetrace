@@ -256,6 +256,7 @@ Roles are stored as **string names** in Firestore (migrated from legacy int indi
 - **Card styling**: Always `AppTheme.cardDecoration`. Never mix border + shadow.
 - **Color usage**: Only `AppTheme.*` constants. When adding a new semantic state, add to AppTheme first, then use it.
 - **Community filtering**: When filtering communities by membership, exclude ALL non-null statuses (approved, pending, rejected) — not just approved.
+- **Communities use incidents, not posts**: The "Reports" tab in `community_detail_screen.dart` shows `IncidentModel` data via `IncidentProvider.communityIncidents`. `PostModel`/`PostProvider` are NOT part of any community screen. The FAB navigates to `ReportIncidentScreen`. Manage Community has 3 tabs: Requests, Incidents, Members — no Posts tab. Never re-add discussion posts to community flows.
 - **Firestore reads in loops**: Never call `.get()` or `.load()` inside a `ListView.builder` or `initState` of a list item widget — batch-fetch at the provider level.
 - **Debug code**: Any `debugPrint` / `print` in production path must be wrapped: `if (kDebugMode) { debugPrint(...); }`
 

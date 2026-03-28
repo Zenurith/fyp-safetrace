@@ -432,8 +432,9 @@ class _MapScreenState extends State<MapScreen> {
         // Show public incidents + community-only incidents the user is an approved member of
         final incidents = provider.incidents
             .where((i) =>
-                i.communityIds.isEmpty ||
-                i.communityIds.any((id) => myApprovedIds.contains(id)))
+                i.status != IncidentStatus.pending &&
+                (i.communityIds.isEmpty ||
+                    i.communityIds.any((id) => myApprovedIds.contains(id))))
             .toList();
         final customCategories =
             categoryProvider.enabledCategories.where((c) => !c.isDefault).toList();

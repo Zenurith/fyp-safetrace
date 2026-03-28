@@ -2,11 +2,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum PostVisibility { public, private }
 
+enum PostStatus { pending, approved, rejected }
+
 class PostModel {
   final String id;
   final String authorId;
   final String communityId;
   final PostVisibility visibility;
+  final PostStatus status;
   final String title;
   final String content;
   final List<String> mediaUrls;
@@ -19,6 +22,7 @@ class PostModel {
     required this.authorId,
     required this.communityId,
     this.visibility = PostVisibility.public,
+    this.status = PostStatus.pending,
     required this.title,
     required this.content,
     this.mediaUrls = const [],
@@ -31,6 +35,10 @@ class PostModel {
 
   bool get isPublic => visibility == PostVisibility.public;
   bool get isPrivate => visibility == PostVisibility.private;
+
+  bool get isPending => status == PostStatus.pending;
+  bool get isApproved => status == PostStatus.approved;
+  bool get isRejected => status == PostStatus.rejected;
 
   String get visibilityLabel {
     switch (visibility) {
@@ -53,6 +61,7 @@ class PostModel {
       'authorId': authorId,
       'communityId': communityId,
       'visibility': visibility.index,
+      'status': status.index,
       'title': title,
       'content': content,
       'mediaUrls': mediaUrls,
@@ -68,6 +77,7 @@ class PostModel {
       authorId: map['authorId'] ?? '',
       communityId: map['communityId'] ?? '',
       visibility: PostVisibility.values[map['visibility'] ?? 0],
+      status: PostStatus.values[map['status'] ?? 0],
       title: map['title'] ?? '',
       content: map['content'] ?? '',
       mediaUrls: List<String>.from(map['mediaUrls'] ?? []),
@@ -84,6 +94,7 @@ class PostModel {
     String? authorId,
     String? communityId,
     PostVisibility? visibility,
+    PostStatus? status,
     String? title,
     String? content,
     List<String>? mediaUrls,
@@ -96,6 +107,7 @@ class PostModel {
       authorId: authorId ?? this.authorId,
       communityId: communityId ?? this.communityId,
       visibility: visibility ?? this.visibility,
+      status: status ?? this.status,
       title: title ?? this.title,
       content: content ?? this.content,
       mediaUrls: mediaUrls ?? this.mediaUrls,
