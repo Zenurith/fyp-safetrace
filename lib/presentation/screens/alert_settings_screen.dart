@@ -7,13 +7,28 @@ import '../providers/alert_settings_provider.dart';
 import '../providers/category_provider.dart';
 
 class AlertSettingsScreen extends StatefulWidget {
-  const AlertSettingsScreen({super.key});
+  final VoidCallback? onSaved;
+  const AlertSettingsScreen({super.key, this.onSaved});
 
   @override
   State<AlertSettingsScreen> createState() => _AlertSettingsScreenState();
 }
 
 class _AlertSettingsScreenState extends State<AlertSettingsScreen> {
+  bool _saved = false;
+  late final AlertSettingsProvider _provider;
+
+  @override
+  void initState() {
+    super.initState();
+    _provider = context.read<AlertSettingsProvider>();
+  }
+
+  @override
+  void dispose() {
+    if (!_saved) _provider.discardChanges();
+    super.dispose();
+  }
   /// Converts a "10:00 PM" formatted string to a [TimeOfDay].
   TimeOfDay _parseTimeString(String timeStr) {
     try {
@@ -324,10 +339,12 @@ class _AlertSettingsScreenState extends State<AlertSettingsScreen> {
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: () {
+                      _saved = true;
                       provider.saveSettings();
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Settings saved')),
                       );
+                      widget.onSaved?.call();
                     },
                     child: const Text(
                       'Save Settings',
