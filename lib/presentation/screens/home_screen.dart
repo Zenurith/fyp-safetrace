@@ -261,7 +261,9 @@ class _HomeScreenState extends State<HomeScreen> {
         currentScreen = const CommunityListScreen();
         break;
       case 3:
-        currentScreen = const AlertSettingsScreen();
+        currentScreen = AlertSettingsScreen(
+          onSaved: () => setState(() => _currentIndex = 0),
+        );
         break;
       case 4:
         currentScreen = ProfileScreen(

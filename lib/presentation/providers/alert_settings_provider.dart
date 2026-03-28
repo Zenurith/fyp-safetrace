@@ -9,6 +9,7 @@ class AlertSettingsProvider extends ChangeNotifier {
   final UserRepository _userRepository = UserRepository();
 
   String? _userId;
+  AlertSettingsModel _committed = AlertSettingsModel();
 
   AlertSettingsModel get settings => _repository.getSettings();
 
@@ -23,7 +24,9 @@ class AlertSettingsProvider extends ChangeNotifier {
     try {
       final map = await _userRepository.getAlertSettings(_userId!);
       if (map != null) {
-        _repository.saveSettings(AlertSettingsModel.fromMap(map));
+        final loaded = AlertSettingsModel.fromMap(map);
+        _committed = loaded;
+        _repository.saveSettings(loaded);
         notifyListeners();
       }
     } catch (_) {}
@@ -31,7 +34,6 @@ class AlertSettingsProvider extends ChangeNotifier {
 
   void updateRadius(double km) {
     _repository.saveSettings(settings.copyWith(radiusKm: km));
-    _syncToFirestore();
     notifyListeners();
   }
 
@@ -43,7 +45,6 @@ class AlertSettingsProvider extends ChangeNotifier {
       current.add(level);
     }
     _repository.saveSettings(settings.copyWith(severityFilters: current));
-    _syncToFirestore();
     notifyListeners();
   }
 
@@ -55,48 +56,48 @@ class AlertSettingsProvider extends ChangeNotifier {
       current.add(category);
     }
     _repository.saveSettings(settings.copyWith(categoryFilters: current));
-    _syncToFirestore();
     notifyListeners();
   }
 
   void toggleActiveHours(bool enabled) {
     _repository.saveSettings(settings.copyWith(activeHoursEnabled: enabled));
-    _syncToFirestore();
     notifyListeners();
   }
 
   void updateActiveFrom(String time) {
     _repository.saveSettings(settings.copyWith(activeFrom: time));
-    _syncToFirestore();
     notifyListeners();
   }
 
   void updateActiveTo(String time) {
     _repository.saveSettings(settings.copyWith(activeTo: time));
-    _syncToFirestore();
     notifyListeners();
   }
 
   void toggleQuietHours(bool enabled) {
     _repository.saveSettings(settings.copyWith(quietHoursEnabled: enabled));
-    _syncToFirestore();
     notifyListeners();
   }
 
   void updateQuietFrom(String time) {
     _repository.saveSettings(settings.copyWith(quietFrom: time));
-    _syncToFirestore();
     notifyListeners();
   }
 
   void updateQuietTo(String time) {
     _repository.saveSettings(settings.copyWith(quietTo: time));
-    _syncToFirestore();
     notifyListeners();
   }
 
   void saveSettings() {
+    _committed = settings;
     _syncToFirestore();
+    notifyListeners();
+  }
+
+  /// Reverts any unsaved changes back to the last saved state.
+  void discardChanges() {
+    _repository.saveSettings(_committed);
     notifyListeners();
   }
 
