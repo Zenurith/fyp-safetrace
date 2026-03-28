@@ -9,6 +9,7 @@ class IncidentProvider extends ChangeNotifier {
   final UserRepository _userRepository = UserRepository();
 
   List<IncidentModel> _incidents = [];
+  List<IncidentModel>? _filteredCache;
   List<IncidentModel> _myReports = [];
   final Set<String> _activeFilters = {};
   final Set<SeverityLevel> _severityFilters = {};
@@ -20,8 +21,13 @@ class IncidentProvider extends ChangeNotifier {
   String? _error;
   StreamSubscription? _incidentsSubscription;
   StreamSubscription? _myReportsSubscription;
+  List<IncidentModel> _communityIncidents = [];
+  String? _activeCommunityId;
+  StreamSubscription? _communitySubscription;
 
   List<IncidentModel> get incidents {
+    if (_filteredCache != null) return _filteredCache!;
+
     var list = _incidents;
 
     // Return all if no filters active
@@ -29,10 +35,10 @@ class IncidentProvider extends ChangeNotifier {
         _severityFilters.isEmpty &&
         _statusFilters.isEmpty &&
         _dateRange == null) {
-      return list;
+      return _filteredCache = list;
     }
 
-    return list.where((i) {
+    return _filteredCache = list.where((i) {
       // Time filter
       if (_activeFilters.contains('Last 24 hours')) {
         final cutoff = DateTime.now().subtract(const Duration(hours: 24));
@@ -73,6 +79,7 @@ class IncidentProvider extends ChangeNotifier {
   List<IncidentModel> get allIncidents => _incidents;
 
   List<IncidentModel> get myReports => _myReports;
+  List<IncidentModel> get communityIncidents => _communityIncidents;
   Set<String> get activeFilters => _activeFilters;
   Set<SeverityLevel> get severityFilters => _severityFilters;
   Set<IncidentStatus> get statusFilters => _statusFilters;
@@ -91,11 +98,10 @@ class IncidentProvider extends ChangeNotifier {
   /// Start listening to recent incidents (last 7 days) - for map/main feed
   void startListening() {
     _incidentsSubscription?.cancel();
-    _incidents = [];
-    notifyListeners();
     _incidentsSubscription = _repository.watchAll().listen(
       (incidents) {
         _incidents = incidents;
+        _filteredCache = null;
         _error = null;
         notifyListeners();
       },
@@ -136,10 +142,30 @@ class IncidentProvider extends ChangeNotifier {
     );
   }
 
+  void watchCommunityIncidents(String communityId) {
+    if (_activeCommunityId == communityId) return;
+    _activeCommunityId = communityId;
+    _communitySubscription?.cancel();
+    _communityIncidents = [];
+    notifyListeners();
+
+    _communitySubscription = _repository.watchCommunityIncidents(communityId).listen(
+      (incidents) {
+        _communityIncidents = incidents;
+        notifyListeners();
+      },
+      onError: (e) {
+        _error = e.toString();
+        notifyListeners();
+      },
+    );
+  }
+
   @override
   void dispose() {
     _incidentsSubscription?.cancel();
     _myReportsSubscription?.cancel();
+    _communitySubscription?.cancel();
     super.dispose();
   }
 
@@ -178,6 +204,7 @@ class IncidentProvider extends ChangeNotifier {
     } else {
       _activeFilters.add(filter);
     }
+    _filteredCache = null;
     notifyListeners();
   }
 
@@ -187,6 +214,7 @@ class IncidentProvider extends ChangeNotifier {
     } else {
       _severityFilters.add(severity);
     }
+    _filteredCache = null;
     notifyListeners();
   }
 
@@ -196,6 +224,7 @@ class IncidentProvider extends ChangeNotifier {
     } else {
       _statusFilters.add(status);
     }
+    _filteredCache = null;
     notifyListeners();
   }
 
@@ -205,6 +234,7 @@ class IncidentProvider extends ChangeNotifier {
     if (range != null) {
       _activeFilters.remove('Last 24 hours');
     }
+    _filteredCache = null;
     notifyListeners();
   }
 
@@ -213,6 +243,7 @@ class IncidentProvider extends ChangeNotifier {
     _severityFilters.clear();
     _statusFilters.clear();
     _dateRange = null;
+    _filteredCache = null;
     notifyListeners();
   }
 

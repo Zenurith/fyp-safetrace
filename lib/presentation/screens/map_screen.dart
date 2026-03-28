@@ -4,10 +4,12 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../config/app_constants.dart';
+import '../../data/models/category_model.dart';
 import '../../data/models/incident_model.dart';
 import '../../data/services/location_service.dart';
 import '../../data/services/heatmap_service.dart';
 import '../../utils/app_theme.dart';
+import '../providers/category_provider.dart';
 import '../providers/incident_provider.dart';
 import '../providers/community_provider.dart';
 import '../widgets/incident_bottom_sheet.dart';
@@ -26,6 +28,8 @@ class _MapScreenState extends State<MapScreen> {
   bool _isCentering = false;
   bool _showHeatmap = false;
   final Map<IncidentCategory, BitmapDescriptor> _markerIconCache = {};
+  final Map<String, BitmapDescriptor> _customMarkerCache = {};
+  final Set<String> _loadingCustomCategories = {};
   String? _lastCenteredIncidentId;
   String _currentLocationName = 'Locating...';
 
@@ -49,14 +53,28 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> _loadMarkerIcons() async {
     for (final category in IncidentCategory.values) {
-      _markerIconCache[category] = await _buildCategoryMarker(category);
+      _markerIconCache[category] = await _buildMarkerFromParams(
+        _categoryColor(category), _categoryIconData(category));
     }
     if (mounted) setState(() {});
   }
 
-  Future<BitmapDescriptor> _buildCategoryMarker(IncidentCategory category) async {
-    final color = _categoryColor(category);
-    final iconData = _categoryIconData(category);
+  Future<void> _loadCustomCategoryMarker(CategoryModel cat) async {
+    if (_loadingCustomCategories.contains(cat.name) ||
+        _customMarkerCache.containsKey(cat.name)) {
+      return;
+    }
+    _loadingCustomCategories.add(cat.name);
+    final marker = await _buildMarkerFromParams(cat.color, cat.icon);
+    if (mounted) {
+      setState(() {
+        _customMarkerCache[cat.name] = marker;
+        _loadingCustomCategories.remove(cat.name);
+      });
+    }
+  }
+
+  Future<BitmapDescriptor> _buildMarkerFromParams(Color color, IconData iconData) async {
 
     // Logical display size
     const double size = 36;
@@ -195,19 +213,32 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  BitmapDescriptor _markerIcon(IncidentCategory category, SeverityLevel severity) {
+  BitmapDescriptor _markerIcon(IncidentCategory category, SeverityLevel severity, String? customCategoryName) {
+    if (category == IncidentCategory.other && customCategoryName != null) {
+      return _customMarkerCache[customCategoryName] ??
+          _markerIconCache[IncidentCategory.other] ??
+          BitmapDescriptor.defaultMarker;
+    }
     return _markerIconCache[category] ?? BitmapDescriptor.defaultMarker;
   }
 
-  Set<Marker> _buildMarkers(List<IncidentModel> incidents) {
+  Set<Marker> _buildMarkers(List<IncidentModel> incidents, List<CategoryModel> customCategories) {
     // Don't show markers when heatmap is enabled
     if (_showHeatmap) return {};
+
+    // Trigger lazy loading for any uncached custom category markers
+    for (final cat in customCategories) {
+      if (!_customMarkerCache.containsKey(cat.name) &&
+          !_loadingCustomCategories.contains(cat.name)) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _loadCustomCategoryMarker(cat));
+      }
+    }
 
     return incidents.map((incident) {
       return Marker(
         markerId: MarkerId(incident.id),
         position: LatLng(incident.latitude, incident.longitude),
-        icon: _markerIcon(incident.category, incident.severity),
+        icon: _markerIcon(incident.category, incident.severity, incident.customCategoryName),
         infoWindow: InfoWindow(
           title: '${incident.categoryLabel} - ${incident.title}',
           snippet: 'Reported ${incident.timeAgo}',
@@ -395,8 +426,8 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer2<IncidentProvider, CommunityProvider>(
-      builder: (context, provider, communityProvider, _) {
+    return Consumer3<IncidentProvider, CommunityProvider, CategoryProvider>(
+      builder: (context, provider, communityProvider, categoryProvider, _) {
         final myApprovedIds = communityProvider.myApprovedCommunityIds;
         // Show public incidents + community-only incidents the user is an approved member of
         final incidents = provider.incidents
@@ -404,6 +435,8 @@ class _MapScreenState extends State<MapScreen> {
                 i.communityIds.isEmpty ||
                 i.communityIds.any((id) => myApprovedIds.contains(id)))
             .toList();
+        final customCategories =
+            categoryProvider.enabledCategories.where((c) => !c.isDefault).toList();
         // Center camera on a selected incident (set by "View on Map" from other screens)
         final selectedIncident = provider.selectedIncident;
         if (selectedIncident != null && selectedIncident.id != _lastCenteredIncidentId) {
@@ -434,7 +467,7 @@ class _MapScreenState extends State<MapScreen> {
                 _mapController = controller;
                 _centerOnUserLocation();
               },
-              markers: _buildMarkers(incidents),
+              markers: _buildMarkers(incidents, customCategories),
               circles: _buildHeatmapCircles(incidents),
               myLocationEnabled: true,
               myLocationButtonEnabled: false,

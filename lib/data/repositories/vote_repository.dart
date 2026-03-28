@@ -422,6 +422,7 @@ class VoteRepository {
   Future<List<VoteModel>> getVotesByUser(String voterId) async {
     final snapshot = await _votesCollection
         .where('voterId', isEqualTo: voterId)
+        .limit(1000)
         .get();
 
     return snapshot.docs

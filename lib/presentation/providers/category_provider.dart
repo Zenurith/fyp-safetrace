@@ -9,8 +9,9 @@ class CategoryProvider extends ChangeNotifier {
   List<CategoryModel> _categories = [];
   List<CategoryModel> get categories => _categories;
 
+  List<CategoryModel>? _enabledCategories;
   List<CategoryModel> get enabledCategories =>
-      _categories.where((c) => c.isEnabled).toList();
+      _enabledCategories ??= _categories.where((c) => c.isEnabled).toList();
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
@@ -23,7 +24,6 @@ class CategoryProvider extends ChangeNotifier {
   /// Initialize and start listening to categories
   Future<void> initialize() async {
     _isLoading = true;
-    notifyListeners();
 
     try {
       // Initialize default categories if needed
@@ -33,6 +33,7 @@ class CategoryProvider extends ChangeNotifier {
       _subscription = _repository.watchAll().listen(
         (categories) {
           _categories = categories;
+          _enabledCategories = null;
           _isLoading = false;
           _error = null;
           notifyListeners();

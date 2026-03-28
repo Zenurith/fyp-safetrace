@@ -107,18 +107,15 @@ class FlagProvider extends ChangeNotifier {
         resolvedBy: resolvedBy,
         resolutionNote: note,
       );
-      // Update local list
-      _flags = _flags.map((f) {
-        if (f.id == id) {
-          return f.copyWith(
-            status: FlagStatus.resolved,
-            resolvedAt: DateTime.now(),
-            resolvedBy: resolvedBy,
-            resolutionNote: note,
-          );
-        }
-        return f;
-      }).toList();
+      final idx = _flags.indexWhere((f) => f.id == id);
+      if (idx != -1) {
+        _flags[idx] = _flags[idx].copyWith(
+          status: FlagStatus.resolved,
+          resolvedAt: DateTime.now(),
+          resolvedBy: resolvedBy,
+          resolutionNote: note,
+        );
+      }
       _pendingFlags.removeWhere((f) => f.id == id);
       _pendingCount = _pendingFlags.length;
       notifyListeners();
@@ -138,18 +135,15 @@ class FlagProvider extends ChangeNotifier {
         resolvedBy: resolvedBy,
         resolutionNote: note,
       );
-      // Update local list
-      _flags = _flags.map((f) {
-        if (f.id == id) {
-          return f.copyWith(
-            status: FlagStatus.dismissed,
-            resolvedAt: DateTime.now(),
-            resolvedBy: resolvedBy,
-            resolutionNote: note,
-          );
-        }
-        return f;
-      }).toList();
+      final idx = _flags.indexWhere((f) => f.id == id);
+      if (idx != -1) {
+        _flags[idx] = _flags[idx].copyWith(
+          status: FlagStatus.dismissed,
+          resolvedAt: DateTime.now(),
+          resolvedBy: resolvedBy,
+          resolutionNote: note,
+        );
+      }
       _pendingFlags.removeWhere((f) => f.id == id);
       _pendingCount = _pendingFlags.length;
       notifyListeners();
@@ -168,17 +162,14 @@ class FlagProvider extends ChangeNotifier {
         FlagStatus.reviewed,
         resolvedBy: resolvedBy,
       );
-      // Update local list
-      _flags = _flags.map((f) {
-        if (f.id == id) {
-          return f.copyWith(
-            status: FlagStatus.reviewed,
-            resolvedAt: DateTime.now(),
-            resolvedBy: resolvedBy,
-          );
-        }
-        return f;
-      }).toList();
+      final idx = _flags.indexWhere((f) => f.id == id);
+      if (idx != -1) {
+        _flags[idx] = _flags[idx].copyWith(
+          status: FlagStatus.reviewed,
+          resolvedAt: DateTime.now(),
+          resolvedBy: resolvedBy,
+        );
+      }
       _pendingFlags.removeWhere((f) => f.id == id);
       _pendingCount = _pendingFlags.length;
       notifyListeners();

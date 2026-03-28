@@ -31,10 +31,25 @@ class UserRepository {
   }
 
   Future<List<UserModel>> getAllUsers() async {
-    final snapshot = await _usersCollection.get();
+    final snapshot = await _usersCollection.limit(500).get();
     return snapshot.docs
         .map((doc) => UserModel.fromMap(doc.data(), doc.id))
         .toList();
+  }
+
+  /// Fetches multiple users by ID using batched whereIn queries (max 10 per batch).
+  Future<List<UserModel>> getUsersByIds(List<String> ids) async {
+    if (ids.isEmpty) return [];
+    final users = <UserModel>[];
+    for (var i = 0; i < ids.length; i += 10) {
+      final batch = ids.skip(i).take(10).toList();
+      final snapshot = await _usersCollection
+          .where(FieldPath.documentId, whereIn: batch)
+          .get();
+      users.addAll(
+          snapshot.docs.map((doc) => UserModel.fromMap(doc.data(), doc.id)));
+    }
+    return users;
   }
 
   Future<void> updateUserRole(String uid, String role) async {

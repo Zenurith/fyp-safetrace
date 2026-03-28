@@ -7,14 +7,12 @@ import '../../data/models/user_model.dart';
 import '../../utils/app_theme.dart';
 import '../providers/community_provider.dart';
 import '../providers/incident_provider.dart';
-import '../providers/post_provider.dart';
 import '../providers/user_provider.dart';
 import '../widgets/incident_bottom_sheet.dart';
-import '../widgets/post_card.dart';
 import '../widgets/user_avatar.dart';
 import 'community_manager_screen.dart';
 import 'create_community_screen.dart';
-import 'create_post_screen.dart';
+import 'report_incident_screen.dart';
 
 class CommunityDetailScreen extends StatefulWidget {
   final String communityId;
@@ -372,119 +370,50 @@ class _PostsTab extends StatefulWidget {
 }
 
 class _PostsTabState extends State<_PostsTab> {
-  final Map<String, UserModel?> _authors = {};
-  final Set<String> _fetchedIds = {};
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<PostProvider>().watchCommunityPosts(widget.communityId);
+      context.read<IncidentProvider>().watchCommunityIncidents(widget.communityId);
     });
-  }
-
-  void _loadMissingAuthors(List posts) {
-    final missing = posts
-        .map((p) => p.authorId as String)
-        .where((id) => !_fetchedIds.contains(id))
-        .toSet()
-        .toList();
-    if (missing.isEmpty) return;
-    for (final id in missing) {
-      _fetchedIds.add(id);
-    }
-    context.read<UserProvider>().getUsersByIds(missing).then((fetched) {
-      if (mounted) setState(() => _authors.addAll(fetched));
-    });
-  }
-
-  void _openCreatePost() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => CreatePostSheet(communityId: widget.communityId),
-    );
-  }
-
-  Future<void> _deletePost(String postId) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Post'),
-        content: const Text('Are you sure you want to delete this post?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete',
-                style: TextStyle(color: AppTheme.primaryRed)),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-    await context.read<PostProvider>().deletePost(postId);
   }
 
   @override
   Widget build(BuildContext context) {
-    final postProvider = context.watch<PostProvider>();
-    final posts = postProvider.posts;
-
-    if (posts.isNotEmpty) {
-      final hasNew = posts.any((p) => !_fetchedIds.contains(p.authorId));
-      if (hasNew) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _loadMissingAuthors(posts);
-        });
-      }
-    }
-
-    if (postProvider.isLoading && posts.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    final incidents = context.watch<IncidentProvider>().communityIncidents;
 
     return Stack(
       children: [
-        posts.isEmpty
+        incidents.isEmpty
             ? Center(
                 child: _EmptyState(
-                  icon: Icons.forum_outlined,
-                  message:
-                      'No posts yet.\nBe the first to start a discussion!',
+                  icon: Icons.warning_amber_outlined,
+                  message: 'No incidents reported yet.\nBe the first to report one!',
                 ),
               )
             : ListView.separated(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-                itemCount: posts.length,
+                itemCount: incidents.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (_, i) {
-                  final post = posts[i];
-                  return PostCard(
-                    post: post,
-                    author: _authors[post.authorId],
-                    isStaff: widget.isStaff,
-                    onDelete: () => _deletePost(post.id),
-                  );
-                },
+                itemBuilder: (_, i) => _IncidentCard(
+                  incident: incidents[i],
+                  communityId: widget.communityId,
+                  isStaff: widget.isStaff,
+                ),
               ),
-        // Write-a-post FAB
         Positioned(
           bottom: 16,
           right: 16,
           child: FloatingActionButton.extended(
             heroTag: 'create_post_fab',
-            onPressed: _openCreatePost,
+            onPressed: () => Navigator.push<bool>(
+              context,
+              MaterialPageRoute(builder: (_) => const ReportIncidentScreen()),
+            ),
             backgroundColor: AppTheme.primaryRed,
             foregroundColor: Colors.white,
-            icon: const Icon(Icons.edit_outlined),
-            label: const Text('Post'),
+            icon: const Icon(Icons.add_alert_outlined),
+            label: const Text('Report'),
           ),
         ),
       ],

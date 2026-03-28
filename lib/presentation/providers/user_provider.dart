@@ -93,10 +93,12 @@ class UserProvider extends ChangeNotifier {
   }
 
   Future<Map<String, UserModel?>> getUsersByIds(List<String> ids) async {
-    final results = await Future.wait(
-      ids.map((id) => _repository.getCurrentUser(id)),
-    );
-    return Map.fromIterables(ids, results);
+    final list = await _repository.getUsersByIds(ids);
+    final map = <String, UserModel?>{for (final u in list) u.id: u};
+    for (final id in ids) {
+      map.putIfAbsent(id, () => null);
+    }
+    return map;
   }
 
   Future<void> updateLocation(double latitude, double longitude) async {

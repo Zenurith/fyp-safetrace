@@ -44,6 +44,16 @@ class IncidentRepository {
             .toList());
   }
 
+  Stream<List<IncidentModel>> watchCommunityIncidents(String communityId) {
+    return _incidentsCollection
+        .where('communityIds', arrayContains: communityId)
+        .orderBy('reportedAt', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => IncidentModel.fromMap(doc.data(), doc.id))
+            .toList());
+  }
+
   /// Get recent incidents only (last 3 days)
   Future<List<IncidentModel>> getAll() async {
     final cutoff = DateTime.now().subtract(const Duration(days: maxIncidentAgeDays));

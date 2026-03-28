@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../../data/models/alert_settings_model.dart';
 import '../../data/models/incident_model.dart';
@@ -9,6 +10,7 @@ class AlertSettingsProvider extends ChangeNotifier {
   final UserRepository _userRepository = UserRepository();
 
   String? _userId;
+  Timer? _debounceTimer;
 
   AlertSettingsModel get settings => _repository.getSettings();
 
@@ -101,8 +103,16 @@ class AlertSettingsProvider extends ChangeNotifier {
   }
 
   void _syncToFirestore() {
-    if (_userId != null) {
+    if (_userId == null) return;
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 800), () {
       _userRepository.updateAlertSettings(_userId!, settings.toMap());
-    }
+    });
+  }
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    super.dispose();
   }
 }

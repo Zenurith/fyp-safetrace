@@ -64,6 +64,14 @@ class _HomeScreenState extends State<HomeScreen> {
       provider.acknowledgeMapTabRequest();
       if (mounted) setState(() => _currentIndex = 0);
     }
+    // Detect new incidents and trigger proximity check
+    final count = provider.incidents.length;
+    if (count > _previousIncidentCount && _previousIncidentCount > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkForNewIncidents();
+      });
+    }
+    _previousIncidentCount = count;
   }
 
   void _initNotifications() {
@@ -230,22 +238,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = context.watch<UserProvider>().currentUser;
+    // Only rebuild when user presence changes (null ↔ non-null), not on every profile update
+    final userIsLoaded = context.select<UserProvider, bool>((p) => p.currentUser != null);
 
-    // Watch for incident changes and check for new incidents immediately
-    final incidents = context.watch<IncidentProvider>().incidents;
-
-    // Detect new incidents and check immediately
-    if (incidents.length > _previousIncidentCount && _previousIncidentCount > 0) {
-      // New incident added - check immediately
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _checkForNewIncidents();
-      });
-    }
-    _previousIncidentCount = incidents.length;
-
-    // Load user votes once user is available
-    if (user != null && !_votesLoaded) {
+    // Load user votes once user is available (first time only)
+    if (userIsLoaded && !_votesLoaded) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _loadUserVotesIfNeeded();
       });
@@ -271,10 +268,6 @@ class _HomeScreenState extends State<HomeScreen> {
       default:
         currentScreen = const MapScreen();
     }
-
-    final sysConfig = context.watch<SystemConfigProvider>().config;
-    final showBanner = sysConfig.announcementEnabled &&
-        sysConfig.announcementMessage.isNotEmpty;
 
     return Scaffold(
       appBar: _currentIndex == 0
@@ -302,8 +295,7 @@ class _HomeScreenState extends State<HomeScreen> {
           : null,
       body: Column(
         children: [
-          if (showBanner)
-            _AnnouncementBanner(message: sysConfig.announcementMessage),
+          const _AnnouncementBannerSlot(),
           Expanded(
             child: Stack(
               fit: StackFit.expand,
@@ -400,6 +392,20 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+}
+
+/// Watches SystemConfigProvider in isolation so only this widget rebuilds on config changes.
+class _AnnouncementBannerSlot extends StatelessWidget {
+  const _AnnouncementBannerSlot();
+
+  @override
+  Widget build(BuildContext context) {
+    final sysConfig = context.watch<SystemConfigProvider>().config;
+    if (!sysConfig.announcementEnabled || sysConfig.announcementMessage.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return _AnnouncementBanner(message: sysConfig.announcementMessage);
   }
 }
 
