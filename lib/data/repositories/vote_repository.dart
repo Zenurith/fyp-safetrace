@@ -86,6 +86,10 @@ class VoteRepository {
       return null;
     }
 
+    // Fetch fresh config before the transaction so admin changes are reflected
+    // immediately rather than relying on the potentially-stale static cache.
+    final config = await SystemConfigRepository().get();
+
     final voteDocId = '${incidentId}_$voterId';
     final voteRef = _votesCollection.doc(voteDocId);
     final incidentRef = _incidentsCollection.doc(incidentId);
@@ -154,7 +158,6 @@ class VoteRepository {
       if (reporterDoc.exists) {
         final reporterData = reporterDoc.data() ?? {};
         final currentPoints = reporterData['points'] ?? 0;
-        final config = SystemConfigRepository.cached;
         final pointsDelta = type == VoteType.upvote
             ? config.pointsForUpvoteReceived
             : config.pointsForDownvoteReceived;
@@ -193,6 +196,10 @@ class VoteRepository {
     required String reporterId,
     required VoteType newType,
   }) async {
+    // Fetch fresh config before the transaction so admin changes are reflected
+    // immediately rather than relying on the potentially-stale static cache.
+    final config = await SystemConfigRepository().get();
+
     final voteDocId = '${incidentId}_$voterId';
     final voteRef = _votesCollection.doc(voteDocId);
     final incidentRef = _incidentsCollection.doc(incidentId);
@@ -276,7 +283,6 @@ class VoteRepository {
       if (reporterDoc.exists) {
         final reporterData = reporterDoc.data() ?? {};
         final currentPoints = reporterData['points'] ?? 0;
-        final config = SystemConfigRepository.cached;
         // Reverse old vote and apply new vote
         final pointsDelta = newType == VoteType.upvote
             ? config.pointsForUpvoteReceived - config.pointsForDownvoteReceived

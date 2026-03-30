@@ -297,7 +297,6 @@ class _HomeScreenState extends State<HomeScreen> {
           : null,
       body: Column(
         children: [
-          const _AnnouncementBannerSlot(),
           Expanded(
             child: Stack(
               fit: StackFit.expand,
@@ -392,52 +391,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Watches SystemConfigProvider in isolation so only this widget rebuilds on config changes.
-class _AnnouncementBannerSlot extends StatelessWidget {
-  const _AnnouncementBannerSlot();
-
-  @override
-  Widget build(BuildContext context) {
-    final sysConfig = context.watch<SystemConfigProvider>().config;
-    if (!sysConfig.announcementEnabled || sysConfig.announcementMessage.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return _AnnouncementBanner(message: sysConfig.announcementMessage);
-  }
-}
-
-class _AnnouncementBanner extends StatelessWidget {
-  final String message;
-
-  const _AnnouncementBanner({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      color: AppTheme.primaryDark,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
-        children: [
-          const Icon(Icons.campaign_outlined, color: Colors.white, size: 18),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              message,
-              style: const TextStyle(
-                fontFamily: AppTheme.fontFamily,
-                fontSize: 13,
-                color: Colors.white,
-                fontWeight: FontWeight.w400,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

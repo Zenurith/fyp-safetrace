@@ -303,34 +303,34 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
                   ),
                 ],
               ),
-            if (membership != null &&
-                membership.isApproved &&
-                !membership.isOwner)
-              PopupMenuButton<String>(
-                onSelected: (value) {
-                  if (value == 'report_community') {
-                    FlagDialog.show(
-                      context,
-                      targetType: FlagTargetType.community,
-                      targetId: widget.communityId,
-                    );
-                  }
-                },
-                itemBuilder: (_) => [
-                  const PopupMenuItem(
-                    value: 'report_community',
-                    child: Row(
-                      children: [
-                        Icon(Icons.flag_outlined,
-                            size: 18, color: AppTheme.warningOrange),
-                        SizedBox(width: 8),
-                        Text('Report Community'),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
           ],
+          if (membership != null &&
+              membership.isApproved &&
+              !membership.isOwner)
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'report_community') {
+                  FlagDialog.show(
+                    context,
+                    targetType: FlagTargetType.community,
+                    targetId: widget.communityId,
+                  );
+                }
+              },
+              itemBuilder: (_) => [
+                const PopupMenuItem(
+                  value: 'report_community',
+                  child: Row(
+                    children: [
+                      Icon(Icons.flag_outlined,
+                          size: 18, color: AppTheme.warningOrange),
+                      SizedBox(width: 8),
+                      Text('Report Community'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
       body: TabBarView(

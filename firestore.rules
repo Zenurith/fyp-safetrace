@@ -198,6 +198,15 @@ service cloud.firestore {
       allow create: if isAuth();
     }
 
+    // ─── System Config ──────────────────────────────────────────────────────
+
+    match /system_config/{docId} {
+      // All authenticated users can read (needed for alert defaults, announcement banner, etc.)
+      allow read: if isAuth();
+      // Only admins can write
+      allow write: if isAdmin();
+    }
+
     // ─── Admin Audit Log ────────────────────────────────────────────────────
 
     match /admin_audit_log/{entryId} {

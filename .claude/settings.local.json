@@ -44,7 +44,8 @@
       "Bash(npx --version)",
       "Bash(npx firebase-tools:*)",
       "Bash(git diff:*)",
-      "Bash(find /c/Users/User/StudioProjects/FYP/fyp-safetrace/functions -type f -name *.js -o -name *.ts)"
+      "Bash(find /c/Users/User/StudioProjects/FYP/fyp-safetrace/functions -type f -name *.js -o -name *.ts)",
+      "Skill(update-config)"
     ]
   }
 }

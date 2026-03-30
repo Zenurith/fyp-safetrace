@@ -95,8 +95,7 @@ class _CommunityManagerScreenState extends State<CommunityManagerScreen>
         ],
         bottom: TabBar(
           controller: _tabController,
-          isScrollable: true,
-          tabAlignment: TabAlignment.fill,
+          labelPadding: const EdgeInsets.symmetric(horizontal: 12),
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white60,
           indicatorColor: AppTheme.primaryRed,

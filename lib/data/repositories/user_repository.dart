@@ -95,7 +95,10 @@ class UserRepository {
     if (!doc.exists) return;
 
     final data = doc.data()!;
-    final config = SystemConfigRepository.cached;
+    // Always fetch fresh config so admin changes take effect immediately.
+    // The static cache may still hold defaults if the Firestore stream hasn't
+    // fired yet (e.g. cold start or offline cache).
+    final config = await SystemConfigRepository().get();
     final currentPoints = data['points'] ?? 0;
     final currentReports = data['reports'] ?? 0;
     final newPoints = currentPoints + config.pointsForReport;

@@ -17,7 +17,6 @@ class SystemConfigPage extends StatefulWidget {
 }
 
 class _SystemConfigPageState extends State<SystemConfigPage> {
-  late final TextEditingController _announcementMsgCtrl;
   late final TextEditingController _pointsForReportCtrl;
   late final TextEditingController _pointsForUpvoteCtrl;
   late final TextEditingController _pointsForDownvoteCtrl;
@@ -25,7 +24,6 @@ class _SystemConfigPageState extends State<SystemConfigPage> {
   late final TextEditingController _alertRadiusCtrl;
   late final TextEditingController _maxAlertsCtrl;
 
-  bool _announcementSaving = false;
   bool _reputationSaving = false;
   bool _notificationSaving = false;
 
@@ -37,8 +35,6 @@ class _SystemConfigPageState extends State<SystemConfigPage> {
     _configProvider = context.read<SystemConfigProvider>();
     final config = _configProvider.config;
 
-    _announcementMsgCtrl =
-        TextEditingController(text: config.announcementMessage);
     _pointsForReportCtrl =
         TextEditingController(text: '${config.pointsForReport}');
     _pointsForUpvoteCtrl =
@@ -55,7 +51,6 @@ class _SystemConfigPageState extends State<SystemConfigPage> {
 
   @override
   void dispose() {
-    _announcementMsgCtrl.dispose();
     _pointsForReportCtrl.dispose();
     _pointsForUpvoteCtrl.dispose();
     _pointsForDownvoteCtrl.dispose();
@@ -82,25 +77,6 @@ class _SystemConfigPageState extends State<SystemConfigPage> {
       detail: detail,
       timestamp: DateTime.now(),
     ));
-  }
-
-  Future<void> _toggleAnnouncement(bool value) async {
-    await _configProvider.updateFields(
-        {'announcementEnabled': value}, _adminName);
-  }
-
-  Future<void> _saveAnnouncement() async {
-    final msg = _announcementMsgCtrl.text.trim();
-    if (msg.isEmpty) {
-      _showSnack('Please enter an announcement message.');
-      return;
-    }
-    setState(() => _announcementSaving = true);
-    final ok = await _configProvider.updateFields(
-        {'announcementMessage': msg}, _adminName);
-    setState(() => _announcementSaving = false);
-    if (ok) _logConfigChange('Updated announcement', msg.length > 80 ? '${msg.substring(0, 80)}…' : msg);
-    _showSnack(ok ? 'Announcement saved.' : 'Failed to save. Try again.');
   }
 
   Future<void> _saveReputation() async {
@@ -184,8 +160,6 @@ class _SystemConfigPageState extends State<SystemConfigPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildAnnouncementSection(config),
-              const SizedBox(height: 20),
               _buildReputationSection(),
               const SizedBox(height: 20),
               _buildNotificationsSection(),
@@ -195,80 +169,6 @@ class _SystemConfigPageState extends State<SystemConfigPage> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildAnnouncementSection(SystemConfigModel config) {
-    return _ConfigSection(
-      title: 'Announcement Banner',
-      description:
-          'Show a pinned message to all mobile users at the top of their home screen.',
-      children: [
-        Row(
-          children: [
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Enable Banner',
-                    style: TextStyle(
-                      fontFamily: AppTheme.fontFamily,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      color: AppTheme.primaryDark,
-                    ),
-                  ),
-                  Text(
-                    'Users will see this pinned at the top of the app.',
-                    style: TextStyle(
-                      fontFamily: AppTheme.fontFamily,
-                      fontSize: 12,
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Switch.adaptive(
-              value: config.announcementEnabled,
-              onChanged: _toggleAnnouncement,
-              activeTrackColor: AppTheme.primaryDark,
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        TextField(
-          controller: _announcementMsgCtrl,
-          decoration: InputDecoration(
-            labelText: 'Announcement Message',
-            labelStyle:
-                const TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 13),
-            hintText: 'e.g. Scheduled maintenance tonight at 11 PM.',
-            hintStyle: TextStyle(
-                fontFamily: AppTheme.fontFamily,
-                color: Colors.grey[400],
-                fontSize: 13),
-            border:
-                OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          ),
-          style:
-              const TextStyle(fontFamily: AppTheme.fontFamily, fontSize: 14),
-          maxLines: 3,
-          maxLength: 280,
-        ),
-        const SizedBox(height: 4),
-        Align(
-          alignment: Alignment.centerRight,
-          child: _SaveButton(
-            label: 'Save Announcement',
-            saving: _announcementSaving,
-            onPressed: _saveAnnouncement,
-          ),
-        ),
-      ],
     );
   }
 
