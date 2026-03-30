@@ -180,8 +180,19 @@ service cloud.firestore {
     // ─── Flags ──────────────────────────────────────────────────────────────
 
     match /flags/{flagId} {
-      // Only admins can view and manage flags
+      // Admins can do everything
       allow read, update, delete: if isAdmin();
+
+      // Community staff can read flags assigned to them (via communityStaffIds fan-out).
+      // Fan-out is written by Cloud Function after flag creation.
+      allow read: if isAuth()
+        && request.auth.uid in resource.data.get('communityStaffIds', []);
+
+      // Community staff can update status fields only (mark reviewed / dismiss).
+      allow update: if isAuth()
+        && request.auth.uid in resource.data.get('communityStaffIds', [])
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'resolvedAt', 'resolvedBy', 'resolutionNote']);
 
       // Any authenticated user can submit a flag/report
       allow create: if isAuth();

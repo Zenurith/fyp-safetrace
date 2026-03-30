@@ -14,11 +14,17 @@ class FlagProvider extends ChangeNotifier {
   StreamSubscription? _flagsSubscription;
   StreamSubscription? _pendingSubscription;
 
+  List<FlagModel> _communityFlags = [];
+  int _communityPendingCount = 0;
+  StreamSubscription? _communityFlagsSubscription;
+
   List<FlagModel> get flags => _flags;
   List<FlagModel> get pendingFlags => _pendingFlags;
   int get pendingCount => _pendingCount;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  List<FlagModel> get communityFlags => _communityFlags;
+  int get communityPendingCount => _communityPendingCount;
 
   void startListening() {
     _flagsSubscription?.cancel();
@@ -51,10 +57,46 @@ class FlagProvider extends ChangeNotifier {
     );
   }
 
+  void startListeningFlagsByCommunity(String communityId) {
+    _communityFlagsSubscription?.cancel();
+    _communityFlagsSubscription =
+        _repository.watchFlagsByCommunity(communityId).listen(
+      (flags) {
+        _communityFlags = flags;
+        _communityPendingCount =
+            flags.where((f) => f.status == FlagStatus.pending).length;
+        notifyListeners();
+      },
+      onError: (e) {
+        _error = e.toString();
+        notifyListeners();
+      },
+    );
+  }
+
+  void stopListeningCommunityFlags() {
+    _communityFlagsSubscription?.cancel();
+    _communityFlagsSubscription = null;
+    _communityFlags = [];
+    _communityPendingCount = 0;
+  }
+
+  Future<void> refreshCommunityPendingCount(String communityId) async {
+    try {
+      _communityPendingCount =
+          await _repository.getPendingFlagCountByCommunity(communityId);
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+    }
+  }
+
   @override
   void dispose() {
     _flagsSubscription?.cancel();
     _pendingSubscription?.cancel();
+    _communityFlagsSubscription?.cancel();
     super.dispose();
   }
 
@@ -118,6 +160,17 @@ class FlagProvider extends ChangeNotifier {
       }
       _pendingFlags.removeWhere((f) => f.id == id);
       _pendingCount = _pendingFlags.length;
+      final cidx = _communityFlags.indexWhere((f) => f.id == id);
+      if (cidx != -1) {
+        _communityFlags[cidx] = _communityFlags[cidx].copyWith(
+          status: FlagStatus.resolved,
+          resolvedAt: DateTime.now(),
+          resolvedBy: resolvedBy,
+          resolutionNote: note,
+        );
+        _communityPendingCount =
+            _communityFlags.where((f) => f.status == FlagStatus.pending).length;
+      }
       notifyListeners();
       return true;
     } catch (e) {
@@ -146,6 +199,17 @@ class FlagProvider extends ChangeNotifier {
       }
       _pendingFlags.removeWhere((f) => f.id == id);
       _pendingCount = _pendingFlags.length;
+      final cidx = _communityFlags.indexWhere((f) => f.id == id);
+      if (cidx != -1) {
+        _communityFlags[cidx] = _communityFlags[cidx].copyWith(
+          status: FlagStatus.dismissed,
+          resolvedAt: DateTime.now(),
+          resolvedBy: resolvedBy,
+          resolutionNote: note,
+        );
+        _communityPendingCount =
+            _communityFlags.where((f) => f.status == FlagStatus.pending).length;
+      }
       notifyListeners();
       return true;
     } catch (e) {
@@ -172,6 +236,16 @@ class FlagProvider extends ChangeNotifier {
       }
       _pendingFlags.removeWhere((f) => f.id == id);
       _pendingCount = _pendingFlags.length;
+      final cidx = _communityFlags.indexWhere((f) => f.id == id);
+      if (cidx != -1) {
+        _communityFlags[cidx] = _communityFlags[cidx].copyWith(
+          status: FlagStatus.reviewed,
+          resolvedAt: DateTime.now(),
+          resolvedBy: resolvedBy,
+        );
+        _communityPendingCount =
+            _communityFlags.where((f) => f.status == FlagStatus.pending).length;
+      }
       notifyListeners();
       return true;
     } catch (e) {

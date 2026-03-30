@@ -8,23 +8,27 @@ import '../providers/user_provider.dart';
 class FlagDialog extends StatefulWidget {
   final FlagTargetType targetType;
   final String targetId;
+  final String? communityId;
 
   const FlagDialog({
     super.key,
     required this.targetType,
     required this.targetId,
+    this.communityId,
   });
 
   static Future<bool?> show(
     BuildContext context, {
     required FlagTargetType targetType,
     required String targetId,
+    String? communityId,
   }) {
     return showDialog<bool>(
       context: context,
       builder: (ctx) => FlagDialog(
         targetType: targetType,
         targetId: targetId,
+        communityId: communityId,
       ),
     );
   }
@@ -37,15 +41,29 @@ class _FlagDialogState extends State<FlagDialog> {
   final _detailsController = TextEditingController();
   String? _selectedReason;
   bool _isSubmitting = false;
+  late final List<String> _reasons;
 
-  final _reasons = [
-    'Spam or misleading',
-    'Inappropriate content',
-    'Harassment or abuse',
-    'False information',
-    'Privacy violation',
-    'Other',
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _reasons = widget.targetType == FlagTargetType.community
+        ? [
+            'Lewd or inappropriate content',
+            'Spam or scam activity',
+            'Harassment of members',
+            'Misinformation',
+            'Illegal activity',
+            'Other',
+          ]
+        : [
+            'Spam or misleading',
+            'Inappropriate content',
+            'Harassment or abuse',
+            'False information',
+            'Privacy violation',
+            'Other',
+          ];
+  }
 
   @override
   void dispose() {
@@ -72,6 +90,7 @@ class _FlagDialogState extends State<FlagDialog> {
           ? _detailsController.text.trim()
           : null,
       createdAt: DateTime.now(),
+      communityId: widget.communityId,
     );
 
     try {

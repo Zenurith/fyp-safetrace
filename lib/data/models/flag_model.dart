@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum FlagTargetType { incident, comment, user }
+enum FlagTargetType { incident, comment, user, community }
 enum FlagStatus { pending, reviewed, resolved, dismissed }
 
 class FlagModel {
@@ -16,6 +16,8 @@ class FlagModel {
   final DateTime? resolvedAt;
   final String? resolvedBy;
   final String? resolutionNote;
+  final String? communityId;
+  final List<String> communityStaffIds;
 
   FlagModel({
     required this.id,
@@ -30,6 +32,8 @@ class FlagModel {
     this.resolvedAt,
     this.resolvedBy,
     this.resolutionNote,
+    this.communityId,
+    this.communityStaffIds = const [],
   });
 
   String get targetTypeLabel {
@@ -40,6 +44,8 @@ class FlagModel {
         return 'Comment';
       case FlagTargetType.user:
         return 'User';
+      case FlagTargetType.community:
+        return 'Community';
     }
   }
 
@@ -78,6 +84,8 @@ class FlagModel {
       'resolvedAt': resolvedAt != null ? Timestamp.fromDate(resolvedAt!) : null,
       'resolvedBy': resolvedBy,
       'resolutionNote': resolutionNote,
+      'communityId': communityId,
+      'communityStaffIds': communityStaffIds,
     };
   }
 
@@ -99,6 +107,8 @@ class FlagModel {
           : null,
       resolvedBy: map['resolvedBy'],
       resolutionNote: map['resolutionNote'],
+      communityId: map['communityId'] as String?,
+      communityStaffIds: List<String>.from(map['communityStaffIds'] ?? []),
     );
   }
 
@@ -115,6 +125,8 @@ class FlagModel {
     DateTime? resolvedAt,
     String? resolvedBy,
     String? resolutionNote,
+    String? communityId,
+    List<String>? communityStaffIds,
   }) {
     return FlagModel(
       id: id ?? this.id,
@@ -129,6 +141,8 @@ class FlagModel {
       resolvedAt: resolvedAt ?? this.resolvedAt,
       resolvedBy: resolvedBy ?? this.resolvedBy,
       resolutionNote: resolutionNote ?? this.resolutionNote,
+      communityId: communityId ?? this.communityId,
+      communityStaffIds: communityStaffIds ?? this.communityStaffIds,
     );
   }
 }

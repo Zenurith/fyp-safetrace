@@ -19,7 +19,7 @@ import 'map_screen.dart';
 import 'alert_settings_screen.dart';
 import 'profile_screen.dart';
 import 'community_list_screen.dart';
-import 'report_incident_screen.dart';
+import 'create_post_screen.dart';
 import 'notification_history_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -206,7 +206,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (_) => const ReportIncidentScreen(),
+        builder: (_) => const CreatePostScreen(),
       ),
     );
     if (result == true && mounted) {

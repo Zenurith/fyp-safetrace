@@ -40,8 +40,12 @@ class _FlagsManagementPageState extends State<FlagsManagementPage>
   @override
   Widget build(BuildContext context) {
     final flagProvider = context.watch<FlagProvider>();
-    final pendingFlags = flagProvider.pendingFlags;
-    final allFlags = flagProvider.flags;
+    // Admin panel shows community reports only.
+    // Incident/comment/user flags are handled by community managers.
+    final allFlags = flagProvider.flags
+        .where((f) => f.targetType == FlagTargetType.community)
+        .toList();
+    final pendingFlags = allFlags.where((f) => f.status == FlagStatus.pending).toList();
     final reviewedFlags = allFlags.where((f) => f.status != FlagStatus.pending).toList();
 
     return Column(
@@ -361,6 +365,8 @@ class _FlagCard extends StatelessWidget {
         return Icons.comment_outlined;
       case FlagTargetType.user:
         return Icons.person_outline;
+      case FlagTargetType.community:
+        return Icons.groups_outlined;
     }
   }
 
@@ -372,6 +378,8 @@ class _FlagCard extends StatelessWidget {
         return AppTheme.primaryDark;
       case FlagTargetType.user:
         return AppTheme.primaryRed;
+      case FlagTargetType.community:
+        return AppTheme.warningOrange;
     }
   }
 

@@ -329,7 +329,12 @@ class _IncidentBottomSheetState extends State<IncidentBottomSheet> {
           const SizedBox(height: 16),
 
           // Comments section
-          CommentsSection(incidentId: incident.id),
+          CommentsSection(
+            incidentId: incident.id,
+            communityId: incident.communityIds.isNotEmpty
+                ? incident.communityIds.first
+                : null,
+          ),
           const SizedBox(height: 16),
 
           // Action buttons
@@ -372,6 +377,9 @@ class _IncidentBottomSheetState extends State<IncidentBottomSheet> {
                   context,
                   targetType: FlagTargetType.incident,
                   targetId: incident.id,
+                  communityId: incident.communityIds.isNotEmpty
+                      ? incident.communityIds.first
+                      : null,
                 ),
                 icon: const Icon(Icons.flag_outlined, size: 16),
                 label: const Text('Report'),

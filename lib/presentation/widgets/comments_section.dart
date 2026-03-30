@@ -10,8 +10,9 @@ import 'user_avatar.dart';
 
 class CommentsSection extends StatefulWidget {
   final String incidentId;
+  final String? communityId;
 
-  const CommentsSection({super.key, required this.incidentId});
+  const CommentsSection({super.key, required this.incidentId, this.communityId});
 
   @override
   State<CommentsSection> createState() => _CommentsSectionState();
@@ -181,7 +182,7 @@ class _CommentsSectionState extends State<CommentsSection> {
                   itemCount: comments.length > 5 ? 5 : comments.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
-                    return _CommentTile(comment: comments[index]);
+                    return _CommentTile(comment: comments[index], communityId: widget.communityId);
                   },
                 ),
 
@@ -239,7 +240,7 @@ class _CommentsSectionState extends State<CommentsSection> {
                     itemCount: comments.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
-                      return _CommentTile(comment: comments[index]);
+                      return _CommentTile(comment: comments[index], communityId: widget.communityId);
                     },
                   ),
                 ),
@@ -321,8 +322,9 @@ class _CommentInput extends StatelessWidget {
 
 class _CommentTile extends StatelessWidget {
   final CommentModel comment;
+  final String? communityId;
 
-  const _CommentTile({required this.comment});
+  const _CommentTile({required this.comment, this.communityId});
 
   @override
   Widget build(BuildContext context) {
@@ -389,12 +391,14 @@ class _CommentTile extends StatelessWidget {
                 context,
                 targetType: FlagTargetType.comment,
                 targetId: comment.id,
+                communityId: communityId,
               );
             } else if (value == 'report_user') {
               FlagDialog.show(
                 context,
                 targetType: FlagTargetType.user,
                 targetId: comment.authorId,
+                communityId: communityId,
               );
             }
           },

@@ -256,6 +256,85 @@ exports.notifyCommunityPost = onDocumentCreated(
   },
 );
 
+// ─── 5. Fan-out + notify when a flag is created ──────────────────────────────
+// targetType: 0=incident, 1=comment, 2=user → community staff fan-out + notify
+// targetType: 3=community → notify admins
+
+exports.onFlagCreated = onDocumentCreated(
+  { document: 'flags/{flagId}', region: REGION },
+  async (event) => {
+    const flag = event.data.data();
+    const flagId = event.params.flagId;
+    const { targetType, communityId, reason } = flag;
+    const db = getFirestore();
+
+    const TARGET_LABELS = ['Incident', 'Comment', 'User', 'Community'];
+    const targetLabel = TARGET_LABELS[targetType] ?? 'Content';
+
+    // ── Community staff fan-out (incident=0, comment=1, user=2) ────────────
+    if ([0, 1, 2].includes(targetType) && communityId) {
+      const staffSnapshot = await db.collection('community_members')
+        .where('communityId', '==', communityId)
+        .where('status', '==', 1) // approved
+        .get();
+
+      const staffIds = staffSnapshot.docs
+        .map(d => d.data())
+        .filter(m => ['owner', 'headModerator', 'moderator'].includes(m.role))
+        .map(m => m.userId);
+
+      if (staffIds.length > 0) {
+        // Write communityStaffIds so Firestore rules grant staff read access
+        await db.collection('flags').doc(flagId).update({ communityStaffIds: staffIds });
+
+        // Fetch FCM tokens for staff
+        const tokens = [];
+        for (const staffId of staffIds) {
+          const userDoc = await db.collection('users').doc(staffId).get();
+          if (userDoc.exists) {
+            const token = userDoc.data().fcmToken;
+            if (token) tokens.push(token);
+          }
+        }
+
+        if (tokens.length > 0) {
+          await sendToTokens(
+            tokens,
+            `New ${targetLabel} Report`,
+            `${reason || 'A report was submitted'} — review it in your community manager.`,
+            { flagId, communityId, type: 'community_content_flag' },
+          );
+        }
+        console.log(`onFlagCreated: fan-out done. flagId=${flagId} communityId=${communityId} targetType=${targetType} staffIds=[${staffIds.join(',')}]`);
+      } else {
+        console.log(`onFlagCreated: no staff found for communityId=${communityId}`);
+      }
+      return;
+    }
+
+    // ── Notify admins for community-level reports (community=3) ────────────
+    if (targetType === 3) {
+      const adminsSnapshot = await db.collection('users')
+        .where('role', '==', 'admin')
+        .get();
+
+      const tokens = adminsSnapshot.docs
+        .map(d => d.data().fcmToken)
+        .filter(t => !!t);
+
+      if (tokens.length > 0) {
+        await sendToTokens(
+          tokens,
+          'Community Reported',
+          `A community has been reported: "${reason || 'No reason provided'}"`,
+          { flagId, communityId: flag.targetId, type: 'community_report' },
+        );
+      }
+      console.log(`onFlagCreated: community report admin notification. flagId=${flagId} tokens=${tokens.length}`);
+    }
+  },
+);
+
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
 function calcDistanceKm(lat1, lon1, lat2, lon2) {
