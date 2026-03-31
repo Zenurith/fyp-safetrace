@@ -26,6 +26,13 @@ class SeverityCount {
   SeverityCount({required this.severity, required this.count});
 }
 
+class PeakHourData {
+  final int hour; // 0–23
+  final int count;
+
+  PeakHourData({required this.hour, required this.count});
+}
+
 class StatusCount {
   final String status;
   final int count;
@@ -42,6 +49,7 @@ class AnalyticsData {
   final List<CategoryCount> categoryDistribution;
   final List<SeverityCount> severityDistribution;
   final List<StatusCount> statusDistribution;
+  final List<PeakHourData> peakHoursData;
   final double averageResolutionDays;
   final int incidentsLast24h;
   final int incidentsLast7d;
@@ -55,6 +63,7 @@ class AnalyticsData {
     required this.categoryDistribution,
     required this.severityDistribution,
     required this.statusDistribution,
+    required this.peakHoursData,
     required this.averageResolutionDays,
     required this.incidentsLast24h,
     required this.incidentsLast7d,
@@ -73,6 +82,7 @@ class AnalyticsService {
         categoryDistribution: [],
         severityDistribution: [],
         statusDistribution: [],
+        peakHoursData: List.generate(24, (i) => PeakHourData(hour: i, count: 0)),
         averageResolutionDays: 0,
         incidentsLast24h: 0,
         incidentsLast7d: 0,
@@ -165,6 +175,14 @@ class AnalyticsService {
       avgResolutionDays = totalDays / resolvedIncidents.length;
     }
 
+    // Peak reporting hours (0–23)
+    final hourMap = {for (int i = 0; i < 24; i++) i: 0};
+    for (final incident in incidents) {
+      final h = incident.reportedAt.hour;
+      hourMap[h] = hourMap[h]! + 1;
+    }
+    final peakHoursData = List.generate(24, (i) => PeakHourData(hour: i, count: hourMap[i]!));
+
     return AnalyticsData(
       totalIncidents: incidents.length,
       activeIncidents: activeCount,
@@ -174,6 +192,7 @@ class AnalyticsService {
       categoryDistribution: categoryDistribution,
       severityDistribution: severityDistribution,
       statusDistribution: statusDistribution,
+      peakHoursData: peakHoursData,
       averageResolutionDays: avgResolutionDays,
       incidentsLast24h: incidentsLast24h,
       incidentsLast7d: incidentsLast7d,

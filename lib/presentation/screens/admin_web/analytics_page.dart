@@ -8,7 +8,7 @@ import '../../providers/category_provider.dart';
 import '../../widgets/analytics/stats_card.dart';
 import '../../widgets/analytics/incident_trend_chart.dart';
 import '../../widgets/analytics/category_pie_chart.dart';
-import '../../widgets/analytics/severity_bar_chart.dart';
+import '../../widgets/analytics/peak_hours_chart.dart';
 
 class AnalyticsPage extends StatefulWidget {
   const AnalyticsPage({super.key});
@@ -277,7 +277,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                 ),
                 const SizedBox(height: 16),
 
-                // Severity Distribution
+                // Peak Reporting Hours
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: AppTheme.cardDecorationFor(context),
@@ -285,13 +285,18 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Severity Distribution',
+                        'Peak Reporting Hours',
                         style: AppTheme.headingSmall.copyWith(color: AppTheme.primaryDark),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Number of incidents reported by hour of day',
+                        style: AppTheme.caption,
                       ),
                       const SizedBox(height: 16),
                       SizedBox(
                         height: 260,
-                        child: SeverityBarChart(data: analytics.severityDistribution),
+                        child: PeakHoursChart(data: analytics.peakHoursData),
                       ),
                     ],
                   ),

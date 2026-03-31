@@ -46,7 +46,10 @@ class FlagProvider extends ChangeNotifier {
     _pendingSubscription = _repository.watchPending().listen(
       (flags) {
         _pendingFlags = flags;
-        _pendingCount = flags.length;
+        // Admin flags page only shows community flags — count only those so the
+        // sidebar badge matches what's actually visible and actionable.
+        _pendingCount =
+            flags.where((f) => f.targetType == FlagTargetType.community).length;
         _error = null;
         notifyListeners();
       },
@@ -121,7 +124,8 @@ class FlagProvider extends ChangeNotifier {
 
     try {
       _pendingFlags = await _repository.getPending();
-      _pendingCount = _pendingFlags.length;
+      _pendingCount =
+          _pendingFlags.where((f) => f.targetType == FlagTargetType.community).length;
       _error = null;
     } catch (e) {
       _error = e.toString();
