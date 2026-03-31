@@ -1,5 +1,3 @@
-import 'dart:convert';
-import 'package:csv/csv.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -7,57 +5,6 @@ import '../models/incident_model.dart';
 import 'export_file_saver.dart';
 
 class ExportService {
-  static Future<String?> exportToCsv(List<IncidentModel> incidents) async {
-    if (incidents.isEmpty) return null;
-
-    final List<List<dynamic>> rows = [
-      // Header row
-      [
-        'ID',
-        'Title',
-        'Category',
-        'Severity',
-        'Status',
-        'Address',
-        'Latitude',
-        'Longitude',
-        'Description',
-        'Reported At',
-        'Reporter ID',
-        'Is Anonymous',
-        'Upvotes',
-        'Downvotes',
-        'Vote Score',
-      ],
-    ];
-
-    // Data rows
-    for (final incident in incidents) {
-      rows.add([
-        incident.id,
-        incident.title,
-        incident.categoryLabel,
-        incident.severityLabel,
-        incident.statusLabel,
-        incident.address,
-        incident.latitude,
-        incident.longitude,
-        incident.description.replaceAll('\n', ' '),
-        DateFormat('yyyy-MM-dd HH:mm').format(incident.reportedAt),
-        incident.reporterId,
-        incident.isAnonymous ? 'Yes' : 'No',
-        incident.upvotes,
-        incident.downvotes,
-        incident.voteScore,
-      ]);
-    }
-
-    final csv = const ListToCsvConverter().convert(rows);
-
-    final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-    return saveExportFile('incidents_$timestamp.csv', utf8.encode(csv));
-  }
-
   static Future<String?> exportToPdf(List<IncidentModel> incidents) async {
     if (incidents.isEmpty) return null;
 
