@@ -16,7 +16,8 @@ class _MembersTab extends StatefulWidget {
   State<_MembersTab> createState() => _MembersTabState();
 }
 
-class _MembersTabState extends State<_MembersTab> {
+class _MembersTabState extends State<_MembersTab>
+    with AutomaticKeepAliveClientMixin {
   List<CommunityMemberModel> _members = [];
   bool _isLoading = true;
   final Map<String, UserModel?> _users = {};
@@ -63,12 +64,16 @@ class _MembersTabState extends State<_MembersTab> {
   }
 
   @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     final currentUserId =
         context.watch<UserProvider>().currentUser?.id ?? '';
 
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const _MembersShimmer();
     }
 
     if (_members.isEmpty) {
@@ -144,6 +149,97 @@ class _MembersTabState extends State<_MembersTab> {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── Shimmer Skeleton ──────────────────────────────────────────────────────────
+
+class _MembersShimmer extends StatefulWidget {
+  const _MembersShimmer();
+
+  @override
+  State<_MembersShimmer> createState() => _MembersShimmerState();
+}
+
+class _MembersShimmerState extends State<_MembersShimmer>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _opacity;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    )..repeat(reverse: true);
+    _opacity = Tween<double>(begin: 0.3, end: 0.8).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _opacity,
+      builder: (context, _) {
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: 6,
+          itemBuilder: (context, index) => Opacity(
+            opacity: _opacity.value,
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: AppTheme.cardDecoration,
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppTheme.backgroundGrey,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          height: 14,
+                          width: 120,
+                          decoration: BoxDecoration(
+                            color: AppTheme.backgroundGrey,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Container(
+                          height: 11,
+                          width: 80,
+                          decoration: BoxDecoration(
+                            color: AppTheme.backgroundGrey,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -333,7 +429,8 @@ class _MemberListItemState extends State<_MemberListItem> {
     try {
       switch (action) {
         case 'promote_mod':
-          success = await provider.promoteToModerator(widget.member.id);
+          success = await provider.promoteToModerator(
+              widget.member.id, widget.communityId);
           successMsg = 'Promoted to Moderator';
           break;
         case 'promote_headmod':
@@ -342,7 +439,8 @@ class _MemberListItemState extends State<_MemberListItem> {
           successMsg = 'Promoted to Head Moderator';
           break;
         case 'demote_mod':
-          success = await provider.demoteToModerator(widget.member.id);
+          success = await provider.demoteToModerator(
+              widget.member.id, widget.communityId);
           successMsg = 'Demoted to Moderator';
           break;
         case 'demote_member':

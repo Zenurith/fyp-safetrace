@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../../data/models/activity_model.dart';
 import '../../data/models/community_model.dart';
 import '../../data/models/community_member_model.dart';
 import '../../data/repositories/community_repository.dart';
@@ -20,6 +21,9 @@ class CommunityProvider extends ChangeNotifier {
   StreamSubscription? _communitiesSubscription;
   double? _userLat;
   double? _userLng;
+  List<CommunityMemberModel>? _cachedMembers;
+  String? _cachedMembersForCommunityId;
+  List<ActivityModel> _activityFeed = [];
 
   List<CommunityModel> get communities => _communities;
   List<CommunityModel> get myCommunities => _myCommunities;
@@ -29,6 +33,7 @@ class CommunityProvider extends ChangeNotifier {
   /// Only approved memberships — use this for content visibility checks.
   Set<String> get myApprovedCommunityIds =>
       _myCommunities.map((c) => c.id).toSet();
+  List<ActivityModel> get activityFeed => _activityFeed;
   CommunityModel? get selectedCommunity => _selectedCommunity;
   CommunityMemberModel? get currentMembership => _currentMembership;
   bool get isLoading => _isLoading;
@@ -63,6 +68,10 @@ class CommunityProvider extends ChangeNotifier {
     _myCommunities = [];
     _myMembershipCommunityIds = {};
     _currentMembership = null;
+    _selectedCommunity = null;
+    _activityFeed = [];
+    _detailLoadGeneration++;
+    _invalidateMemberCache();
     notifyListeners();
   }
 
@@ -163,6 +172,9 @@ class CommunityProvider extends ChangeNotifier {
     final generation = ++_detailLoadGeneration;
     _isLoading = true;
     _currentMembership = null;
+    if (_cachedMembersForCommunityId != communityId) {
+      _invalidateMemberCache();
+    }
     notifyListeners();
 
     try {
@@ -219,6 +231,7 @@ class CommunityProvider extends ChangeNotifier {
     try {
       await _repository.approveRequest(memberId, communityId, approvedBy);
       _pendingRequests.removeWhere((m) => m.id == memberId);
+      _invalidateMemberCache();
       notifyListeners();
       return true;
     } catch (e) {
@@ -246,6 +259,7 @@ class CommunityProvider extends ChangeNotifier {
     try {
       await _repository.approveBulkRequests(memberIds, communityId, approvedBy);
       _pendingRequests.removeWhere((m) => memberIds.contains(m.id));
+      _invalidateMemberCache();
       notifyListeners();
       return true;
     } catch (e) {
@@ -287,6 +301,7 @@ class CommunityProvider extends ChangeNotifier {
       _myCommunities.removeWhere((c) => c.id == communityId);
       _myMembershipCommunityIds.remove(communityId);
       _currentMembership = null;
+      _invalidateMemberCache();
       notifyListeners();
       return true;
     } catch (e) {
@@ -296,9 +311,10 @@ class CommunityProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> promoteToModerator(String memberId) async {
+  Future<bool> promoteToModerator(String memberId, String communityId) async {
     try {
-      await _repository.promoteToModerator(memberId);
+      await _repository.promoteToModerator(memberId, communityId);
+      _invalidateMemberCache();
       notifyListeners();
       return true;
     } catch (e) {
@@ -310,7 +326,8 @@ class CommunityProvider extends ChangeNotifier {
 
   Future<bool> promoteToHeadModerator(String communityId, String memberId) async {
     try {
-      await _repository.promoteToHeadModerator(memberId);
+      await _repository.promoteToHeadModerator(memberId, communityId);
+      _invalidateMemberCache();
       notifyListeners();
       return true;
     } catch (e) {
@@ -320,9 +337,10 @@ class CommunityProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> demoteToModerator(String memberId) async {
+  Future<bool> demoteToModerator(String memberId, String communityId) async {
     try {
-      await _repository.demoteToModerator(memberId);
+      await _repository.demoteToModerator(memberId, communityId);
+      _invalidateMemberCache();
       notifyListeners();
       return true;
     } catch (e) {
@@ -348,6 +366,7 @@ class CommunityProvider extends ChangeNotifier {
   Future<bool> removeMember(String memberId, String communityId) async {
     try {
       await _repository.removeMemberById(memberId, communityId);
+      _invalidateMemberCache();
       notifyListeners();
       return true;
     } catch (e) {
@@ -362,6 +381,7 @@ class CommunityProvider extends ChangeNotifier {
     try {
       await _repository.banMember(memberId, communityId,
           bannedUntil: bannedUntil);
+      _invalidateMemberCache();
       notifyListeners();
       return true;
     } catch (e) {
@@ -412,7 +432,28 @@ class CommunityProvider extends ChangeNotifier {
 
   Future<List<CommunityMemberModel>> getCommunityMembers(
       String communityId) async {
-    return await _repository.getCommunityMembers(communityId);
+    if (_cachedMembersForCommunityId == communityId &&
+        _cachedMembers != null) {
+      return _cachedMembers!;
+    }
+    final result = await _repository.getCommunityMembers(communityId);
+    _cachedMembersForCommunityId = communityId;
+    _cachedMembers = result;
+    return result;
+  }
+
+  Future<void> loadActivityFeed(String communityId) async {
+    try {
+      _activityFeed = await _repository.loadActivityFeed(communityId);
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+    }
+  }
+
+  void _invalidateMemberCache() {
+    _cachedMembers = null;
   }
 
   void clearError() {

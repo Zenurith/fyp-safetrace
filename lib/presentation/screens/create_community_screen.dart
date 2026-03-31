@@ -171,13 +171,31 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
       }
     } catch (e) {
       if (mounted) {
+        final message = _friendlyErrorMessage(e);
         messenger.showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
+          SnackBar(
+            content: Text(message),
+            backgroundColor: AppTheme.primaryRed,
+          ),
         );
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
+  }
+
+  String _friendlyErrorMessage(Object e) {
+    final msg = e.toString().toLowerCase();
+    if (msg.contains('permission') || msg.contains('denied')) {
+      return 'Permission denied. Please allow location access and try again.';
+    } else if (msg.contains('network') ||
+        msg.contains('unavailable') ||
+        msg.contains('socket')) {
+      return 'Network error. Please check your connection and try again.';
+    } else if (msg.contains('storage') || msg.contains('upload')) {
+      return 'Failed to upload image. Please try again.';
+    }
+    return 'Something went wrong. Please try again.';
   }
 
   @override
@@ -266,6 +284,7 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
                   TextFormField(
                     controller: _descriptionController,
                     maxLines: 3,
+                    maxLength: 500,
                     decoration: InputDecoration(
                       hintText: 'Describe your community and its purpose...',
                       border: OutlineInputBorder(

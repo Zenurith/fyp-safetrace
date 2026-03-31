@@ -11,7 +11,8 @@ class _CommunityIncidentsTab extends StatefulWidget {
   State<_CommunityIncidentsTab> createState() => _CommunityIncidentsTabState();
 }
 
-class _CommunityIncidentsTabState extends State<_CommunityIncidentsTab> {
+class _CommunityIncidentsTabState extends State<_CommunityIncidentsTab>
+    with AutomaticKeepAliveClientMixin {
   late final IncidentProvider _incidentProvider;
 
   @override
@@ -30,7 +31,11 @@ class _CommunityIncidentsTabState extends State<_CommunityIncidentsTab> {
   }
 
   @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     final all = context.watch<IncidentProvider>().communityIncidents;
     // Show only non-pending, non-dismissed incidents
     final incidents = all

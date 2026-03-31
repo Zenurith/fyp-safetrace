@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/activity_model.dart';
 import '../models/community_model.dart';
 import '../models/community_member_model.dart';
 
@@ -10,6 +11,10 @@ class CommunityRepository {
 
   CollectionReference<Map<String, dynamic>> get _membersCollection =>
       _firestore.collection('community_members');
+
+  CollectionReference<Map<String, dynamic>> _activityCollection(
+          String communityId) =>
+      _communitiesCollection.doc(communityId).collection('activity');
 
   // ==================== Community CRUD ====================
 
@@ -172,6 +177,16 @@ class CommunityRepository {
         await _communitiesCollection.doc(communityId).update({
           'memberCount': FieldValue.increment(1),
         });
+        await logActivity(
+          communityId,
+          ActivityModel(
+            id: '',
+            type: ActivityType.memberJoined,
+            actorId: userId,
+            metadata: const {},
+            createdAt: DateTime.now(),
+          ),
+        );
       }
       return existingMembership.docs.first.id;
     }
@@ -193,6 +208,16 @@ class CommunityRepository {
       await _communitiesCollection.doc(communityId).update({
         'memberCount': FieldValue.increment(1),
       });
+      await logActivity(
+        communityId,
+        ActivityModel(
+          id: '',
+          type: ActivityType.memberJoined,
+          actorId: userId,
+          metadata: const {},
+          createdAt: DateTime.now(),
+        ),
+      );
     }
 
     return docRef.id;
@@ -201,14 +226,32 @@ class CommunityRepository {
   /// Approve a membership request (staff only).
   Future<void> approveRequest(
       String memberId, String communityId, String approvedBy) async {
+    final memberDoc = await _membersCollection.doc(memberId).get();
+    final alreadyApproved =
+        memberDoc.data()?['status'] == MemberStatus.approved.index;
+
     await _membersCollection.doc(memberId).update({
       'status': MemberStatus.approved.index,
       'approvedAt': Timestamp.now(),
       'approvedBy': approvedBy,
     });
-    await _communitiesCollection.doc(communityId).update({
-      'memberCount': FieldValue.increment(1),
-    });
+
+    if (!alreadyApproved) {
+      await _communitiesCollection.doc(communityId).update({
+        'memberCount': FieldValue.increment(1),
+      });
+      await logActivity(
+        communityId,
+        ActivityModel(
+          id: '',
+          type: ActivityType.memberJoined,
+          actorId: approvedBy,
+          targetId: memberId,
+          metadata: const {},
+          createdAt: DateTime.now(),
+        ),
+      );
+    }
   }
 
   /// Reject a membership request (staff only).
@@ -339,24 +382,58 @@ class CommunityRepository {
   }
 
   /// Promote a member to moderator.
-  Future<void> promoteToModerator(String memberId) async {
+  Future<void> promoteToModerator(String memberId, String communityId) async {
     await _membersCollection.doc(memberId).update({
       'role': MemberRole.moderator.name,
     });
+    await logActivity(
+      communityId,
+      ActivityModel(
+        id: '',
+        type: ActivityType.roleChanged,
+        actorId: '',
+        targetId: memberId,
+        metadata: {'role': MemberRole.moderator.name},
+        createdAt: DateTime.now(),
+      ),
+    );
   }
 
   /// Promote a moderator to head moderator.
-  Future<void> promoteToHeadModerator(String memberId) async {
+  Future<void> promoteToHeadModerator(
+      String memberId, String communityId) async {
     await _membersCollection.doc(memberId).update({
       'role': MemberRole.headModerator.name,
     });
+    await logActivity(
+      communityId,
+      ActivityModel(
+        id: '',
+        type: ActivityType.roleChanged,
+        actorId: '',
+        targetId: memberId,
+        metadata: {'role': MemberRole.headModerator.name},
+        createdAt: DateTime.now(),
+      ),
+    );
   }
 
   /// Demote a head moderator to moderator.
-  Future<void> demoteToModerator(String memberId) async {
+  Future<void> demoteToModerator(String memberId, String communityId) async {
     await _membersCollection.doc(memberId).update({
       'role': MemberRole.moderator.name,
     });
+    await logActivity(
+      communityId,
+      ActivityModel(
+        id: '',
+        type: ActivityType.roleChanged,
+        actorId: '',
+        targetId: memberId,
+        metadata: {'role': MemberRole.moderator.name},
+        createdAt: DateTime.now(),
+      ),
+    );
   }
 
   /// Demote a staff member to regular member. Throws if target is owner.
@@ -369,6 +446,17 @@ class CommunityRepository {
     await _membersCollection.doc(memberId).update({
       'role': MemberRole.member.name,
     });
+    await logActivity(
+      communityId,
+      ActivityModel(
+        id: '',
+        type: ActivityType.roleChanged,
+        actorId: '',
+        targetId: memberId,
+        metadata: {'role': MemberRole.member.name},
+        createdAt: DateTime.now(),
+      ),
+    );
   }
 
   /// Ban a member from the community.
@@ -437,5 +525,28 @@ class CommunityRepository {
       'role': MemberRole.owner.name,
     });
     await batch.commit();
+  }
+
+  // ==================== Activity Feed ====================
+
+  /// Log an activity event for a community.
+  Future<void> logActivity(
+      String communityId, ActivityModel activity) async {
+    try {
+      await _activityCollection(communityId).add(activity.toMap());
+    } catch (_) {
+      // Activity logging is best-effort; never block the primary action.
+    }
+  }
+
+  /// Load the 20 most recent activity events for a community.
+  Future<List<ActivityModel>> loadActivityFeed(String communityId) async {
+    final snapshot = await _activityCollection(communityId)
+        .orderBy('createdAt', descending: true)
+        .limit(20)
+        .get();
+    return snapshot.docs
+        .map((doc) => ActivityModel.fromMap(doc.data(), doc.id))
+        .toList();
   }
 }

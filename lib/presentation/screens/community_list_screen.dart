@@ -20,6 +20,7 @@ class _CommunityListScreenState extends State<CommunityListScreen>
   late TabController _tabController;
   final _locationService = LocationService();
   bool _loadingLocation = false;
+  bool _locationFailed = false;
 
   @override
   void initState() {
@@ -42,14 +43,21 @@ class _CommunityListScreenState extends State<CommunityListScreen>
       communityProvider.loadMyCommunities(userId);
     }
 
-    setState(() => _loadingLocation = true);
+    setState(() {
+      _loadingLocation = true;
+      _locationFailed = false;
+    });
     try {
       final pos = await _locationService.getCurrentPosition();
       if (pos != null && mounted) {
         await communityProvider.loadNearbyCommunities(
             pos.latitude, pos.longitude);
+      } else if (mounted) {
+        setState(() => _locationFailed = true);
       }
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) setState(() => _locationFailed = true);
+    }
     if (mounted) setState(() => _loadingLocation = false);
   }
 
@@ -75,6 +83,7 @@ class _CommunityListScreenState extends State<CommunityListScreen>
           _MyCommunities(onRefresh: _loadData),
           _DiscoverCommunities(
             loadingLocation: _loadingLocation,
+            locationFailed: _locationFailed,
             onRefresh: _loadData,
           ),
         ],
@@ -212,9 +221,15 @@ class _MyCommunitiesState extends State<_MyCommunities> {
                     padding: const EdgeInsets.all(16),
                     itemCount: communities.length,
                     itemBuilder: (context, index) {
+                      final c = communities[index];
+                      final lat = provider.userLat;
+                      final lng = provider.userLng;
                       return _CommunityCard(
-                        community: communities[index],
+                        community: c,
                         showJoinButton: false,
+                        distanceKm: (lat != null && lng != null)
+                            ? c.calculateDistance(lat, lng)
+                            : null,
                       );
                     },
                   ),
@@ -229,10 +244,12 @@ class _MyCommunitiesState extends State<_MyCommunities> {
 
 class _DiscoverCommunities extends StatefulWidget {
   final bool loadingLocation;
+  final bool locationFailed;
   final Future<void> Function() onRefresh;
 
   const _DiscoverCommunities({
     required this.loadingLocation,
+    required this.locationFailed,
     required this.onRefresh,
   });
 
@@ -292,10 +309,16 @@ class _DiscoverCommunitiesState extends State<_DiscoverCommunities> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.explore_off, size: 64, color: AppTheme.textSecondary),
+            Icon(
+              widget.locationFailed ? Icons.location_off : Icons.explore_off,
+              size: 64,
+              color: AppTheme.textSecondary,
+            ),
             const SizedBox(height: 16),
             Text(
-              'No communities nearby',
+              widget.locationFailed
+                  ? 'Could not detect location'
+                  : 'No communities nearby',
               style: TextStyle(
                 fontSize: 18,
                 color: AppTheme.textSecondary,
@@ -303,9 +326,22 @@ class _DiscoverCommunitiesState extends State<_DiscoverCommunities> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Be the first to create one!',
+              widget.locationFailed
+                  ? 'Please allow location access and try again'
+                  : 'Be the first to create one!',
               style: TextStyle(color: AppTheme.textSecondary),
             ),
+            if (widget.locationFailed) ...[
+              const SizedBox(height: 12),
+              TextButton.icon(
+                onPressed: widget.onRefresh,
+                icon: const Icon(Icons.refresh, color: AppTheme.primaryRed),
+                label: const Text(
+                  'Retry',
+                  style: TextStyle(color: AppTheme.primaryRed),
+                ),
+              ),
+            ],
           ],
         ),
       );

@@ -15,7 +15,8 @@ class _MembersListTab extends StatefulWidget {
   State<_MembersListTab> createState() => _MembersListTabState();
 }
 
-class _MembersListTabState extends State<_MembersListTab> {
+class _MembersListTabState extends State<_MembersListTab>
+    with AutomaticKeepAliveClientMixin {
   List<CommunityMemberModel> _members = [];
   final Map<String, UserModel?> _users = {};
   bool _isLoading = true;
@@ -199,9 +200,13 @@ class _MembersListTabState extends State<_MembersListTab> {
   }
 
   @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const _MembersShimmerList();
     }
 
     if (_members.isEmpty) {
@@ -471,6 +476,97 @@ class _MembersListTabState extends State<_MembersListTab> {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── Shimmer Skeleton ──────────────────────────────────────────────────────────
+
+class _MembersShimmerList extends StatefulWidget {
+  const _MembersShimmerList();
+
+  @override
+  State<_MembersShimmerList> createState() => _MembersShimmerListState();
+}
+
+class _MembersShimmerListState extends State<_MembersShimmerList>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _opacity;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    )..repeat(reverse: true);
+    _opacity = Tween<double>(begin: 0.3, end: 0.8).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _opacity,
+      builder: (context, _) {
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: 6,
+          itemBuilder: (context, index) => Opacity(
+            opacity: _opacity.value,
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: AppTheme.cardDecoration,
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppTheme.backgroundGrey,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          height: 14,
+                          width: 120,
+                          decoration: BoxDecoration(
+                            color: AppTheme.backgroundGrey,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Container(
+                          height: 11,
+                          width: 80,
+                          decoration: BoxDecoration(
+                            color: AppTheme.backgroundGrey,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

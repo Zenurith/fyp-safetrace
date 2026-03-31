@@ -47,7 +47,10 @@
       "Bash(find /c/Users/User/StudioProjects/FYP/fyp-safetrace/functions -type f -name *.js -o -name *.ts)",
       "Skill(update-config)",
       "Bash(~/flutter/bin/flutter analyze:*)",
-      "Bash(/c/flutter/bin/flutter analyze:*)"
+      "Bash(/c/flutter/bin/flutter analyze:*)",
+      "Bash(find C:UsersUserStudioProjectsFYPfyp-safetrace -type f -name *community* -o -name *member*)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)"
     ]
   }
 }
