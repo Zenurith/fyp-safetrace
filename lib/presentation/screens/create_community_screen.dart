@@ -432,64 +432,12 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
                           activeTrackColor: AppTheme.successGreen,
                           onChanged: (v) => setState(() {
                             _isPublic = v;
-                            if (!v) _requiresApproval = true;
+                            _requiresApproval = !v;
                           }),
                         ),
                       ],
                     ),
                   ),
-                  if (_isPublic) ...[
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppTheme.backgroundGrey,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.cardBorder),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            _requiresApproval
-                                ? Icons.admin_panel_settings
-                                : Icons.how_to_reg,
-                            color: _requiresApproval
-                                ? AppTheme.warningOrange
-                                : AppTheme.successGreen,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _requiresApproval
-                                      ? 'Admin Approval Required'
-                                      : 'Auto-Approve Members',
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold),
-                                ),
-                                Text(
-                                  _requiresApproval
-                                      ? 'New members need admin approval to join'
-                                      : 'Anyone can join instantly',
-                                  style: const TextStyle(
-                                      fontSize: 12,
-                                      color: AppTheme.textSecondary),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Switch(
-                            value: _requiresApproval,
-                            activeTrackColor: AppTheme.warningOrange,
-                            onChanged: (v) =>
-                                setState(() => _requiresApproval = v),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                   const SizedBox(height: 32),
 
                   // Buttons
