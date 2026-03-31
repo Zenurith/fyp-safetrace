@@ -192,7 +192,7 @@ class _CommunityManagerScreenState extends State<CommunityManagerScreen>
             communityId: widget.communityId,
             onRefresh: _loadData,
           ),
-          _PendingIncidentsTab(communityId: widget.communityId),
+            _PendingIncidentsTab(communityId: widget.communityId),
           _MembersTab(
             key: ValueKey(_membersReloadKey),
             communityId: widget.communityId,

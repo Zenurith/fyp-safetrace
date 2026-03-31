@@ -160,6 +160,12 @@ class _UserLoaderState extends State<_UserLoader> {
   void _loadUser() async {
     final userProvider = context.read<UserProvider>();
     if (userProvider.currentUser == null && !userProvider.isLoading) {
+      // Clear previous user's community data before loading the new user.
+      // Providers live above AuthGate and persist across account switches,
+      // so stale myApprovedCommunityIds from the old account would otherwise
+      // cause the map to show that account's community-exclusive incidents.
+      context.read<CommunityProvider>().clearUserData();
+
       await userProvider.loadOrCreateUser(
         widget.firebaseUser.uid,
         widget.firebaseUser.email ?? '',

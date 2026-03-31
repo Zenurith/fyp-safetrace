@@ -47,10 +47,31 @@ class _SystemConfigPageState extends State<SystemConfigPage> {
         TextEditingController(text: '${config.defaultAlertRadiusKm}');
     _maxAlertsCtrl =
         TextEditingController(text: '${config.maxAlertsPerHour}');
+
+    // AdminWebShell calls startListening() inside addPostFrameCallback, which
+    // runs AFTER this initState — so the provider still holds defaults here.
+    // Always register this listener so controllers are synced once the first
+    // real Firestore snapshot arrives.
+    _configProvider.addListener(_onFirstLoad);
+  }
+
+  /// Syncs controllers with the first real Firestore snapshot, then detaches.
+  void _onFirstLoad() {
+    if (_configProvider.isLoading) return; // not ready yet
+    _configProvider.removeListener(_onFirstLoad);
+    if (!mounted) return;
+    final config = _configProvider.config;
+    _pointsForReportCtrl.text = '${config.pointsForReport}';
+    _pointsForUpvoteCtrl.text = '${config.pointsForUpvoteReceived}';
+    _pointsForDownvoteCtrl.text = '${config.pointsForDownvoteReceived}';
+    _trustedThresholdCtrl.text = '${config.trustedThreshold}';
+    _alertRadiusCtrl.text = '${config.defaultAlertRadiusKm}';
+    _maxAlertsCtrl.text = '${config.maxAlertsPerHour}';
   }
 
   @override
   void dispose() {
+    _configProvider.removeListener(_onFirstLoad);
     _pointsForReportCtrl.dispose();
     _pointsForUpvoteCtrl.dispose();
     _pointsForDownvoteCtrl.dispose();

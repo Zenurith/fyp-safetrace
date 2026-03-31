@@ -57,6 +57,15 @@ class CommunityProvider extends ChangeNotifier {
     super.dispose();
   }
 
+  /// Clear all user-specific data. Call this synchronously on logout / account switch
+  /// so the map never shows a previous user's community incidents.
+  void clearUserData() {
+    _myCommunities = [];
+    _myMembershipCommunityIds = {};
+    _currentMembership = null;
+    notifyListeners();
+  }
+
   Future<void> loadMyCommunities(String userId) async {
     _isLoading = true;
     notifyListeners();

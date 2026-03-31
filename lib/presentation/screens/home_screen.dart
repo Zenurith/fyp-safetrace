@@ -32,6 +32,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   bool _votesLoaded = false;
+  bool _communitiesLoaded = false;
 
   final _notificationService = IncidentNotificationService();
   final _locationService = LocationService();
@@ -52,6 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _incidentProvider.startListening();
       context.read<SystemConfigProvider>().startListening();
       _loadUserVotesIfNeeded();
+      _loadMyCommunityIfNeeded();
       _initNotifications();
       _wireUpAlertSettings();
       _incidentProvider.addListener(_onIncidentProviderChanged);
@@ -150,6 +152,15 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _loadMyCommunityIfNeeded() {
+    if (_communitiesLoaded) return;
+    final user = context.read<UserProvider>().currentUser;
+    if (user != null) {
+      context.read<CommunityProvider>().loadMyCommunities(user.id);
+      _communitiesLoaded = true;
+    }
+  }
+
   /// Saves a notification to SharedPreferences history.
   Future<void> _saveToHistory(IncidentNotification n) async {
     try {
@@ -241,10 +252,11 @@ class _HomeScreenState extends State<HomeScreen> {
     // Only rebuild when user presence changes (null ↔ non-null), not on every profile update
     final userIsLoaded = context.select<UserProvider, bool>((p) => p.currentUser != null);
 
-    // Load user votes once user is available (first time only)
-    if (userIsLoaded && !_votesLoaded) {
+    // Load user-specific data once user is available (first time only)
+    if (userIsLoaded && (!_votesLoaded || !_communitiesLoaded)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _loadUserVotesIfNeeded();
+        _loadMyCommunityIfNeeded();
       });
     }
 
