@@ -6,6 +6,7 @@ import '../../../utils/incident_enum_helpers.dart';
 class CategorySuggestionBanner extends StatelessWidget {
   final IncidentCategory? suggestedCategory;
   final IncidentCategory selectedCategory;
+  final bool isLoading;
   final ValueChanged<IncidentCategory> onApply;
   final VoidCallback onDismiss;
 
@@ -13,12 +14,43 @@ class CategorySuggestionBanner extends StatelessWidget {
     super.key,
     required this.suggestedCategory,
     required this.selectedCategory,
+    this.isLoading = false,
     required this.onApply,
     required this.onDismiss,
   });
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppTheme.backgroundGrey,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppTheme.cardBorder),
+        ),
+        child: Row(
+          children: [
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              'Suggesting category…',
+              style: TextStyle(
+                fontSize: 13,
+                color: AppTheme.textSecondary,
+                fontFamily: AppTheme.fontFamily,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     final suggested = suggestedCategory;
     if (suggested == null) return const SizedBox.shrink();
 

@@ -13,6 +13,7 @@ import '../../data/services/location_service.dart';
 import '../../data/services/media_upload_service.dart';
 import '../../data/services/image_verification_service.dart';
 import '../../data/services/report_draft_service.dart';
+import '../../data/services/category_suggestion_service.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/incident_enum_helpers.dart';
 import '../providers/incident_provider.dart';
@@ -47,6 +48,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final _verificationService = ImageVerificationService(
     apiKey: AppConstants.geminiApiKey,
   );
+  final _suggestionService = CategorySuggestionService(
+    apiKey: AppConstants.geminiApiKey,
+  );
 
   static const double _maxReportDistanceMeters = 5000;
   static const int _maxTitleLength = 100;
@@ -69,6 +73,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   DateTime? _incidentTime;
 
   IncidentCategory? _suggestedCategory;
+  bool _isSuggestingCategory = false;
+  int _suggestionGeneration = 0;
   Timer? _suggestionDebounceTimer;
   Timer? _draftSaveTimer;
 
@@ -93,7 +99,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     _addressController.addListener(_onAddressChanged);
     _addressFocusNode.addListener(_onAddressFocusChanged);
     _titleController.addListener(_onTextChangedForSuggestion);
-    _descriptionController.addListener(_onTextChangedForSuggestion);
     _titleController.addListener(_onTextChangedForDraft);
     _descriptionController.addListener(_onTextChangedForDraft);
 
@@ -127,100 +132,42 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     super.dispose();
   }
 
-  // ─── AI Category Suggestion ───────────────────────────────────────────────
+  // ─── AI Category Suggestion (Gemini) ─────────────────────────────────────
 
   void _onTextChangedForSuggestion() {
     _suggestionDebounceTimer?.cancel();
-    _suggestionDebounceTimer = Timer(const Duration(milliseconds: 400), () {
+    _suggestionDebounceTimer = Timer(const Duration(milliseconds: 800), () {
       _suggestCategory();
     });
   }
 
-  IncidentCategory? _matchCategoryFromText(String text) {
-    final t = text.toLowerCase();
-    const keywords = <IncidentCategory, List<String>>{
-      IncidentCategory.emergency: [
-        'fire', 'ambulance', 'medical', 'emergency', 'collapse', 'explosion',
-        'earthquake', 'flood', 'rescue', 'unconscious', 'critical', 'faint',
-        'injured', 'injure', 'hurt', 'bleeding', 'bleed', 'wound', 'fracture',
-        'broken bone', 'heart attack', 'stroke', 'overdose', 'choking',
-        'electrocuted', 'drowning', 'gas leak', 'trapped',
-        // Malay
-        'kebakaran', 'banjir', 'kecemasan', 'lemas', 'pengsan', 'cedera',
-        'patah', 'berdarah', 'darah', 'terbakar', 'terperangkap', 'letupan',
-        'gempa', 'runtuh', 'serangan jantung', 'strok', 'lemas dalam air',
-      ],
-      IncidentCategory.crime: [
-        'robbery', 'theft', 'steal', 'stolen', 'murder', 'assault', 'rape',
-        'break in', 'break-in', 'vandalism', 'graffiti', 'shooting', 'stab',
-        'drug', 'criminal', 'crime', 'burglary', 'snatch', 'pickpocket',
-        'scam', 'fraud', 'kidnap', 'threaten', 'threat', 'weapon', 'gun',
-        'knife', 'parang', 'punch', 'beat up', 'molest', 'harass', 'victim',
-        // Malay
-        'rompak', 'ragut', 'curi', 'pecah masuk', 'dadah', 'ugut', 'pukul',
-        'rogol', 'bunuh', 'samun', 'penipuan', 'scam', 'culik', 'senjata',
-        'pisau', 'histeria', 'cabul', 'ganggu', 'mangsa', 'tangkap',
-      ],
-      IncidentCategory.traffic: [
-        'accident', 'crash', 'collision', 'traffic', 'motorcycle', 'motorbike',
-        'lorry', 'truck', 'jam', 'congestion', 'roadblock', 'pothole',
-        'highway', 'vehicle', 'parking', 'car', 'bus', 'van', 'taxi',
-        'road', 'reckless', 'speeding', 'drunk driving', 'hit and run',
-        // Malay
-        'kemalangan', 'langgar', 'terlanggar', 'sesak', 'kesesakan', 'motosikal',
-        'lori', 'jalan', 'trafik', 'laju', 'lari', 'jambatan', 'lebuh raya',
-        'kenderaan', 'parkir', 'bas', 'teksi', 'lumba haram',
-      ],
-      IncidentCategory.infrastructure: [
-        'pipe', 'burst', 'electricity', 'power outage', 'blackout',
-        'sewage', 'drain', 'lamppost', 'streetlight', 'pavement', 'sidewalk',
-        'bridge', 'construction', 'infrastructure', 'broken', 'water supply',
-        'no water', 'leaking', 'sinkhole', 'landslide', 'building',
-        // Malay
-        'paip bocor', 'bekalan air', 'tiada air', 'lampu jalan', 'longkang',
-        'gelap', 'gangguan bekalan', 'tanah runtuh', 'pembetungan', 'rosak',
-        'elektrik', 'pembinaan', 'infrastruktur', 'bumbung', 'dinding retak',
-      ],
-      IncidentCategory.environmental: [
-        'rubbish', 'garbage', 'litter', 'pollution', 'smoke', 'haze',
-        'fallen tree', 'tree fell', 'environmental', 'dumping', 'illegal dump',
-        'dead animal', 'pest', 'dengue', 'mosquito', 'rat', 'dirty',
-        'stench', 'smell', 'river', 'toxic',
-        // Malay
-        'sampah', 'pembuangan haram', 'bau', 'asap', 'jerebu', 'pokok tumbang',
-        'nyamuk', 'tikus', 'pencemaran', 'busuk', 'sungai', 'biawak',
-        'buang sampah', 'alam sekitar', 'haiwan mati', 'kotor',
-      ],
-      IncidentCategory.suspicious: [
-        'suspicious', 'stranger', 'loitering', 'following', 'watching',
-        'unknown', 'weird', 'odd', 'lurking', 'stalking', 'spy', 'peeping',
-        'abandoned', 'unattended', 'bag left', 'package',
-        // Malay
-        'mencurigakan', 'orang asing', 'merayau', 'ikut', 'mengintai',
-        'pelik', 'beg ditinggal', 'bungkusan', 'suspek', 'tidak dikenali',
-        'terbiar', 'memerhati', 'intai', 'stalker',
-      ],
-    };
-
-    for (final entry in keywords.entries) {
-      for (final kw in entry.value) {
-        if (t.contains(kw)) return entry.key;
-      }
-    }
-    return null;
-  }
-
-  void _suggestCategory() {
-    final text =
-        '${_titleController.text.trim()} ${_descriptionController.text.trim()}';
-    if (text.trim().length < 5) {
-      if (mounted && _suggestedCategory != null) {
-        setState(() => _suggestedCategory = null);
+  Future<void> _suggestCategory() async {
+    final title = _titleController.text.trim();
+    if (title.length < 5) {
+      if (mounted && (_suggestedCategory != null || _isSuggestingCategory)) {
+        setState(() {
+          _suggestedCategory = null;
+          _isSuggestingCategory = false;
+        });
       }
       return;
     }
-    final cat = _matchCategoryFromText(text);
-    if (mounted) setState(() => _suggestedCategory = cat);
+
+    _suggestionGeneration++;
+    final generation = _suggestionGeneration;
+    if (mounted) setState(() => _isSuggestingCategory = true);
+
+    final cat = await _suggestionService.suggestCategory(
+      title,
+      description: _descriptionController.text.trim(),
+    );
+
+    if (mounted && generation == _suggestionGeneration) {
+      setState(() {
+        _suggestedCategory = cat;
+        _isSuggestingCategory = false;
+      });
+    }
   }
 
   // ─── Draft Auto-Save ──────────────────────────────────────────────────────
@@ -1143,6 +1090,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   CategorySuggestionBanner(
                     suggestedCategory: _suggestedCategory,
                     selectedCategory: _selectedCategory,
+                    isLoading: _isSuggestingCategory,
                     onApply: (cat) => setState(() {
                       _selectedCategory = cat;
                       _suggestedCategory = null;

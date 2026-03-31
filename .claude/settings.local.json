@@ -45,7 +45,9 @@
       "Bash(npx firebase-tools:*)",
       "Bash(git diff:*)",
       "Bash(find /c/Users/User/StudioProjects/FYP/fyp-safetrace/functions -type f -name *.js -o -name *.ts)",
-      "Skill(update-config)"
+      "Skill(update-config)",
+      "Bash(~/flutter/bin/flutter analyze:*)",
+      "Bash(/c/flutter/bin/flutter analyze:*)"
     ]
   }
 }
