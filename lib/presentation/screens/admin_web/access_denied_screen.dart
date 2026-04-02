@@ -22,7 +22,7 @@ class AccessDeniedScreen extends StatelessWidget {
                 height: 80,
                 decoration: BoxDecoration(
                   color: AppTheme.primaryDark,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
                   Icons.shield,

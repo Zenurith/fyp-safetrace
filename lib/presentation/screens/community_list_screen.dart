@@ -190,11 +190,11 @@ class _MyCommunitiesState extends State<_MyCommunities> {
               prefixIcon: const Icon(Icons.search, size: 20),
               isDense: true,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(6),
                 borderSide: const BorderSide(color: AppTheme.cardBorder),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(6),
                 borderSide: const BorderSide(color: AppTheme.cardBorder),
               ),
               contentPadding: const EdgeInsets.symmetric(vertical: 10),
@@ -358,11 +358,11 @@ class _DiscoverCommunitiesState extends State<_DiscoverCommunities> {
               prefixIcon: const Icon(Icons.search, size: 20),
               isDense: true,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(6),
                 borderSide: const BorderSide(color: AppTheme.cardBorder),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(6),
                 borderSide: const BorderSide(color: AppTheme.cardBorder),
               ),
               contentPadding: const EdgeInsets.symmetric(vertical: 10),
@@ -426,7 +426,7 @@ class _CommunityCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         side: const BorderSide(color: AppTheme.cardBorder),
       ),
       child: InkWell(
@@ -438,7 +438,7 @@ class _CommunityCard extends StatelessWidget {
             ),
           );
         },
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -509,7 +509,7 @@ class _CommunityCard extends StatelessWidget {
                       color: community.isPublic
                           ? AppTheme.successGreen.withValues(alpha: 0.1)
                           : AppTheme.warningOrange.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,

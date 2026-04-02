@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../repositories/user_repository.dart';
+import '../../presentation/screens/community_manager_screen.dart';
 
 class PushNotificationService {
   static final PushNotificationService _instance = PushNotificationService._internal();
@@ -134,7 +135,13 @@ class PushNotificationService {
     // Encode type into payload so _onNotificationTap can route correctly
     final type = message.data['type'];
     String? payload;
-    if (type == 'community_post') {
+    if (type == 'join_request' || type == 'pending_community_incident') {
+      final communityId = message.data['communityId'];
+      if (communityId != null) payload = 'community_manager:$communityId';
+    } else if (type == 'join_approved' || type == 'join_rejected') {
+      final communityId = message.data['communityId'];
+      if (communityId != null) payload = 'community:$communityId';
+    } else if (type == 'community_post') {
       final communityId = message.data['communityId'];
       if (communityId != null) payload = 'community:$communityId';
     } else {
@@ -156,7 +163,9 @@ class PushNotificationService {
   void _onNotificationTap(NotificationResponse response) {
     final payload = response.payload;
     if (payload == null) return;
-    if (payload.startsWith('community:')) {
+    if (payload.startsWith('community_manager:')) {
+      _navigateToCommunityManager(payload.substring('community_manager:'.length));
+    } else if (payload.startsWith('community:')) {
       _navigateToCommunity(payload.substring('community:'.length));
     } else if (payload.startsWith('incident:')) {
       _navigateToIncident(payload.substring('incident:'.length));
@@ -169,8 +178,10 @@ class PushNotificationService {
   /// Route a notification data payload to the correct screen.
   void _routeMessage(Map<String, dynamic> data) {
     final type = data['type'];
-    if (type == 'community_post') {
-      final communityId = data['communityId'];
+    final communityId = data['communityId'];
+    if (type == 'join_request' || type == 'pending_community_incident') {
+      if (communityId != null) _navigateToCommunityManager(communityId);
+    } else if (type == 'join_approved' || type == 'join_rejected' || type == 'community_post') {
       if (communityId != null) _navigateToCommunity(communityId);
     } else {
       final incidentId = data['incidentId'];
@@ -188,6 +199,14 @@ class PushNotificationService {
     final context = _navigatorKey?.currentContext;
     if (context == null) return;
     _onCommunityTap?.call(context, communityId);
+  }
+
+  void _navigateToCommunityManager(String communityId) {
+    final context = _navigatorKey?.currentContext;
+    if (context == null) return;
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => CommunityManagerScreen(communityId: communityId),
+    ));
   }
 
   Future<void> _showLocalNotification({

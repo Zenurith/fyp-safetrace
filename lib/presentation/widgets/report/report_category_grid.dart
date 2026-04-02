@@ -93,7 +93,7 @@ class _CategoryItem extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: selected ? Colors.white : Colors.grey[50],
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: selected ? AppTheme.primaryRed : Colors.grey[300]!,
             width: selected ? 2 : 1,

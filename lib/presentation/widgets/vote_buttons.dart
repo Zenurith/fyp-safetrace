@@ -99,7 +99,7 @@ class VoteButtons extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.backgroundGrey,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppTheme.cardBorder),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

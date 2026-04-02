@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../data/models/activity_model.dart';
 import '../../data/models/community_member_model.dart';
 import '../../data/models/community_model.dart';
 import '../../data/models/incident_model.dart';
@@ -18,7 +17,6 @@ import 'create_community_screen.dart';
 import 'create_post_screen.dart';
 
 part 'community_detail/incidents_tab.dart';
-part 'community_detail/activity_tab.dart';
 part 'community_detail/members_list_tab.dart';
 part 'community_detail/detail_widgets.dart';
 
@@ -39,7 +37,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadCommunity();
   }
 
@@ -230,7 +228,6 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
           tabs: const [
             Tab(text: 'About'),
             Tab(text: 'Reports'),
-            Tab(text: 'Activity'),
             Tab(text: 'Members'),
           ],
         ),
@@ -367,19 +364,6 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
                     padding: EdgeInsets.all(32),
                     child: Text(
                       'Join this community to see reports',
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-
-          // ── Activity tab ──────────────────────────────────────────────
-          isApprovedMember
-              ? _ActivityTab(communityId: widget.communityId)
-              : const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(32),
-                    child: Text(
-                      'Join this community to see activity',
                       textAlign: TextAlign.center,
                     ),
                   ),

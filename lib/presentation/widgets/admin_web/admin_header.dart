@@ -162,7 +162,7 @@ class AdminHeader extends StatelessWidget {
                   context: context,
                   builder: (ctx) => AlertDialog(
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                        borderRadius: BorderRadius.circular(8)),
                     title: Text('Sign Out', style: AppTheme.headingMedium),
                     content: Text(
                       'Are you sure you want to sign out?',

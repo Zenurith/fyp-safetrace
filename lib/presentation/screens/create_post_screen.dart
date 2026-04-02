@@ -13,6 +13,7 @@ import '../../data/services/location_service.dart';
 import '../../data/services/media_upload_service.dart';
 import '../../data/services/image_verification_service.dart';
 import '../../data/services/report_draft_service.dart';
+import '../../data/services/video_frame_extractor.dart';
 import '../../data/services/category_suggestion_service.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/incident_enum_helpers.dart';
@@ -682,16 +683,38 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       setState(() => _isVerifying = true);
       try {
         ImageVerificationResult? worstResult;
+        const videoExtensions = ['mp4', 'mov', 'avi', 'mkv', 'webm', '3gp'];
         for (final media in _selectedMedia) {
           final ext = media.path.split('.').last.toLowerCase();
-          if (['mp4', 'mov', 'avi', 'mkv'].contains(ext)) continue;
+          final isVideo = videoExtensions.contains(ext);
 
-          final imageBytes = await media.readAsBytes();
-          final result = await _verificationService.verifyImage(
-            imageBytes: imageBytes,
-            categoryName: _selectedCategoryName ?? categoryLabel(_selectedCategory),
-            description: _descriptionController.text.trim(),
-          );
+          late final ImageVerificationResult result;
+          if (isVideo) {
+            if (kDebugMode) debugPrint('Report: Extracting frame from video: ${media.path}');
+            final frame = await extractVideoFrame(media.path);
+            if (frame == null) {
+              // Web or extraction failed — flag for manual review
+              result = ImageVerificationResult.failed(
+                'Video verification is not supported on this platform. Submitted for manual review.',
+              );
+            } else {
+              if (kDebugMode) debugPrint('Report: Verifying video frame (${frame.length} bytes)');
+              result = await _verificationService.verifyImage(
+                imageBytes: frame,
+                categoryName: _selectedCategoryName ?? categoryLabel(_selectedCategory),
+                description: _descriptionController.text.trim(),
+                mimeType: 'image/jpeg',
+              );
+            }
+          } else {
+            final imageBytes = await media.readAsBytes();
+            result = await _verificationService.verifyImage(
+              imageBytes: imageBytes,
+              categoryName: _selectedCategoryName ?? categoryLabel(_selectedCategory),
+              description: _descriptionController.text.trim(),
+            );
+          }
+
           if (worstResult == null ||
               result.confidenceScore < worstResult.confidenceScore) {
             worstResult = result;

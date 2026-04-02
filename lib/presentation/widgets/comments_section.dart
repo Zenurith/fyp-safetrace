@@ -69,7 +69,7 @@ class _CommentsSectionState extends State<CommentsSection> {
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
                     color: AppTheme.primaryRed.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     '$count',
@@ -227,7 +227,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                         color: AppTheme.primaryRed.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
                         '$count',
@@ -293,8 +293,10 @@ class _CommentsSheetState extends State<_CommentsSheet> {
 
           // Sticky comment input
           const Divider(height: 1),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 8, 12),
+          SafeArea(
+            top: false,
+            child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
             child: Consumer<CommentProvider>(
               builder: (context, provider, _) {
                 final user = context.watch<UserProvider>().currentUser;
@@ -344,6 +346,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                 );
               },
             ),
+          ),
           ),
         ],
       ),

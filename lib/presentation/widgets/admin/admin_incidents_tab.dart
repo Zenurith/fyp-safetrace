@@ -192,7 +192,7 @@ class _FilterChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected ? chipColor.withValues(alpha: 0.1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: isSelected ? chipColor : AppTheme.cardBorder,
           ),
@@ -311,7 +311,7 @@ class _IncidentCard extends StatelessWidget {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           title: Text('Update Status', style: AppTheme.headingMedium),
           content: SizedBox(
             width: double.maxFinite,
@@ -443,7 +443,7 @@ class _IncidentCard extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         title: Text('Delete Incident', style: AppTheme.headingMedium),
         content: Text(
           'Are you sure you want to delete "${incident.title}"?',
@@ -668,7 +668,7 @@ class _IncidentDetailSheet extends StatelessWidget {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           title: Text('Update Status', style: AppTheme.headingMedium),
           content: SizedBox(
             width: double.maxFinite,
@@ -791,7 +791,7 @@ class _IncidentDetailSheet extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         title: Text('Delete Incident', style: AppTheme.headingMedium),
         content: Text(
           'Are you sure you want to delete "${incident.title}"? This cannot be undone.',
@@ -875,7 +875,7 @@ class _IncidentDetailSheet extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppTheme.categoryColor(incident.categoryLabel)
                         .withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(6),
                   ),
                   child: Icon(
                     Icons.warning_amber_rounded,

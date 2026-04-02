@@ -27,7 +27,7 @@ class CategorySuggestionBanner extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: AppTheme.backgroundGrey,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(6),
           border: Border.all(color: AppTheme.cardBorder),
         ),
         child: Row(
@@ -63,7 +63,7 @@ class CategorySuggestionBanner extends StatelessWidget {
         color: isMatch
             ? AppTheme.successGreen.withValues(alpha: 0.1)
             : AppTheme.warningOrange.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(
           color: isMatch
               ? AppTheme.successGreen.withValues(alpha: 0.4)

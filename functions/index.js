@@ -1,4 +1,4 @@
-const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
+const { onDocumentCreated, onDocumentUpdated, onDocumentWritten } = require('firebase-functions/v2/firestore');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
@@ -256,7 +256,68 @@ exports.notifyCommunityPost = onDocumentCreated(
   },
 );
 
-// ─── 5. Fan-out + notify when a flag is created ──────────────────────────────
+// ─── 5. Notify community staff when a new join request is created ────────────
+
+exports.onJoinRequestCreated = onDocumentCreated(
+  { document: 'community_members/{memberId}', region: REGION },
+  async (event) => {
+    const member = event.data.data();
+    const { communityId, userId, status } = member;
+
+    // MemberStatus.pending = index 0; ignore auto-approved joins (status != 0)
+    if (status !== 0) return;
+    if (!communityId || !userId) return;
+
+    const db = getFirestore();
+
+    // Get community name
+    const communityDoc = await db.collection('communities').doc(communityId).get();
+    if (!communityDoc.exists) return;
+    const communityName = communityDoc.data().name || 'Your Community';
+
+    // Get requester's display name
+    const requesterDoc = await db.collection('users').doc(userId).get();
+    const requesterName = requesterDoc.exists
+      ? (requesterDoc.data().displayName || 'Someone')
+      : 'Someone';
+
+    // Get all approved staff members (owner, headModerator, moderator)
+    const staffSnapshot = await db.collection('community_members')
+      .where('communityId', '==', communityId)
+      .where('status', '==', 1) // approved
+      .get();
+
+    const staffIds = staffSnapshot.docs
+      .map(d => d.data())
+      .filter(m => ['owner', 'headModerator', 'moderator'].includes(m.role))
+      .map(m => m.userId);
+
+    if (staffIds.length === 0) return;
+
+    // Collect FCM tokens for staff
+    const tokens = [];
+    for (const staffId of staffIds) {
+      const userDoc = await db.collection('users').doc(staffId).get();
+      if (userDoc.exists) {
+        const token = userDoc.data().fcmToken;
+        if (token) tokens.push(token);
+      }
+    }
+
+    if (tokens.length === 0) return;
+
+    await sendToTokens(
+      tokens,
+      `New Join Request — ${communityName}`,
+      `${requesterName} wants to join your community.`,
+      { communityId, type: 'join_request' },
+    );
+
+    console.log(`onJoinRequestCreated: communityId=${communityId} requester=${userId} notified ${tokens.length} staff`);
+  },
+);
+
+// ─── 6. Fan-out + notify when a flag is created ──────────────────────────────
 // targetType: 0=incident, 1=comment, 2=user → community staff fan-out + notify
 // targetType: 3=community → notify admins
 
@@ -332,6 +393,107 @@ exports.onFlagCreated = onDocumentCreated(
       }
       console.log(`onFlagCreated: community report admin notification. flagId=${flagId} tokens=${tokens.length}`);
     }
+  },
+);
+
+// ─── 7. Notify community staff when a pending incident is submitted to their community ──
+
+exports.onCommunityIncidentCreated = onDocumentCreated(
+  { document: 'incidents/{incidentId}', region: REGION },
+  async (event) => {
+    const incident = event.data.data();
+    const incidentId = event.params.incidentId;
+    const { communityIds, status, title, reporterId } = incident;
+
+    // Only notify for pending incidents linked to at least one community
+    // IncidentStatus.pending = index 0
+    if (status !== 0) return;
+    if (!communityIds || communityIds.length === 0) return;
+
+    const db = getFirestore();
+
+    for (const communityId of communityIds) {
+      const communityDoc = await db.collection('communities').doc(communityId).get();
+      if (!communityDoc.exists) continue;
+      const communityName = communityDoc.data().name || 'Your Community';
+
+      // Get approved staff for this community
+      const staffSnapshot = await db.collection('community_members')
+        .where('communityId', '==', communityId)
+        .where('status', '==', 1) // approved
+        .get();
+
+      const staffIds = staffSnapshot.docs
+        .map(d => d.data())
+        .filter(m => ['owner', 'headModerator', 'moderator'].includes(m.role))
+        .map(m => m.userId)
+        .filter(id => id !== reporterId); // don't notify if reporter is also staff
+
+      if (staffIds.length === 0) continue;
+
+      const tokens = [];
+      for (const staffId of staffIds) {
+        const userDoc = await db.collection('users').doc(staffId).get();
+        if (userDoc.exists) {
+          const token = userDoc.data().fcmToken;
+          if (token) tokens.push(token);
+        }
+      }
+
+      if (tokens.length === 0) continue;
+
+      await sendToTokens(
+        tokens,
+        `New Report Pending — ${communityName}`,
+        title || 'A new incident report needs your review.',
+        { incidentId, communityId, type: 'pending_community_incident' },
+      );
+
+      console.log(`onCommunityIncidentCreated: incidentId=${incidentId} communityId=${communityId} notified ${tokens.length} staff`);
+    }
+  },
+);
+
+// ─── 8. Notify user when their community join request is approved or rejected ──
+
+exports.onMembershipStatusChanged = onDocumentUpdated(
+  { document: 'community_members/{memberId}', region: REGION },
+  async (event) => {
+    const before = event.data.before.data();
+    const after = event.data.after.data();
+
+    // Only act when status transitions out of pending (0)
+    if (before.status !== 0) return;
+    // Only care about approved (1) or rejected (2)
+    if (after.status !== 1 && after.status !== 2) return;
+
+    const { userId, communityId } = after;
+    if (!userId || !communityId) return;
+
+    const db = getFirestore();
+
+    const communityDoc = await db.collection('communities').doc(communityId).get();
+    const communityName = communityDoc.exists
+      ? (communityDoc.data().name || 'the community')
+      : 'the community';
+
+    const userDoc = await db.collection('users').doc(userId).get();
+    if (!userDoc.exists) return;
+
+    const fcmToken = userDoc.data().fcmToken;
+    if (!fcmToken) return;
+
+    const isApproved = after.status === 1;
+    await sendToToken(
+      fcmToken,
+      isApproved ? 'Join Request Approved' : 'Join Request Declined',
+      isApproved
+        ? `You've been approved to join ${communityName}!`
+        : `Your request to join ${communityName} was not approved.`,
+      { communityId, type: isApproved ? 'join_approved' : 'join_rejected' },
+    );
+
+    console.log(`onMembershipStatusChanged: userId=${userId} communityId=${communityId} status=${after.status}`);
   },
 );
 

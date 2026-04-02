@@ -50,7 +50,13 @@
       "Bash(/c/flutter/bin/flutter analyze:*)",
       "Bash(find C:UsersUserStudioProjectsFYPfyp-safetrace -type f -name *community* -o -name *member*)",
       "Bash(git pull:*)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Bash(pip install:*)",
+      "Bash(python:*)",
+      "Bash(python3 -m pip install opencv-python)",
+      "Bash(py -m pip install opencv-python)",
+      "Bash(\"C:/Users/User/AppData/Local/Programs/Python/Python314/python.exe\" \"c:/Users/User/Downloads/morphological_operations.py\" 2>&1)",
+      "Bash(npm install:*)"
     ]
   }
 }

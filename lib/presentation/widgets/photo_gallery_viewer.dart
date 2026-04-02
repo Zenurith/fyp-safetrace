@@ -151,7 +151,7 @@ class _PhotoGalleryViewerState extends State<PhotoGalleryViewer> {
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: Colors.black54,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     '${_currentIndex + 1} / ${widget.imageUrls.length}',
@@ -240,7 +240,7 @@ class _PhotoGalleryViewerState extends State<PhotoGalleryViewer> {
       padding: const EdgeInsets.all(40),
       decoration: BoxDecoration(
         color: Colors.grey[900],
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: const Column(
         mainAxisSize: MainAxisSize.min,
@@ -261,7 +261,7 @@ class _PhotoGalleryViewerState extends State<PhotoGalleryViewer> {
       padding: const EdgeInsets.all(40),
       decoration: BoxDecoration(
         color: Colors.grey[900],
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,

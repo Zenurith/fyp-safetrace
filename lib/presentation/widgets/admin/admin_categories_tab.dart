@@ -90,7 +90,7 @@ class _CategoryCard extends StatelessWidget {
             height: 44,
             decoration: BoxDecoration(
               color: category.color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(6),
             ),
             child: Icon(category.icon, color: category.color, size: 22),
           ),
@@ -184,7 +184,7 @@ class _CategoryCard extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         title: Text('Delete Category', style: AppTheme.headingMedium),
         content: Text(
           'Are you sure you want to delete "${category.name}"?',
@@ -317,7 +317,7 @@ class _CategoryDialogState extends State<_CategoryDialog> {
     final isEditing = widget.category != null;
 
     return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       title: Text(
         isEditing ? 'Edit Category' : 'Add Category',
         style: AppTheme.headingMedium,

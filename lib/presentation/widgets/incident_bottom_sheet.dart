@@ -121,7 +121,7 @@ class _IncidentBottomSheetState extends State<IncidentBottomSheet> {
                   decoration: BoxDecoration(
                     color: AppTheme.categoryColor(incident.categoryLabel)
                         .withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: AppTheme.categoryColor(incident.categoryLabel),
                     ),
@@ -347,7 +347,7 @@ class _IncidentBottomSheetState extends State<IncidentBottomSheet> {
                       widget.onViewOnMap!();
                     } else {
                       context.read<IncidentProvider>().requestMapFocus(incident);
-                      Navigator.pop(context);
+                      Navigator.popUntil(context, (route) => route.isFirst);
                     }
                   },
                   icon: const Icon(Icons.map_outlined, size: 18),
@@ -417,7 +417,7 @@ class _VotingSection extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppTheme.backgroundGrey,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppTheme.cardBorder),
       ),
       child: Column(
@@ -487,7 +487,7 @@ class _StatusBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: _getStatusColor().withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(color: _getStatusColor().withValues(alpha: 0.5)),
       ),
       child: Text(

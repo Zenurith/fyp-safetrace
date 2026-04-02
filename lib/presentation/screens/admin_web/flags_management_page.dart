@@ -180,13 +180,18 @@ class _FlagCard extends StatefulWidget {
 
 class _FlagCardState extends State<_FlagCard> {
   CommunityModel? _community;
+  bool _communityLoaded = false;
 
   @override
   void initState() {
     super.initState();
     if (widget.flag.targetType == FlagTargetType.community) {
       CommunityRepository().getById(widget.flag.targetId).then((c) {
-        if (mounted) setState(() => _community = c);
+        debugPrint('[FlagCard] community fetch result: ${c?.name} (id: ${widget.flag.targetId})');
+        if (mounted) setState(() { _community = c; _communityLoaded = true; });
+      }).catchError((e) {
+        debugPrint('[FlagCard] community fetch error: $e (id: ${widget.flag.targetId})');
+        if (mounted) setState(() => _communityLoaded = true);
       });
     }
   }
@@ -371,7 +376,7 @@ class _FlagCardState extends State<_FlagCard> {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    _community?.name ?? 'Loading...',
+                    _community?.name ?? (_communityLoaded ? 'Unknown Community' : 'Loading...'),
                     style: AppTheme.bodyMedium.copyWith(
                       color: AppTheme.primaryDark,
                       fontWeight: FontWeight.w600,

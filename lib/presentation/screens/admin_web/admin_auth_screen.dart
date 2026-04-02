@@ -366,7 +366,7 @@ class _BrandPanel extends StatelessWidget {
             height: 42,
             decoration: BoxDecoration(
               color: AppTheme.primaryRed,
-              borderRadius: BorderRadius.circular(9),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(Icons.shield, color: Colors.white, size: 22),
           ),

@@ -252,8 +252,8 @@ DEFAULT TO isValid: false IF UNCERTAIN. Return ONLY the JSON object.''';
     );
   }
 
-  /// Verifies multiple images and returns the combined result
-  /// Only verifies the first image to save API costs
+  /// Verifies all images and returns a combined result.
+  /// Strict mode: ALL images must pass. If any image fails, returns that failing result immediately.
   Future<ImageVerificationResult> verifyMultipleImages({
     required List<Uint8List> imageBytesList,
     required String categoryName,
@@ -263,11 +263,41 @@ DEFAULT TO isValid: false IF UNCERTAIN. Return ONLY the JSON object.''';
       return ImageVerificationResult.skipped();
     }
 
-    // Only verify the first image for cost efficiency
-    return verifyImage(
-      imageBytes: imageBytesList.first,
-      categoryName: categoryName,
-      description: description,
+    final results = <ImageVerificationResult>[];
+
+    for (int i = 0; i < imageBytesList.length; i++) {
+      if (kDebugMode) debugPrint('ImageVerificationService: Verifying image ${i + 1}/${imageBytesList.length}');
+      final result = await verifyImage(
+        imageBytes: imageBytesList[i],
+        categoryName: categoryName,
+        description: description,
+      );
+
+      // Fail fast — if any image is invalid, reject the whole submission
+      if (!result.isValid) {
+        return ImageVerificationResult(
+          isValid: false,
+          confidenceScore: result.confidenceScore,
+          explanation: 'Image ${i + 1} failed verification: ${result.explanation}',
+          detectedElements: result.detectedElements,
+          concerns: result.concerns,
+        );
+      }
+
+      results.add(result);
+    }
+
+    // All images passed — return combined result with minimum confidence score (most conservative)
+    final minScore = results.map((r) => r.confidenceScore).reduce((a, b) => a < b ? a : b);
+    final allElements = results.expand((r) => r.detectedElements).toSet().toList();
+    final allConcerns = results.expand((r) => r.concerns).toList();
+
+    return ImageVerificationResult(
+      isValid: true,
+      confidenceScore: minScore,
+      explanation: 'All ${results.length} image(s) verified successfully.',
+      detectedElements: allElements,
+      concerns: allConcerns,
     );
   }
 }

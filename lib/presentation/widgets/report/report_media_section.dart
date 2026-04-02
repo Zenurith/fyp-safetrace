@@ -52,7 +52,7 @@ class ReportMediaSection extends StatelessWidget {
         height: 100,
         decoration: BoxDecoration(
           color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(color: Colors.grey[300]!),
         ),
         child: Column(
@@ -89,7 +89,7 @@ class _MediaPreviewItem extends StatelessWidget {
       height: 100,
       margin: const EdgeInsets.only(right: 8),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         image: isVideo
             ? null
             : DecorationImage(
@@ -140,7 +140,7 @@ class _AddMediaButton extends StatelessWidget {
         height: 100,
         decoration: BoxDecoration(
           color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(color: Colors.grey[300]!),
         ),
         child: const Icon(Icons.add, size: 32, color: Colors.grey),
