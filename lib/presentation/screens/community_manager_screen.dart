@@ -33,6 +33,7 @@ class _CommunityManagerScreenState extends State<CommunityManagerScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late final FlagProvider _flagProvider;
+  late final IncidentProvider _incidentProvider;
   // Incrementing this causes _MembersTab to rebuild with a new Key, resetting
   // its state and triggering a fresh member list load.
   int _membersReloadKey = 0;
@@ -42,9 +43,11 @@ class _CommunityManagerScreenState extends State<CommunityManagerScreen>
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
     _flagProvider = context.read<FlagProvider>();
+    _incidentProvider = context.read<IncidentProvider>();
     _loadData();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _flagProvider.startListeningFlagsByCommunity(widget.communityId);
+      _incidentProvider.watchPendingCommunityIncidents(widget.communityId);
     });
   }
 
@@ -96,8 +99,7 @@ class _CommunityManagerScreenState extends State<CommunityManagerScreen>
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
-          tabAlignment: TabAlignment.start,
-          labelPadding: const EdgeInsets.symmetric(horizontal: 16),
+          tabAlignment: TabAlignment.center,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white60,
           indicatorColor: AppTheme.primaryRed,

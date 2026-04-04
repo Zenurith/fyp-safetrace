@@ -12,31 +12,15 @@ class _PendingIncidentsTab extends StatefulWidget {
 }
 
 class _PendingIncidentsTabState extends State<_PendingIncidentsTab> {
-  late final IncidentProvider _incidentProvider;
-
-  @override
-  void initState() {
-    super.initState();
-    _incidentProvider = context.read<IncidentProvider>();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _incidentProvider.watchPendingCommunityIncidents(widget.communityId);
-    });
-  }
-
-  @override
-  void dispose() {
-    _incidentProvider.stopWatchingPendingCommunityIncidents();
-    super.dispose();
-  }
-
   Future<void> _approve(IncidentModel incident) async {
+    final provider = context.read<IncidentProvider>();
     final staffId = context.read<UserProvider>().currentUser?.id ?? '';
-    final ok = await _incidentProvider.approveCommunityIncident(incident.id, staffId);
+    final ok = await provider.approveCommunityIncident(incident.id, staffId);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(ok
             ? 'Incident approved — now visible on map'
-            : (_incidentProvider.error ?? 'Failed to approve')),
+            : (provider.error ?? 'Failed to approve')),
         backgroundColor: ok ? AppTheme.successGreen : AppTheme.primaryRed,
       ));
     }
@@ -63,11 +47,12 @@ class _PendingIncidentsTabState extends State<_PendingIncidentsTab> {
     );
     if (confirmed != true || !mounted) return;
 
+    final provider = context.read<IncidentProvider>();
     final staffId = context.read<UserProvider>().currentUser?.id ?? '';
-    final ok = await _incidentProvider.rejectCommunityIncident(incident.id, staffId);
+    final ok = await provider.rejectCommunityIncident(incident.id, staffId);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(ok ? 'Report dismissed' : (_incidentProvider.error ?? 'Failed')),
+        content: Text(ok ? 'Report dismissed' : (provider.error ?? 'Failed')),
         backgroundColor: ok ? AppTheme.warningOrange : AppTheme.primaryRed,
       ));
     }

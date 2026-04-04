@@ -2,16 +2,57 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../data/models/incident_model.dart';
 import '../../data/models/status_history_model.dart';
+import '../../data/repositories/user_repository.dart';
 import '../../utils/app_theme.dart';
 
-class StatusTimelineWidget extends StatelessWidget {
+class StatusTimelineWidget extends StatefulWidget {
   final IncidentModel incident;
 
   const StatusTimelineWidget({super.key, required this.incident});
 
   @override
+  State<StatusTimelineWidget> createState() => _StatusTimelineWidgetState();
+}
+
+class _StatusTimelineWidgetState extends State<StatusTimelineWidget> {
+  final _userRepository = UserRepository();
+  Map<String, String> _userNames = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveUserNames();
+  }
+
+  @override
+  void didUpdateWidget(StatusTimelineWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.incident.id != widget.incident.id ||
+        oldWidget.incident.statusHistory.length !=
+            widget.incident.statusHistory.length) {
+      _resolveUserNames();
+    }
+  }
+
+  Future<void> _resolveUserNames() async {
+    final ids = widget.incident.statusHistory
+        .map((e) => e.updatedBy)
+        .whereType<String>()
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList();
+
+    if (ids.isEmpty) return;
+
+    final users = await _userRepository.getUsersByIds(ids);
+    if (!mounted) return;
+    setState(() {
+      _userNames = {for (final u in users) u.id: u.name};
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Build timeline entries from status history
     final entries = _buildTimelineEntries();
 
     if (entries.isEmpty) {
@@ -23,13 +64,13 @@ class StatusTimelineWidget extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(
+            const Icon(
               Icons.timeline,
               size: 18,
               color: AppTheme.textSecondary,
             ),
             const SizedBox(width: 8),
-            Text(
+            const Text(
               'Status Timeline',
               style: TextStyle(
                 fontSize: 15,
@@ -46,11 +87,15 @@ class StatusTimelineWidget extends StatelessWidget {
           final isLast = index == entries.length - 1;
           final isFirst = index == 0;
 
+          final resolvedName = item.updatedBy != null
+              ? (_userNames[item.updatedBy] ?? item.updatedBy)
+              : null;
+
           return _TimelineEntry(
             status: item.status,
             timestamp: item.timestamp,
             note: item.note,
-            updatedBy: item.updatedBy,
+            updatedBy: resolvedName,
             isFirst: isFirst,
             isLast: isLast,
             isCurrent: isFirst,
@@ -64,34 +109,34 @@ class StatusTimelineWidget extends StatelessWidget {
     final List<StatusHistoryEntry> entries = [];
 
     // Add current status if no history exists
-    if (incident.statusHistory.isEmpty) {
+    if (widget.incident.statusHistory.isEmpty) {
       // Add current status first (newest) if different from pending
-      if (incident.status != IncidentStatus.pending) {
+      if (widget.incident.status != IncidentStatus.pending) {
         entries.add(StatusHistoryEntry(
-          status: incident.status,
-          timestamp: incident.statusUpdatedAt ?? DateTime.now(),
-          note: incident.statusNote,
+          status: widget.incident.status,
+          timestamp: widget.incident.statusUpdatedAt ?? DateTime.now(),
+          note: widget.incident.statusNote,
         ));
       }
 
       // Add initial "reported" entry last (oldest)
       entries.add(StatusHistoryEntry(
         status: IncidentStatus.pending,
-        timestamp: incident.reportedAt,
+        timestamp: widget.incident.reportedAt,
         note: 'Incident reported',
       ));
     } else {
       // Use actual history, sorted by timestamp descending (most recent first)
-      entries.addAll(incident.statusHistory.toList()
+      entries.addAll(widget.incident.statusHistory.toList()
         ..sort((a, b) => b.timestamp.compareTo(a.timestamp)));
 
       // Add initial "reported" entry if not in history
       final hasInitialEntry =
-          entries.any((e) => e.timestamp == incident.reportedAt);
+          entries.any((e) => e.timestamp == widget.incident.reportedAt);
       if (!hasInitialEntry) {
         entries.add(StatusHistoryEntry(
           status: IncidentStatus.pending,
-          timestamp: incident.reportedAt,
+          timestamp: widget.incident.reportedAt,
           note: 'Incident reported',
         ));
       }

@@ -127,7 +127,9 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final reports = context.watch<IncidentProvider>().myReports;
+    final provider = context.watch<IncidentProvider>();
+    final reports = provider.myReports;
+    final loading = provider.myReportsLoading;
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundGrey,
@@ -152,7 +154,11 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
             ),
         ],
       ),
-      body: reports.isEmpty ? _buildEmptyState() : _buildList(reports),
+      body: loading
+          ? const Center(child: CircularProgressIndicator())
+          : reports.isEmpty
+              ? _buildEmptyState()
+              : _buildList(reports),
     );
   }
 

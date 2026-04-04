@@ -433,6 +433,7 @@ class _MapScreenState extends State<MapScreen> {
         final incidents = provider.incidents
             .where((i) =>
                 i.status != IncidentStatus.pending &&
+                i.status != IncidentStatus.dismissed &&
                 (i.communityIds.isEmpty ||
                     i.communityIds.any((id) => myApprovedIds.contains(id))))
             .toList();

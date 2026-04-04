@@ -32,18 +32,21 @@ class CommunityDetailScreen extends StatefulWidget {
 class _CommunityDetailScreenState extends State<CommunityDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  late final IncidentProvider _incidentProvider;
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _incidentProvider = context.read<IncidentProvider>();
     _loadCommunity();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _incidentProvider.stopWatchingPendingCommunityIncidents();
     super.dispose();
   }
 
@@ -59,6 +62,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
 
     if (m?.isStaff == true && m?.isApproved == true) {
       await provider.loadPendingRequests(widget.communityId);
+      _incidentProvider.watchPendingCommunityIncidents(widget.communityId);
     }
 
     if (mounted) {
@@ -227,7 +231,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
           indicatorColor: AppTheme.primaryRed,
           tabs: const [
             Tab(text: 'About'),
-            Tab(text: 'Reports'),
+            Tab(text: 'Incidents'),
             Tab(text: 'Members'),
           ],
         ),
@@ -258,8 +262,12 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
                     ),
                   ).then((_) => _loadCommunity()),
                 ),
-                if (provider.pendingRequests.isNotEmpty)
-                  Positioned(
+                Builder(builder: (context) {
+                  final pendingCount =
+                      provider.pendingRequests.length +
+                      context.watch<IncidentProvider>().pendingCommunityIncidents.length;
+                  if (pendingCount == 0) return const SizedBox.shrink();
+                  return Positioned(
                     right: 6,
                     top: 6,
                     child: Container(
@@ -271,7 +279,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
                       constraints:
                           const BoxConstraints(minWidth: 16, minHeight: 16),
                       child: Text(
-                        '${provider.pendingRequests.length}',
+                        '$pendingCount',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 10,
@@ -280,7 +288,8 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
                         textAlign: TextAlign.center,
                       ),
                     ),
-                  ),
+                  );
+                }),
               ],
             ),
             if (canDelete)

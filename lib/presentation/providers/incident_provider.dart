@@ -11,6 +11,7 @@ class IncidentProvider extends ChangeNotifier {
   List<IncidentModel> _incidents = [];
   List<IncidentModel>? _filteredCache;
   List<IncidentModel> _myReports = [];
+  bool _myReportsLoading = false;
   final Set<String> _activeFilters = {};
   final Set<SeverityLevel> _severityFilters = {};
   final Set<IncidentStatus> _statusFilters = {};
@@ -81,6 +82,7 @@ class IncidentProvider extends ChangeNotifier {
   List<IncidentModel> get allIncidents => _incidents;
 
   List<IncidentModel> get myReports => _myReports;
+  bool get myReportsLoading => _myReportsLoading;
   List<IncidentModel> get communityIncidents => _communityIncidents;
   List<IncidentModel> get pendingCommunityIncidents => _pendingCommunityIncidents;
   Set<String> get activeFilters => _activeFilters;
@@ -133,13 +135,17 @@ class IncidentProvider extends ChangeNotifier {
 
   void startListeningMyReports(String userId) {
     _myReportsSubscription?.cancel();
+    _myReportsLoading = true;
+    notifyListeners();
     _myReportsSubscription = _repository.watchByReporter(userId).listen(
       (reports) {
         _myReports = reports;
+        _myReportsLoading = false;
         notifyListeners();
       },
       onError: (e) {
         _error = e.toString();
+        _myReportsLoading = false;
         notifyListeners();
       },
     );
@@ -201,6 +207,9 @@ class IncidentProvider extends ChangeNotifier {
         updatedBy: staffId,
         note: 'Approved by community manager',
       );
+      _pendingCommunityIncidents =
+          _pendingCommunityIncidents.where((i) => i.id != id).toList();
+      notifyListeners();
       return true;
     } catch (e) {
       _error = e.toString();
@@ -217,6 +226,9 @@ class IncidentProvider extends ChangeNotifier {
         updatedBy: staffId,
         note: 'Rejected by community manager',
       );
+      _pendingCommunityIncidents =
+          _pendingCommunityIncidents.where((i) => i.id != id).toList();
+      notifyListeners();
       return true;
     } catch (e) {
       _error = e.toString();
