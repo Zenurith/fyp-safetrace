@@ -213,6 +213,58 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
       );
     }
 
+    final currentUser = context.watch<UserProvider>().currentUser;
+    if (community.isActivelySuspended && currentUser?.isAdmin != true) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(community.name),
+          backgroundColor: AppTheme.primaryDark,
+          foregroundColor: Colors.white,
+        ),
+        backgroundColor: AppTheme.backgroundGrey,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.block_rounded, size: 64, color: AppTheme.primaryRed),
+                const SizedBox(height: 16),
+                Text(
+                  'Community Suspended',
+                  style: AppTheme.headingMedium.copyWith(color: AppTheme.primaryDark),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  community.isTempBanned && community.bannedUntil != null
+                      ? 'This community has been temporarily suspended until ${community.bannedUntil!.day}/${community.bannedUntil!.month}/${community.bannedUntil!.year}.'
+                      : 'This community has been permanently suspended by an administrator.',
+                  textAlign: TextAlign.center,
+                  style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
+                ),
+                if (community.banReason != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryRed.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppTheme.primaryRed.withValues(alpha: 0.2)),
+                    ),
+                    child: Text(
+                      'Reason: ${community.banReason}',
+                      textAlign: TextAlign.center,
+                      style: AppTheme.caption.copyWith(color: AppTheme.textSecondary),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     final isApprovedMember = membership != null && membership.isApproved;
     final isStaff =
         membership?.isStaff == true && membership?.isApproved == true;

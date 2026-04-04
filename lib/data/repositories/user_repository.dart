@@ -26,6 +26,15 @@ class UserRepository {
     return null;
   }
 
+  /// Real-time stream of the current user's document.
+  /// Emits whenever any field (including isAdmin, isBanned) changes.
+  Stream<UserModel?> watchCurrentUser(String uid) {
+    return _usersCollection.doc(uid).snapshots().map((doc) =>
+        doc.exists && doc.data() != null
+            ? UserModel.fromMap(doc.data()!, doc.id)
+            : null);
+  }
+
   Future<void> updateUser(UserModel user) async {
     await _usersCollection.doc(user.id).update(user.toMap());
   }

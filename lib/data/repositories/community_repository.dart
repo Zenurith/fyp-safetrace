@@ -527,6 +527,27 @@ class CommunityRepository {
     await batch.commit();
   }
 
+  /// Ban a community (admin only).
+  /// [bannedUntil] = null → permanent ban; non-null → temporary ban.
+  Future<void> banCommunity(String communityId,
+      {DateTime? bannedUntil, String? reason}) async {
+    await _communitiesCollection.doc(communityId).update({
+      'isBanned': true,
+      'bannedUntil':
+          bannedUntil != null ? Timestamp.fromDate(bannedUntil) : null,
+      'banReason': reason,
+    });
+  }
+
+  /// Lift the ban on a community (admin only).
+  Future<void> unbanCommunity(String communityId) async {
+    await _communitiesCollection.doc(communityId).update({
+      'isBanned': false,
+      'bannedUntil': null,
+      'banReason': null,
+    });
+  }
+
   // ==================== Activity Feed ====================
 
   /// Log an activity event for a community.

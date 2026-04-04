@@ -48,6 +48,7 @@ class _CommunityManagerScreenState extends State<CommunityManagerScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _flagProvider.startListeningFlagsByCommunity(widget.communityId);
       _incidentProvider.watchPendingCommunityIncidents(widget.communityId);
+      _incidentProvider.watchCommunityIncidents(widget.communityId);
     });
   }
 
@@ -196,7 +197,7 @@ class _CommunityManagerScreenState extends State<CommunityManagerScreen>
             communityId: widget.communityId,
             onRefresh: _loadData,
           ),
-            _PendingIncidentsTab(communityId: widget.communityId),
+            _AllIncidentsTab(communityId: widget.communityId),
           _MembersTab(
             key: ValueKey(_membersReloadKey),
             communityId: widget.communityId,

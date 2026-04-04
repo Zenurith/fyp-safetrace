@@ -15,6 +15,9 @@ class CommunityModel {
   final bool requiresApproval;
   final DateTime createdAt;
   final String? imageUrl;
+  final bool isBanned;
+  final DateTime? bannedUntil;
+  final String? banReason;
 
   CommunityModel({
     required this.id,
@@ -30,7 +33,16 @@ class CommunityModel {
     this.requiresApproval = false,
     required this.createdAt,
     this.imageUrl,
+    this.isBanned = false,
+    this.bannedUntil,
+    this.banReason,
   });
+
+  bool get isActivelySuspended =>
+      isBanned && (bannedUntil == null || bannedUntil!.isAfter(DateTime.now()));
+
+  bool get isTempBanned => isBanned && bannedUntil != null;
+  bool get isPermanentlyBanned => isBanned && bannedUntil == null;
 
   /// Check if a location is within this community's radius using Haversine formula
   bool isLocationWithinRadius(double lat, double lng) {
@@ -83,6 +95,9 @@ class CommunityModel {
       'requiresApproval': requiresApproval,
       'createdAt': Timestamp.fromDate(createdAt),
       'imageUrl': imageUrl,
+      'isBanned': isBanned,
+      'bannedUntil': bannedUntil != null ? Timestamp.fromDate(bannedUntil!) : null,
+      'banReason': banReason,
     };
   }
 
@@ -103,6 +118,11 @@ class CommunityModel {
           ? (map['createdAt'] as Timestamp).toDate()
           : DateTime.now(),
       imageUrl: map['imageUrl'],
+      isBanned: map['isBanned'] ?? false,
+      bannedUntil: map['bannedUntil'] is Timestamp
+          ? (map['bannedUntil'] as Timestamp).toDate()
+          : null,
+      banReason: map['banReason'],
     );
   }
 
@@ -120,6 +140,9 @@ class CommunityModel {
     bool? requiresApproval,
     DateTime? createdAt,
     String? imageUrl,
+    bool? isBanned,
+    DateTime? bannedUntil,
+    String? banReason,
   }) {
     return CommunityModel(
       id: id ?? this.id,
@@ -135,6 +158,9 @@ class CommunityModel {
       requiresApproval: requiresApproval ?? this.requiresApproval,
       createdAt: createdAt ?? this.createdAt,
       imageUrl: imageUrl ?? this.imageUrl,
+      isBanned: isBanned ?? this.isBanned,
+      bannedUntil: bannedUntil ?? this.bannedUntil,
+      banReason: banReason ?? this.banReason,
     );
   }
 }

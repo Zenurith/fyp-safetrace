@@ -414,6 +414,32 @@ class CommunityProvider extends ChangeNotifier {
     return await _repository.isMember(communityId, userId);
   }
 
+  Future<bool> banCommunity(String communityId,
+      {DateTime? bannedUntil, String? reason}) async {
+    try {
+      await _repository.banCommunity(communityId,
+          bannedUntil: bannedUntil, reason: reason);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> unbanCommunity(String communityId) async {
+    try {
+      await _repository.unbanCommunity(communityId);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<bool> deleteCommunity(String communityId) async {
     try {
       await _repository.delete(communityId);

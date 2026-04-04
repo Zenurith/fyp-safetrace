@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../data/models/user_model.dart';
@@ -11,10 +12,17 @@ class UserProvider extends ChangeNotifier {
   UserModel? _currentUser;
   bool _isLoading = false;
   String? _error;
+  StreamSubscription<UserModel?>? _userSubscription;
 
   UserModel? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
   String? get error => _error;
+
+  @override
+  void dispose() {
+    _userSubscription?.cancel();
+    super.dispose();
+  }
 
   Future<void> loadUser(String uid) async {
     _isLoading = true;
@@ -24,12 +32,26 @@ class UserProvider extends ChangeNotifier {
     try {
       _currentUser = await _repository.getCurrentUser(uid);
       _error = null;
+      _startWatching(uid);
     } catch (e) {
       _error = e.toString();
     } finally {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  void _startWatching(String uid) {
+    _userSubscription?.cancel();
+    _userSubscription = _repository.watchCurrentUser(uid).listen(
+      (user) {
+        if (user != null) {
+          _currentUser = user;
+          notifyListeners();
+        }
+      },
+      onError: (_) {}, // best-effort — don't interrupt the session
+    );
   }
 
   Future<void> createUser(String uid, String name, String handle) async {
@@ -40,6 +62,7 @@ class UserProvider extends ChangeNotifier {
     try {
       await _repository.createUser(uid, name, handle);
       _currentUser = await _repository.getCurrentUser(uid);
+      _startWatching(uid);
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -61,6 +84,7 @@ class UserProvider extends ChangeNotifier {
         await _repository.createUser(uid, name, '@$name');
         _currentUser = await _repository.getCurrentUser(uid);
       }
+      _startWatching(uid);
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -111,6 +135,8 @@ class UserProvider extends ChangeNotifier {
   }
 
   void clearUser() {
+    _userSubscription?.cancel();
+    _userSubscription = null;
     _currentUser = null;
     _error = null;
     notifyListeners();

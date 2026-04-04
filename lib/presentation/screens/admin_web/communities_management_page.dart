@@ -183,6 +183,14 @@ class _CommunityCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      if (community.isActivelySuspended) ...[
+                        const SizedBox(width: 8),
+                        _InlineBadge(
+                          icon: Icons.block,
+                          label: community.isTempBanned ? 'Temp Banned' : 'Banned',
+                          color: AppTheme.primaryRed,
+                        ),
+                      ],
                       if (!community.isPublic) ...[
                         const SizedBox(width: 8),
                         _InlineBadge(
@@ -196,7 +204,7 @@ class _CommunityCard extends StatelessWidget {
                         _InlineBadge(
                           icon: Icons.how_to_reg,
                           label: 'Approval Required',
-                          color: AppTheme.primaryRed,
+                          color: AppTheme.warningOrange,
                         ),
                       ],
                     ],
@@ -757,6 +765,51 @@ class _DangerZoneContent extends StatefulWidget {
 
 class _DangerZoneContentState extends State<_DangerZoneContent> {
   bool _isDeleting = false;
+  bool _isBanning = false;
+
+  Future<void> _banCommunity({DateTime? bannedUntil, String? reason}) async {
+    setState(() => _isBanning = true);
+    final success = await context
+        .read<CommunityProvider>()
+        .banCommunity(widget.community.id, bannedUntil: bannedUntil, reason: reason);
+    if (!mounted) return;
+    setState(() => _isBanning = false);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(success
+          ? '"${widget.community.name}" has been banned'
+          : 'Failed to ban community'),
+      backgroundColor: success ? AppTheme.primaryRed : AppTheme.warningOrange,
+    ));
+  }
+
+  Future<void> _unbanCommunity() async {
+    setState(() => _isBanning = true);
+    final success = await context
+        .read<CommunityProvider>()
+        .unbanCommunity(widget.community.id);
+    if (!mounted) return;
+    setState(() => _isBanning = false);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(success
+          ? '"${widget.community.name}" ban lifted'
+          : 'Failed to unban community'),
+      backgroundColor: success ? AppTheme.successGreen : AppTheme.warningOrange,
+    ));
+  }
+
+  Future<void> _showBanDialog() async {
+    final result = await showDialog<({bool permanent, int? days, String reason})>(
+      context: context,
+      builder: (ctx) => _CommunityBanDialog(communityName: widget.community.name),
+    );
+    if (result == null || !mounted) return;
+    final bannedUntil = result.permanent
+        ? null
+        : DateTime.now().add(Duration(days: result.days!));
+    await _banCommunity(
+        bannedUntil: bannedUntil,
+        reason: result.reason.isEmpty ? null : result.reason);
+  }
 
   Future<void> _deleteCommunity() async {
     final confirmed = await showDialog<bool>(
@@ -808,7 +861,11 @@ class _DangerZoneContentState extends State<_DangerZoneContent> {
 
   @override
   Widget build(BuildContext context) {
-    final community = widget.community;
+    // Use watched community so ban status updates in real time
+    final community = context.watch<CommunityProvider>().communities
+        .where((c) => c.id == widget.community.id)
+        .firstOrNull ?? widget.community;
+    final isBanned = community.isActivelySuspended;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -826,9 +883,33 @@ class _DangerZoneContentState extends State<_DangerZoneContent> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  community.name,
-                  style: AppTheme.headingSmall.copyWith(color: AppTheme.primaryDark),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        community.name,
+                        style: AppTheme.headingSmall.copyWith(color: AppTheme.primaryDark),
+                      ),
+                    ),
+                    if (isBanned)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryRed.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppTheme.primaryRed.withValues(alpha: 0.3)),
+                        ),
+                        child: Text(
+                          community.isTempBanned ? 'Temp Banned' : 'Permanently Banned',
+                          style: const TextStyle(
+                            fontFamily: AppTheme.fontFamily,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.primaryRed,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 6),
                 Row(
@@ -855,6 +936,20 @@ class _DangerZoneContentState extends State<_DangerZoneContent> {
                     _InfoChip(label: community.isPublic ? 'Public' : 'Private'),
                   ],
                 ),
+                if (isBanned && community.bannedUntil != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Banned until: ${community.bannedUntil!.day}/${community.bannedUntil!.month}/${community.bannedUntil!.year}',
+                    style: AppTheme.caption.copyWith(color: AppTheme.primaryRed),
+                  ),
+                ],
+                if (isBanned && community.banReason != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'Reason: ${community.banReason}',
+                    style: AppTheme.caption.copyWith(color: AppTheme.textSecondary),
+                  ),
+                ],
               ],
             ),
           ),
@@ -863,13 +958,87 @@ class _DangerZoneContentState extends State<_DangerZoneContent> {
           // Danger zone header
           Row(
             children: [
-              Icon(Icons.warning_amber_rounded, size: 18, color: AppTheme.primaryRed),
+              const Icon(Icons.warning_amber_rounded, size: 18, color: AppTheme.primaryRed),
               const SizedBox(width: 6),
               Text(
                 'Danger Zone',
                 style: AppTheme.headingSmall.copyWith(color: AppTheme.primaryRed),
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+
+          // Ban / Unban community action
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: isBanned
+                    ? AppTheme.successGreen.withValues(alpha: 0.4)
+                    : AppTheme.warningOrange.withValues(alpha: 0.4),
+              ),
+              borderRadius: BorderRadius.circular(12),
+              color: isBanned
+                  ? AppTheme.successGreen.withValues(alpha: 0.03)
+                  : AppTheme.warningOrange.withValues(alpha: 0.03),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isBanned ? 'Lift community ban' : 'Ban this community',
+                        style: AppTheme.bodyMedium.copyWith(
+                          color: AppTheme.primaryDark,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        isBanned
+                            ? 'Restore access for all members.'
+                            : 'Suspend the community temporarily or permanently. Members will see a suspended notice.',
+                        style: AppTheme.caption.copyWith(color: AppTheme.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                if (_isBanning)
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: isBanned ? AppTheme.successGreen : AppTheme.warningOrange,
+                    ),
+                  )
+                else if (isBanned)
+                  ElevatedButton.icon(
+                    onPressed: _unbanCommunity,
+                    icon: const Icon(Icons.lock_open_outlined, size: 16),
+                    label: const Text('Lift Ban'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.successGreen,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    ),
+                  )
+                else
+                  ElevatedButton.icon(
+                    onPressed: _showBanDialog,
+                    icon: const Icon(Icons.block_outlined, size: 16),
+                    label: const Text('Ban Community'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.warningOrange,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    ),
+                  ),
+              ],
+            ),
           ),
           const SizedBox(height: 12),
 
@@ -927,6 +1096,110 @@ class _DangerZoneContentState extends State<_DangerZoneContent> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ── Community Ban Dialog ───────────────────────────────────────────────────────
+
+class _CommunityBanDialog extends StatefulWidget {
+  final String communityName;
+
+  const _CommunityBanDialog({required this.communityName});
+
+  @override
+  State<_CommunityBanDialog> createState() => _CommunityBanDialogState();
+}
+
+class _CommunityBanDialogState extends State<_CommunityBanDialog> {
+  bool _isPermanent = false;
+  int _selectedDays = 7;
+  final _reasonController = TextEditingController();
+
+  static const _options = [
+    (label: '1 day', days: 1),
+    (label: '3 days', days: 3),
+    (label: '7 days', days: 7),
+    (label: '30 days', days: 30),
+    (label: '90 days', days: 90),
+  ];
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Ban Community'),
+      content: SizedBox(
+        width: 400,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Suspend "${widget.communityName}"? Members will see a suspended notice and cannot interact.',
+              style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
+            ),
+            const SizedBox(height: 16),
+            SwitchListTile.adaptive(
+              title: Text('Permanent ban', style: AppTheme.bodyMedium),
+              subtitle: Text(
+                _isPermanent ? 'No expiry — admin must lift manually' : 'Select a duration below',
+                style: AppTheme.caption,
+              ),
+              value: _isPermanent,
+              activeColor: AppTheme.primaryRed,
+              contentPadding: EdgeInsets.zero,
+              onChanged: (v) => setState(() => _isPermanent = v),
+            ),
+            if (!_isPermanent) ...[
+              const SizedBox(height: 4),
+              ..._options.map((opt) => RadioListTile<int>(
+                    title: Text(opt.label, style: AppTheme.bodyMedium),
+                    value: opt.days,
+                    groupValue: _selectedDays,
+                    activeColor: AppTheme.warningOrange,
+                    contentPadding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                    onChanged: (v) => setState(() => _selectedDays = v!),
+                  )),
+            ],
+            const SizedBox(height: 12),
+            TextField(
+              controller: _reasonController,
+              decoration: const InputDecoration(
+                labelText: 'Reason (optional)',
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+              maxLines: 2,
+              maxLength: 200,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, (
+            permanent: _isPermanent,
+            days: _isPermanent ? null : _selectedDays,
+            reason: _reasonController.text.trim(),
+          )),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _isPermanent ? AppTheme.primaryRed : AppTheme.warningOrange,
+            foregroundColor: Colors.white,
+          ),
+          child: Text(_isPermanent ? 'Ban Permanently' : 'Apply Temp Ban'),
+        ),
+      ],
     );
   }
 }

@@ -434,6 +434,7 @@ class _MapScreenState extends State<MapScreen> {
             .where((i) =>
                 i.status != IncidentStatus.pending &&
                 i.status != IncidentStatus.dismissed &&
+                i.status != IncidentStatus.resolved &&
                 (i.communityIds.isEmpty ||
                     i.communityIds.any((id) => myApprovedIds.contains(id))))
             .toList();
@@ -796,7 +797,12 @@ class _FilterSheet extends StatelessWidget {
               child: Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: IncidentStatus.values.map((status) {
+                children: IncidentStatus.values
+                    .where((s) =>
+                        s != IncidentStatus.pending &&
+                        s != IncidentStatus.dismissed &&
+                        s != IncidentStatus.resolved)
+                    .map((status) {
                   final label = _statusLabel(status);
                   return _buildFilterChip(
                     label,
