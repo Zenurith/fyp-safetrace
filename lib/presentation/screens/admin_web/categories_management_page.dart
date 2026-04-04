@@ -339,10 +339,11 @@ class _CategoryCard extends StatelessWidget {
             iconName: iconName,
             colorHex: colorHex,
           );
-          final result = await context.read<CategoryProvider>().updateCategory(updated);
-          if (result && context.mounted) {
+          final provider = context.read<CategoryProvider>();
+          final result = await provider.updateCategory(updated);
+          if (result && ctx.mounted) {
             Navigator.pop(ctx);
-            ScaffoldMessenger.of(context).showSnackBar(
+            ScaffoldMessenger.of(ctx).showSnackBar(
               SnackBar(
                 content: Text('Category "$name" updated'),
                 backgroundColor: AppTheme.successGreen,
@@ -371,12 +372,14 @@ class _CategoryCard extends StatelessWidget {
           ),
           TextButton(
             onPressed: () async {
-              final result = await context.read<CategoryProvider>().deleteCategory(category.id);
-              if (result && context.mounted) {
+              final provider = context.read<CategoryProvider>();
+              final name = category.name;
+              final result = await provider.deleteCategory(category.id);
+              if (result && ctx.mounted) {
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
+                ScaffoldMessenger.of(ctx).showSnackBar(
                   SnackBar(
-                    content: Text('Category "${category.name}" deleted'),
+                    content: Text('Category "$name" deleted'),
                     backgroundColor: AppTheme.successGreen,
                   ),
                 );

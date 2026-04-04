@@ -429,14 +429,19 @@ class _MapScreenState extends State<MapScreen> {
     return Consumer3<IncidentProvider, CommunityProvider, CategoryProvider>(
       builder: (context, provider, communityProvider, categoryProvider, _) {
         final myApprovedIds = communityProvider.myApprovedCommunityIds;
-        // Show public incidents + community-only incidents the user is an approved member of
+        final bannedCommunityIds = communityProvider.communities
+            .where((c) => c.isActivelySuspended)
+            .map((c) => c.id)
+            .toSet();
+        // Show community incidents the user is an approved member of, excluding banned communities
         final incidents = provider.incidents
             .where((i) =>
                 i.status != IncidentStatus.pending &&
                 i.status != IncidentStatus.dismissed &&
                 i.status != IncidentStatus.resolved &&
                 (i.communityIds.isEmpty ||
-                    i.communityIds.any((id) => myApprovedIds.contains(id))))
+                    i.communityIds.any((id) => myApprovedIds.contains(id))) &&
+                !i.communityIds.any((id) => bannedCommunityIds.contains(id)))
             .toList();
         final customCategories =
             categoryProvider.enabledCategories.where((c) => !c.isDefault).toList();

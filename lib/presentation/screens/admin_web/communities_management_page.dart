@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../data/models/audit_log_model.dart';
 import '../../../data/models/community_model.dart';
 import '../../../data/models/community_member_model.dart';
 import '../../../data/models/user_model.dart';
+import '../../../data/repositories/audit_log_repository.dart';
 import '../../../utils/app_theme.dart';
 import '../../providers/community_provider.dart';
 import '../../providers/user_provider.dart';
@@ -766,6 +768,22 @@ class _DangerZoneContent extends StatefulWidget {
 class _DangerZoneContentState extends State<_DangerZoneContent> {
   bool _isDeleting = false;
   bool _isBanning = false;
+  final _auditRepo = AuditLogRepository();
+
+  void _logAction(String action, String detail) {
+    final admin = context.read<UserProvider>().currentUser;
+    if (admin == null) return;
+    _auditRepo.create(AuditLogModel(
+      id: '',
+      adminId: admin.id,
+      adminName: admin.name,
+      action: action,
+      targetType: 'community',
+      targetId: widget.community.id,
+      detail: detail,
+      timestamp: DateTime.now(),
+    ));
+  }
 
   Future<void> _banCommunity({DateTime? bannedUntil, String? reason}) async {
     setState(() => _isBanning = true);
@@ -774,6 +792,18 @@ class _DangerZoneContentState extends State<_DangerZoneContent> {
         .banCommunity(widget.community.id, bannedUntil: bannedUntil, reason: reason);
     if (!mounted) return;
     setState(() => _isBanning = false);
+    if (success) {
+      final durLabel = bannedUntil == null
+          ? 'permanently'
+          : 'until ${bannedUntil.day}/${bannedUntil.month}/${bannedUntil.year}';
+      final reasonPart = (reason != null && reason.isNotEmpty) ? ' — Reason: $reason' : '';
+      _logAction(
+        bannedUntil == null
+            ? 'Permanently banned community "${widget.community.name}"'
+            : 'Temp banned community "${widget.community.name}"',
+        'Banned $durLabel$reasonPart',
+      );
+    }
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(success
           ? '"${widget.community.name}" has been banned'
@@ -789,6 +819,12 @@ class _DangerZoneContentState extends State<_DangerZoneContent> {
         .unbanCommunity(widget.community.id);
     if (!mounted) return;
     setState(() => _isBanning = false);
+    if (success) {
+      _logAction(
+        'Lifted ban on community "${widget.community.name}"',
+        'Community access restored',
+      );
+    }
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(success
           ? '"${widget.community.name}" ban lifted'
