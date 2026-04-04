@@ -83,12 +83,16 @@ class _MembersListTabState extends State<_MembersListTab>
   void _showMemberProfile(
       BuildContext context, CommunityMemberModel member, UserModel? user) {
     final roleColor = _roleColor(member.role);
+    final currentUserId =
+        context.read<UserProvider>().currentUser?.id ?? '';
+    final isSelf = member.userId == currentUserId;
+
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => Padding(
+      builder: (sheetCtx) => Padding(
         padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -193,6 +197,30 @@ class _MembersListTabState extends State<_MembersListTab>
               ),
             const SizedBox(height: 16),
             Text(_joinedAgo(member), style: AppTheme.caption),
+            if (!isSelf) ...[
+              const SizedBox(height: 12),
+              TextButton.icon(
+                onPressed: () {
+                  Navigator.pop(sheetCtx);
+                  FlagDialog.show(
+                    context,
+                    targetType: FlagTargetType.user,
+                    targetId: member.userId,
+                    communityId: widget.communityId,
+                  );
+                },
+                icon: const Icon(Icons.flag_outlined, size: 16),
+                label: const Text('Report User'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppTheme.primaryRed,
+                  textStyle: const TextStyle(
+                    fontFamily: AppTheme.fontFamily,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),

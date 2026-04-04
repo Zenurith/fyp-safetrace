@@ -78,19 +78,22 @@ class FlagRepository {
   Stream<List<FlagModel>> watchFlagsByCommunity(String communityId) {
     return _collection
         .where('communityId', isEqualTo: communityId)
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => FlagModel.fromMap(doc.data(), doc.id))
-            .toList());
+        .map((snapshot) {
+          final flags = snapshot.docs
+              .map((doc) => FlagModel.fromMap(doc.data(), doc.id))
+              .toList();
+          flags.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return flags;
+        });
   }
 
   Future<int> getPendingFlagCountByCommunity(String communityId) async {
     final snapshot = await _collection
         .where('communityId', isEqualTo: communityId)
-        .where('status', isEqualTo: FlagStatus.pending.index)
-        .count()
         .get();
-    return snapshot.count ?? 0;
+    return snapshot.docs
+        .where((doc) => (doc.data()['status'] ?? 0) == FlagStatus.pending.index)
+        .length;
   }
 }
