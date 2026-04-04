@@ -88,17 +88,11 @@ class _FullScreenMapPickerScreenState
             right: 0,
             child: Container(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: Colors.white,
                 borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(20)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 12,
-                    offset: const Offset(0, -4),
-                  ),
-                ],
+                    BorderRadius.vertical(top: Radius.circular(20)),
+                border: Border(top: BorderSide(color: AppTheme.cardBorder)),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,

@@ -88,7 +88,7 @@ class LocationService {
         return parts.join(', ');
       }
     } catch (e) {
-      debugPrint('Error getting address from coordinates: $e');
+      if (kDebugMode) debugPrint('Error getting address from coordinates: $e');
     }
     return 'Unknown location';
   }
@@ -131,7 +131,7 @@ class LocationService {
         }
       }
     } catch (e) {
-      debugPrint('Error getting address suggestions: $e');
+      if (kDebugMode) debugPrint('Error getting address suggestions: $e');
     }
     return [];
   }
@@ -158,7 +158,7 @@ class LocationService {
         }
       }
     } catch (e) {
-      debugPrint('Error getting coordinates from place ID: $e');
+      if (kDebugMode) debugPrint('Error getting coordinates from place ID: $e');
     }
     return null;
   }
@@ -176,7 +176,7 @@ class LocationService {
         );
       }
     } catch (e) {
-      debugPrint('Error getting coordinates from address: $e');
+      if (kDebugMode) debugPrint('Error getting coordinates from address: $e');
     }
     return null;
   }

@@ -218,7 +218,6 @@ Roles are stored as **string names** in Firestore (migrated from legacy int indi
 
 ### Performance Issues (Open)
 - `community_repository.dart`: `getNearbyCommunities()` is O(n) client-side — fetches all communities then filters. Will degrade at scale; consider GeoFlutterFire or geohashing.
-- Edit profile dialog (`profile_screen.dart`): `TextEditingController`s created on every open, not disposed if dismissed via back gesture (memory leak risk).
 
 ---
 

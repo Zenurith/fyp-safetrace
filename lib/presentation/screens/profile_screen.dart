@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import '../../data/models/user_model.dart';
 import '../../utils/app_theme.dart';
 import '../providers/user_provider.dart';
 import '../widgets/user_avatar.dart';
@@ -116,58 +117,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final user = provider.currentUser;
     if (user == null) return;
 
-    final nameController = TextEditingController(text: user.name);
-    final handleController = TextEditingController(text: user.handle);
-
     showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Edit Profile'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Name',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: handleController,
-              decoration: const InputDecoration(
-                labelText: 'Handle',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final updated = user.copyWith(
-                name: nameController.text.trim(),
-                handle: handleController.text.trim(),
-              );
-              provider.updateUser(updated);
-              Navigator.pop(ctx);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryDark,
-            ),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    ).then((_) {
-      nameController.dispose();
-      handleController.dispose();
-    });
+      builder: (ctx) => _EditProfileDialog(user: user, provider: provider),
+    );
   }
 
   @override
@@ -458,6 +411,82 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+class _EditProfileDialog extends StatefulWidget {
+  final UserModel user;
+  final UserProvider provider;
+
+  const _EditProfileDialog({required this.user, required this.provider});
+
+  @override
+  State<_EditProfileDialog> createState() => _EditProfileDialogState();
+}
+
+class _EditProfileDialogState extends State<_EditProfileDialog> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _handleController;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.user.name);
+    _handleController = TextEditingController(text: widget.user.handle);
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _handleController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit Profile'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _nameController,
+            decoration: const InputDecoration(
+              labelText: 'Name',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _handleController,
+            decoration: const InputDecoration(
+              labelText: 'Handle',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            final updated = widget.user.copyWith(
+              name: _nameController.text.trim(),
+              handle: _handleController.text.trim(),
+            );
+            widget.provider.updateUser(updated);
+            Navigator.pop(context);
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.primaryDark,
+          ),
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 }

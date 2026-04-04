@@ -185,7 +185,7 @@ class AppTheme {
       case 'low':
         return severityLow;
       default:
-        return Colors.grey;
+        return textSecondary;
     }
   }
 

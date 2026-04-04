@@ -878,7 +878,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.grey[100],
+                    color: AppTheme.backgroundGrey,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -920,7 +920,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   result.isValid
                       ? 'The image may not clearly match your report. Do you want to submit anyway?'
                       : 'The image does not appear to match your selected category. Please review your submission.',
-                  style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                  style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
                 ),
               ],
             ),
@@ -1189,7 +1189,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                               : _submit,
                           style: _locationTooFar
                               ? ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.grey)
+                                  backgroundColor: AppTheme.textSecondary)
                               : null,
                           child: _isSubmitting
                               ? const SizedBox(

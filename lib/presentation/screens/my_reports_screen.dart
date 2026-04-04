@@ -76,10 +76,11 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
               Navigator.pop(ctx);
               await context.read<IncidentProvider>().deleteIncident(incident.id);
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
+                messenger.showSnackBar(
                   const SnackBar(
                     content: Text('Report deleted'),
                     backgroundColor: AppTheme.primaryRed,
@@ -108,10 +109,11 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
       builder: (ctx) => _EditIncidentSheet(
         incident: incident,
         onSave: (updated) async {
+          final messenger = ScaffoldMessenger.of(context);
           Navigator.pop(ctx);
           await context.read<IncidentProvider>().updateIncident(updated);
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            messenger.showSnackBar(
               const SnackBar(
                 content: Text('Report updated'),
                 backgroundColor: AppTheme.successGreen,

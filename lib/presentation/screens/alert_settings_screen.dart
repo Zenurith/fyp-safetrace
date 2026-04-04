@@ -227,7 +227,7 @@ class _AlertSettingsScreenState extends State<AlertSettingsScreen> {
                 const SizedBox(height: 4),
                 Text(
                   'Alert categories:',
-                  style: TextStyle(color: Colors.grey[600]),
+                  style: const TextStyle(color: AppTheme.textSecondary),
                 ),
                 const SizedBox(height: 12),
                 _CategoryFilterGrid(

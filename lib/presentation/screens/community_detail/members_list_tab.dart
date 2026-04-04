@@ -51,9 +51,9 @@ class _MembersListTabState extends State<_MembersListTab>
 
     if (members.isNotEmpty) {
       final ids = members.map((m) => m.userId).toList();
-      context.read<UserProvider>().getUsersByIds(ids).then((fetched) {
-        if (mounted) setState(() => _users.addAll(fetched));
-      });
+      final fetched = await context.read<UserProvider>().getUsersByIds(ids);
+      if (!mounted) return;
+      setState(() => _users.addAll(fetched));
     }
   }
 

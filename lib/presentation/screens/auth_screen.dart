@@ -128,9 +128,9 @@ class _AuthScreenState extends State<AuthScreen> {
                 Text(
                   _isLogin ? 'Welcome back' : 'Create your account',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 16,
-                    color: Colors.grey[600],
+                    color: AppTheme.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 32),

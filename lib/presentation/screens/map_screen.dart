@@ -139,9 +139,9 @@ class _MapScreenState extends State<MapScreen> {
   Color _categoryColor(IncidentCategory category) {
     switch (category) {
       case IncidentCategory.crime:
-        return Colors.red;
+        return AppTheme.primaryRed;
       case IncidentCategory.traffic:
-        return Colors.orange;
+        return AppTheme.warningOrange;
       case IncidentCategory.emergency:
         return Colors.pink[700]!;
       case IncidentCategory.infrastructure:
@@ -151,7 +151,7 @@ class _MapScreenState extends State<MapScreen> {
       case IncidentCategory.suspicious:
         return Colors.deepPurple;
       case IncidentCategory.other:
-        return Colors.grey;
+        return AppTheme.textSecondary;
     }
   }
 
@@ -193,7 +193,7 @@ class _MapScreenState extends State<MapScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Unable to get current location'),
-            backgroundColor: Colors.orange,
+            backgroundColor: AppTheme.warningOrange,
           ),
         );
       }
@@ -202,7 +202,7 @@ class _MapScreenState extends State<MapScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Location timeout - please try again'),
-            backgroundColor: Colors.orange,
+            backgroundColor: AppTheme.warningOrange,
           ),
         );
       }
@@ -295,7 +295,7 @@ class _MapScreenState extends State<MapScreen> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey[300],
+                color: AppTheme.cardBorder,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -716,7 +716,7 @@ class _FilterSheet extends StatelessWidget {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey[300],
+                  color: AppTheme.cardBorder,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),

@@ -104,7 +104,7 @@ class _IncidentBottomSheetState extends State<IncidentBottomSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey[300],
+                color: AppTheme.cardBorder,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -161,7 +161,7 @@ class _IncidentBottomSheetState extends State<IncidentBottomSheet> {
               const SizedBox(width: 8),
               Text(
                 'Reported ${incident.timeAgo}',
-                style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+                style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
               ),
             ],
           ),
@@ -217,9 +217,9 @@ class _IncidentBottomSheetState extends State<IncidentBottomSheet> {
                 const SizedBox(width: 8),
                 Text(
                   '${incident.mediaUrls.length} ${incident.mediaUrls.length == 1 ? 'photo' : 'photos'}',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 13,
-                    color: Colors.grey[500],
+                    color: AppTheme.textSecondary,
                   ),
                 ),
               ],
@@ -251,7 +251,7 @@ class _IncidentBottomSheetState extends State<IncidentBottomSheet> {
                           margin: const EdgeInsets.only(right: 8),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(8),
-                            color: isVideo ? Colors.grey[800] : Colors.grey[200],
+                            color: isVideo ? AppTheme.primaryDark : AppTheme.backgroundGrey,
                           ),
                           clipBehavior: Clip.hardEdge,
                           child: isVideo
@@ -263,7 +263,7 @@ class _IncidentBottomSheetState extends State<IncidentBottomSheet> {
                                       fit: BoxFit.cover,
                                       errorBuilder: (context, error, stackTrace) {
                                         return const Icon(Icons.broken_image,
-                                            color: Colors.grey);
+                                            color: AppTheme.textSecondary);
                                       },
                                     )
                                   : Image.network(
@@ -283,7 +283,7 @@ class _IncidentBottomSheetState extends State<IncidentBottomSheet> {
                                       },
                                       errorBuilder: (context, error, stackTrace) {
                                         return const Icon(Icons.broken_image,
-                                            color: Colors.grey);
+                                            color: AppTheme.textSecondary);
                                       },
                                     ),
                         ),
@@ -438,12 +438,12 @@ class _VotingSection extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.grey.withValues(alpha: 0.2),
+                    color: AppTheme.cardBorder,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Text(
                     'Your report',
-                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                    style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
                   ),
                 ),
             ],
@@ -629,7 +629,7 @@ class _ImageVerificationBadge extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               incident.verificationNote ?? 'No details available',
-              style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+              style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
             ),
           ],
         ),
