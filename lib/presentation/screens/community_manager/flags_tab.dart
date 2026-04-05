@@ -75,6 +75,27 @@ class _FlagCard extends StatelessWidget {
                         Text(flag.targetTypeLabel, style: AppTheme.headingSmall),
                         const SizedBox(width: 8),
                         _StatusChip(status: flag.status),
+                        if (flag.escalatedToAdmin) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryDark.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                  color: AppTheme.primaryDark.withValues(alpha: 0.4)),
+                            ),
+                            child: const Text(
+                              'ESCALATED',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.primaryDark,
+                                fontFamily: AppTheme.fontFamily,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 2),
@@ -126,8 +147,8 @@ class _FlagCard extends StatelessWidget {
             ),
           ],
 
-          // ── Action row (pending only) ────────────────────────────────────
-          if (isPending) ...[
+          // ── Action row (pending only, not yet escalated) ─────────────────
+          if (isPending && !flag.escalatedToAdmin) ...[
             const SizedBox(height: 10),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
@@ -407,6 +428,14 @@ class _UserActionSheet extends StatelessWidget {
             subtitle: 'Permanently ban this user from the community.',
             onTap: () => _banUser(context),
           ),
+          const SizedBox(height: 8),
+          _ActionTile(
+            icon: Icons.admin_panel_settings_outlined,
+            color: AppTheme.primaryDark,
+            title: 'Escalate to System Admin',
+            subtitle: 'Report this behaviour to platform administrators for account-level action.',
+            onTap: () => _escalateToAdmin(context),
+          ),
         ],
       ),
     );
@@ -452,6 +481,64 @@ class _UserActionSheet extends StatelessWidget {
     );
     if (confirmed != true || !parentCtx.mounted) return;
     await _doUserAction(parentCtx, ban: true);
+  }
+
+  Future<void> _escalateToAdmin(BuildContext ctx) async {
+    Navigator.pop(ctx); // close bottom sheet
+    final noteController = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: parentCtx,
+      builder: (d) => AlertDialog(
+        title: const Text('Escalate to System Admin'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'This will send the report to system administrators for platform-level review (e.g. account suspension).',
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: noteController,
+              style: AppTheme.bodyMedium,
+              decoration: InputDecoration(
+                labelText: 'Escalation note',
+                hintText: 'Describe the behaviour and why admin action is needed...',
+                labelStyle: AppTheme.caption,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              maxLines: 3,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(d, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(d, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryDark),
+            child: const Text('Escalate'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !parentCtx.mounted) return;
+    final staffId = parentCtx.read<UserProvider>().currentUser?.id ?? '';
+    final note = noteController.text.trim().isEmpty
+        ? 'Escalated by community staff for admin review.'
+        : noteController.text.trim();
+    final ok = await parentCtx.read<FlagProvider>().escalateToAdmin(
+          flag.id,
+          escalatedBy: staffId,
+          note: note,
+        );
+    if (!parentCtx.mounted) return;
+    ScaffoldMessenger.of(parentCtx).showSnackBar(SnackBar(
+      content: Text(ok ? 'Escalated to system admin' : 'Failed to escalate'),
+      backgroundColor: ok ? AppTheme.primaryDark : AppTheme.primaryRed,
+    ));
   }
 
   Future<void> _doUserAction(BuildContext ctx, {required bool ban}) async {

@@ -12,6 +12,16 @@ class _AllIncidentsTab extends StatefulWidget {
 }
 
 class _AllIncidentsTabState extends State<_AllIncidentsTab> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  IncidentStatus? _statusFilter;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _approve(IncidentModel incident) async {
     final provider = context.read<IncidentProvider>();
     final staffId = context.read<UserProvider>().currentUser?.id ?? '';
@@ -61,6 +71,7 @@ class _AllIncidentsTabState extends State<_AllIncidentsTab> {
   void _showStatusDialog(IncidentModel incident) {
     final noteController = TextEditingController();
     IncidentStatus selectedStatus = incident.status;
+    var saving = false;
 
     showDialog(
       context: context,
@@ -168,30 +179,40 @@ class _AllIncidentsTabState extends State<_AllIncidentsTab> {
                       .copyWith(color: AppTheme.textSecondary)),
             ),
             ElevatedButton(
-              onPressed: () async {
-                await context.read<IncidentProvider>().updateIncidentStatus(
-                      incident.id,
-                      selectedStatus,
-                      note: noteController.text.trim().isEmpty
-                          ? null
-                          : noteController.text.trim(),
-                    );
-                if (context.mounted) {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text(
-                        'Status updated to ${_statusLabel(selectedStatus)}'),
-                    backgroundColor: AppTheme.successGreen,
-                  ));
-                }
-              },
+              onPressed: saving
+                  ? null
+                  : () async {
+                      setDialogState(() => saving = true);
+                      await context.read<IncidentProvider>().updateIncidentStatus(
+                            incident.id,
+                            selectedStatus,
+                            note: noteController.text.trim().isEmpty
+                                ? null
+                                : noteController.text.trim(),
+                          );
+                      if (context.mounted) {
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text(
+                              'Status updated to ${_statusLabel(selectedStatus)}'),
+                          backgroundColor: AppTheme.successGreen,
+                        ));
+                      }
+                    },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryDark,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8)),
               ),
-              child: const Text('Update'),
+              child: saving
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Update'),
             ),
           ],
         ),
@@ -247,61 +268,216 @@ class _AllIncidentsTabState extends State<_AllIncidentsTab> {
   @override
   Widget build(BuildContext context) {
     final all = context.watch<IncidentProvider>().communityIncidents;
+
+    final filtered = all.where((i) {
+      final matchesSearch = _searchQuery.isEmpty ||
+          i.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          i.categoryLabel.toLowerCase().contains(_searchQuery.toLowerCase());
+      final matchesStatus =
+          _statusFilter == null || i.status == _statusFilter;
+      return matchesSearch && matchesStatus;
+    }).toList();
+
     final pending =
-        all.where((i) => i.status == IncidentStatus.pending).toList();
-    final active = all
+        filtered.where((i) => i.status == IncidentStatus.pending).toList();
+    final active = filtered
         .where((i) => i.status != IncidentStatus.pending)
         .toList()
       ..sort((a, b) => b.reportedAt.compareTo(a.reportedAt));
 
-    if (all.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.warning_amber_outlined,
-                size: 64, color: AppTheme.textSecondary),
-            const SizedBox(height: 16),
-            Text('No incident reports',
-                style: TextStyle(fontSize: 18, color: AppTheme.textSecondary)),
-            const SizedBox(height: 8),
-            Text('No incidents have been shared with this community',
-                style: TextStyle(color: AppTheme.textSecondary)),
-          ],
-        ),
-      );
-    }
-
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    return Column(
       children: [
-        if (pending.isNotEmpty) ...[
-          _SectionHeader(label: 'Pending Review (${pending.length})'),
-          const SizedBox(height: 8),
-          ...pending.map((incident) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _PendingIncidentCard(
-                  incident: incident,
-                  onApprove: () => _approve(incident),
-                  onReject: () => _reject(incident),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: _searchController,
+                onChanged: (v) => setState(() => _searchQuery = v),
+                style: AppTheme.bodyMedium,
+                decoration: InputDecoration(
+                  hintText: 'Search incidents...',
+                  hintStyle: AppTheme.caption,
+                  prefixIcon: const Icon(Icons.search,
+                      size: 20, color: AppTheme.textSecondary),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.close,
+                              size: 18, color: AppTheme.textSecondary),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                        )
+                      : null,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppTheme.cardBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppTheme.cardBorder),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide:
+                        const BorderSide(color: AppTheme.primaryDark),
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
                 ),
-              )),
-        ],
-        if (active.isNotEmpty) ...[
-          if (pending.isNotEmpty) const SizedBox(height: 4),
-          _SectionHeader(label: 'All Incidents (${active.length})'),
-          const SizedBox(height: 8),
-          ...active.map((incident) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _ActiveIncidentCard(
-                  incident: incident,
-                  statusColor: _statusColor(incident.status),
-                  statusLabel: _statusLabel(incident.status),
-                  onUpdateStatus: () => _showStatusDialog(incident),
+              ),
+              const SizedBox(height: 10),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _StatusFilterChip(
+                      label: 'All',
+                      selected: _statusFilter == null,
+                      onTap: () => setState(() => _statusFilter = null),
+                    ),
+                    const SizedBox(width: 8),
+                    ...IncidentStatus.values.map((status) => Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: _StatusFilterChip(
+                            label: _statusLabel(status),
+                            selected: _statusFilter == status,
+                            selectedColor: _statusColor(status),
+                            onTap: () => setState(() {
+                              _statusFilter =
+                                  _statusFilter == status ? null : status;
+                            }),
+                          ),
+                        )),
+                  ],
                 ),
-              )),
-        ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        if (all.isEmpty)
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.warning_amber_outlined,
+                      size: 64, color: AppTheme.textSecondary),
+                  const SizedBox(height: 16),
+                  Text('No incident reports',
+                      style: TextStyle(
+                          fontSize: 18, color: AppTheme.textSecondary)),
+                  const SizedBox(height: 8),
+                  Text(
+                      'No incidents have been shared with this community',
+                      style: TextStyle(color: AppTheme.textSecondary)),
+                ],
+              ),
+            ),
+          )
+        else if (filtered.isEmpty)
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.search_off,
+                      size: 64, color: AppTheme.textSecondary),
+                  const SizedBox(height: 16),
+                  Text('No matching incidents',
+                      style: TextStyle(
+                          fontSize: 18, color: AppTheme.textSecondary)),
+                  const SizedBox(height: 8),
+                  Text('Try adjusting your search or filter',
+                      style: TextStyle(color: AppTheme.textSecondary)),
+                ],
+              ),
+            ),
+          )
+        else
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              children: [
+                if (pending.isNotEmpty) ...[
+                  _SectionHeader(
+                      label: 'Pending Review (${pending.length})'),
+                  const SizedBox(height: 8),
+                  ...pending.map((incident) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _PendingIncidentCard(
+                          incident: incident,
+                          onApprove: () => _approve(incident),
+                          onReject: () => _reject(incident),
+                        ),
+                      )),
+                ],
+                if (active.isNotEmpty) ...[
+                  if (pending.isNotEmpty) const SizedBox(height: 4),
+                  _SectionHeader(
+                      label: 'All Incidents (${active.length})'),
+                  const SizedBox(height: 8),
+                  ...active.map((incident) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _ActiveIncidentCard(
+                          incident: incident,
+                          statusColor: _statusColor(incident.status),
+                          statusLabel: _statusLabel(incident.status),
+                          onUpdateStatus: () =>
+                              _showStatusDialog(incident),
+                        ),
+                      )),
+                ],
+              ],
+            ),
+          ),
       ],
+    );
+  }
+}
+
+// ── Status filter chip ────────────────────────────────────────────────────────
+
+class _StatusFilterChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final Color? selectedColor;
+  final VoidCallback onTap;
+
+  const _StatusFilterChip({
+    required this.label,
+    required this.selected,
+    this.selectedColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selectedColor ?? AppTheme.primaryDark;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? color.withValues(alpha: 0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? color : AppTheme.cardBorder,
+          ),
+        ),
+        child: Text(
+          label,
+          style: AppTheme.caption.copyWith(
+            color: selected ? color : AppTheme.textSecondary,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+          ),
+        ),
+      ),
     );
   }
 }

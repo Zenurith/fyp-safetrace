@@ -4,11 +4,9 @@ part of '../community_manager_screen.dart';
 
 class _PendingRequestsTab extends StatefulWidget {
   final String communityId;
-  final Future<void> Function() onRefresh;
 
   const _PendingRequestsTab({
     required this.communityId,
-    required this.onRefresh,
   });
 
   @override
@@ -156,7 +154,6 @@ class _PendingRequestsTabState extends State<_PendingRequestsTab> {
           _requestedIds.clear();
           _selectedIds.clear();
         });
-        await widget.onRefresh();
       },
       child: Column(
         children: [

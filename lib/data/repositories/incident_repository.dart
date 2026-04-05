@@ -6,13 +6,13 @@ import '../models/status_history_model.dart';
 class IncidentRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Hide incidents older than 1 day
-  static const int maxIncidentAgeDays = 1;
+  // Hide incidents older than 7 days on the map/main feed
+  static const int maxIncidentAgeDays = 7;
 
   CollectionReference<Map<String, dynamic>> get _incidentsCollection =>
       _firestore.collection('incidents');
 
-  /// Watch recent incidents only (last 1 day) - for map and main feed
+  /// Watch recent incidents only (last 7 days) - for map and main feed
   Stream<List<IncidentModel>> watchAll() {
     final cutoff = DateTime.now().subtract(const Duration(days: maxIncidentAgeDays));
     return _incidentsCollection
@@ -44,11 +44,10 @@ class IncidentRepository {
             .toList());
   }
 
+  /// Watch all incidents for a community — no age cutoff so moderators see full history.
   Stream<List<IncidentModel>> watchCommunityIncidents(String communityId) {
-    final cutoff = DateTime.now().subtract(const Duration(days: maxIncidentAgeDays));
     return _incidentsCollection
         .where('communityIds', arrayContains: communityId)
-        .where('reportedAt', isGreaterThan: Timestamp.fromDate(cutoff))
         .orderBy('reportedAt', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs
@@ -68,7 +67,7 @@ class IncidentRepository {
             .toList());
   }
 
-  /// Get recent incidents only (last 1 day)
+  /// Get recent incidents only (last 7 days)
   Future<List<IncidentModel>> getAll() async {
     final cutoff = DateTime.now().subtract(const Duration(days: maxIncidentAgeDays));
     final snapshot = await _incidentsCollection

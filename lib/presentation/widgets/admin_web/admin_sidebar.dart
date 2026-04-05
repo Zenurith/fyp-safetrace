@@ -20,7 +20,7 @@ class AdminSidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final flagProvider = context.watch<FlagProvider>();
-    final pendingCount = flagProvider.pendingCount;
+    final pendingCount = flagProvider.totalAdminPendingCount;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 220),

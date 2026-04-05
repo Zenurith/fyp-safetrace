@@ -18,6 +18,8 @@ class FlagModel {
   final String? resolutionNote;
   final String? communityId;
   final List<String> communityStaffIds;
+  final bool escalatedToAdmin;
+  final String? escalatedBy;
 
   FlagModel({
     required this.id,
@@ -34,6 +36,8 @@ class FlagModel {
     this.resolutionNote,
     this.communityId,
     this.communityStaffIds = const [],
+    this.escalatedToAdmin = false,
+    this.escalatedBy,
   });
 
   String get targetTypeLabel {
@@ -86,6 +90,8 @@ class FlagModel {
       'resolutionNote': resolutionNote,
       'communityId': communityId,
       'communityStaffIds': communityStaffIds,
+      'escalatedToAdmin': escalatedToAdmin,
+      'escalatedBy': escalatedBy,
     };
   }
 
@@ -109,6 +115,8 @@ class FlagModel {
       resolutionNote: map['resolutionNote'],
       communityId: map['communityId'] as String?,
       communityStaffIds: List<String>.from(map['communityStaffIds'] ?? []),
+      escalatedToAdmin: map['escalatedToAdmin'] as bool? ?? false,
+      escalatedBy: map['escalatedBy'] as String?,
     );
   }
 
@@ -127,6 +135,8 @@ class FlagModel {
     String? resolutionNote,
     String? communityId,
     List<String>? communityStaffIds,
+    bool? escalatedToAdmin,
+    String? escalatedBy,
   }) {
     return FlagModel(
       id: id ?? this.id,
@@ -143,6 +153,8 @@ class FlagModel {
       resolutionNote: resolutionNote ?? this.resolutionNote,
       communityId: communityId ?? this.communityId,
       communityStaffIds: communityStaffIds ?? this.communityStaffIds,
+      escalatedToAdmin: escalatedToAdmin ?? this.escalatedToAdmin,
+      escalatedBy: escalatedBy ?? this.escalatedBy,
     );
   }
 }

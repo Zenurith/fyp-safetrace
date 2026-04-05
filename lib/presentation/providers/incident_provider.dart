@@ -209,6 +209,13 @@ class IncidentProvider extends ChangeNotifier {
       );
       _pendingCommunityIncidents =
           _pendingCommunityIncidents.where((i) => i.id != id).toList();
+      // Optimistic update on communityIncidents so the list reflects the new
+      // status immediately without waiting for the Firestore stream to re-emit.
+      final idx = _communityIncidents.indexWhere((i) => i.id == id);
+      if (idx != -1) {
+        _communityIncidents[idx] =
+            _communityIncidents[idx].copyWith(status: IncidentStatus.underReview);
+      }
       notifyListeners();
       return true;
     } catch (e) {
@@ -228,6 +235,12 @@ class IncidentProvider extends ChangeNotifier {
       );
       _pendingCommunityIncidents =
           _pendingCommunityIncidents.where((i) => i.id != id).toList();
+      // Optimistic update so the list reflects dismissed status immediately.
+      final idx = _communityIncidents.indexWhere((i) => i.id == id);
+      if (idx != -1) {
+        _communityIncidents[idx] =
+            _communityIncidents[idx].copyWith(status: IncidentStatus.dismissed);
+      }
       notifyListeners();
       return true;
     } catch (e) {
@@ -466,6 +479,16 @@ class IncidentProvider extends ChangeNotifier {
     IncidentStatus status, {
     String? note,
   }) async {
+    // Optimistic update so cards reflect the new status immediately
+    _incidents = _incidents
+        .map((i) => i.id == id ? i.copyWith(status: status) : i)
+        .toList();
+    _communityIncidents = _communityIncidents
+        .map((i) => i.id == id ? i.copyWith(status: status) : i)
+        .toList();
+    _filteredCache = null;
+    notifyListeners();
+
     try {
       await _repository.updateStatus(id, status, note: note);
     } catch (e) {

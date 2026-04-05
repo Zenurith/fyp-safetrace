@@ -19,6 +19,7 @@ class CommunityProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   StreamSubscription? _communitiesSubscription;
+  StreamSubscription? _pendingRequestsSubscription;
   double? _userLat;
   double? _userLng;
   List<CommunityMemberModel>? _cachedMembers;
@@ -59,6 +60,7 @@ class CommunityProvider extends ChangeNotifier {
   @override
   void dispose() {
     _communitiesSubscription?.cancel();
+    _pendingRequestsSubscription?.cancel();
     super.dispose();
   }
 
@@ -209,6 +211,27 @@ class CommunityProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  void watchPendingRequests(String communityId) {
+    _pendingRequestsSubscription?.cancel();
+    _pendingRequestsSubscription =
+        _repository.watchPendingRequests(communityId).listen(
+      (requests) {
+        _pendingRequests = requests;
+        notifyListeners();
+      },
+      onError: (e) {
+        _error = e.toString();
+        notifyListeners();
+      },
+    );
+  }
+
+  void stopWatchingPendingRequests() {
+    _pendingRequestsSubscription?.cancel();
+    _pendingRequestsSubscription = null;
+    _pendingRequests = [];
   }
 
   Future<void> loadPendingRequests(String communityId) async {

@@ -34,6 +34,7 @@ class _CommunityManagerScreenState extends State<CommunityManagerScreen>
   late TabController _tabController;
   late final FlagProvider _flagProvider;
   late final IncidentProvider _incidentProvider;
+  late final CommunityProvider _communityProvider;
   // Incrementing this causes _MembersTab to rebuild with a new Key, resetting
   // its state and triggering a fresh member list load.
   int _membersReloadKey = 0;
@@ -44,11 +45,13 @@ class _CommunityManagerScreenState extends State<CommunityManagerScreen>
     _tabController = TabController(length: 4, vsync: this);
     _flagProvider = context.read<FlagProvider>();
     _incidentProvider = context.read<IncidentProvider>();
-    _loadData();
+    _communityProvider = context.read<CommunityProvider>();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _communityProvider.watchPendingRequests(widget.communityId);
       _flagProvider.startListeningFlagsByCommunity(widget.communityId);
       _incidentProvider.watchPendingCommunityIncidents(widget.communityId);
       _incidentProvider.watchCommunityIncidents(widget.communityId);
+      if (mounted) setState(() => _membersReloadKey++);
     });
   }
 
@@ -56,13 +59,8 @@ class _CommunityManagerScreenState extends State<CommunityManagerScreen>
   void dispose() {
     _tabController.dispose();
     _flagProvider.stopListeningCommunityFlags();
+    _communityProvider.stopWatchingPendingRequests();
     super.dispose();
-  }
-
-  Future<void> _loadData() async {
-    final provider = context.read<CommunityProvider>();
-    await provider.loadPendingRequests(widget.communityId);
-    if (mounted) setState(() => _membersReloadKey++);
   }
 
   @override
@@ -195,7 +193,6 @@ class _CommunityManagerScreenState extends State<CommunityManagerScreen>
         children: [
           _PendingRequestsTab(
             communityId: widget.communityId,
-            onRefresh: _loadData,
           ),
             _AllIncidentsTab(communityId: widget.communityId),
           _MembersTab(

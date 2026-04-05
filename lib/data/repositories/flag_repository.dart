@@ -63,6 +63,21 @@ class FlagRepository {
     });
   }
 
+  Future<void> escalate(
+    String id, {
+    required String escalatedBy,
+    String? note,
+  }) async {
+    await _collection.doc(id).update({
+      'status': FlagStatus.reviewed.index,
+      'escalatedToAdmin': true,
+      'escalatedBy': escalatedBy,
+      'resolvedAt': Timestamp.now(),
+      'resolvedBy': escalatedBy,
+      'resolutionNote': note,
+    });
+  }
+
   Future<void> delete(String id) async {
     await _collection.doc(id).delete();
   }

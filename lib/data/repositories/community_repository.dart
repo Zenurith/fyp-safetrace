@@ -292,6 +292,21 @@ class CommunityRepository {
     await batch.commit();
   }
 
+  /// Real-time stream of pending join requests for a community.
+  Stream<List<CommunityMemberModel>> watchPendingRequests(String communityId) {
+    return _membersCollection
+        .where('communityId', isEqualTo: communityId)
+        .where('status', isEqualTo: MemberStatus.pending.index)
+        .snapshots()
+        .map((snapshot) {
+      final results = snapshot.docs
+          .map((doc) => CommunityMemberModel.fromMap(doc.data(), doc.id))
+          .toList();
+      results.sort((a, b) => b.requestedAt.compareTo(a.requestedAt));
+      return results;
+    });
+  }
+
   /// Get all pending requests for a community (for staff view).
   Future<List<CommunityMemberModel>> getPendingRequests(
       String communityId) async {

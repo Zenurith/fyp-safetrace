@@ -33,6 +33,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late final IncidentProvider _incidentProvider;
+  late final CommunityProvider _communityProvider;
   bool _isLoading = true;
 
   @override
@@ -40,6 +41,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _incidentProvider = context.read<IncidentProvider>();
+    _communityProvider = context.read<CommunityProvider>();
     _loadCommunity();
   }
 
@@ -47,6 +49,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
   void dispose() {
     _tabController.dispose();
     _incidentProvider.stopWatchingPendingCommunityIncidents();
+    _communityProvider.stopWatchingPendingRequests();
     super.dispose();
   }
 
@@ -56,12 +59,11 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
     final userId = context.read<UserProvider>().currentUser?.id;
     if (userId == null) return;
 
-    final provider = context.read<CommunityProvider>();
-    await provider.loadCommunityDetails(widget.communityId, userId);
-    final m = provider.currentMembership;
+    await _communityProvider.loadCommunityDetails(widget.communityId, userId);
+    final m = _communityProvider.currentMembership;
 
     if (m?.isStaff == true && m?.isApproved == true) {
-      await provider.loadPendingRequests(widget.communityId);
+      _communityProvider.watchPendingRequests(widget.communityId);
       _incidentProvider.watchPendingCommunityIncidents(widget.communityId);
     }
 

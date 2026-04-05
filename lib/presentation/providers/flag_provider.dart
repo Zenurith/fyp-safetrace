@@ -26,6 +26,17 @@ class FlagProvider extends ChangeNotifier {
   List<FlagModel> get communityFlags => _communityFlags;
   int get communityPendingCount => _communityPendingCount;
 
+  /// User-type flags that community staff have escalated to system admin
+  /// and are still awaiting admin action (status == reviewed).
+  List<FlagModel> get escalatedFlags => _flags
+      .where((f) =>
+          f.escalatedToAdmin && f.status == FlagStatus.reviewed)
+      .toList()
+    ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+  /// Combined count for the admin sidebar badge.
+  int get totalAdminPendingCount => _pendingCount + escalatedFlags.length;
+
   void startListening() {
     _flagsSubscription?.cancel();
     _flagsSubscription = _repository.watchAll().listen(
@@ -250,6 +261,43 @@ class FlagProvider extends ChangeNotifier {
         _communityPendingCount =
             _communityFlags.where((f) => f.status == FlagStatus.pending).length;
       }
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> escalateToAdmin(
+    String id, {
+    required String escalatedBy,
+    String? note,
+  }) async {
+    try {
+      await _repository.escalate(id, escalatedBy: escalatedBy, note: note);
+      final now = DateTime.now();
+      void patchList(List<FlagModel> list) {
+        final idx = list.indexWhere((f) => f.id == id);
+        if (idx != -1) {
+          list[idx] = list[idx].copyWith(
+            status: FlagStatus.reviewed,
+            escalatedToAdmin: true,
+            escalatedBy: escalatedBy,
+            resolvedAt: now,
+            resolvedBy: escalatedBy,
+            resolutionNote: note,
+          );
+        }
+      }
+      patchList(_flags);
+      patchList(_communityFlags);
+      _pendingFlags.removeWhere((f) => f.id == id);
+      _pendingCount =
+          _pendingFlags.where((f) => f.targetType == FlagTargetType.community).length;
+      _communityPendingCount =
+          _communityFlags.where((f) => f.status == FlagStatus.pending).length;
       notifyListeners();
       return true;
     } catch (e) {

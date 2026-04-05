@@ -23,7 +23,7 @@ class _FlagsManagementPageState extends State<FlagsManagementPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
 
     // Start listening to flags
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -42,13 +42,18 @@ class _FlagsManagementPageState extends State<FlagsManagementPage>
   @override
   Widget build(BuildContext context) {
     final flagProvider = context.watch<FlagProvider>();
-    // Admin panel shows community reports only.
-    // Incident/comment/user flags are handled by community managers.
-    final allFlags = flagProvider.flags
+    // Community-type flags reviewed by admin.
+    final communityFlags = flagProvider.flags
         .where((f) => f.targetType == FlagTargetType.community)
         .toList();
-    final pendingFlags = allFlags.where((f) => f.status == FlagStatus.pending).toList();
-    final reviewedFlags = allFlags.where((f) => f.status != FlagStatus.pending).toList();
+    // User flags escalated by community staff — pending admin action.
+    final escalatedFlags = flagProvider.escalatedFlags;
+    final pendingFlags =
+        communityFlags.where((f) => f.status == FlagStatus.pending).toList();
+    final reviewedFlags =
+        communityFlags.where((f) => f.status != FlagStatus.pending).toList();
+    final allFlags = [...communityFlags, ...escalatedFlags
+        .where((f) => f.status == FlagStatus.resolved || f.status == FlagStatus.dismissed)];
 
     return Column(
       children: [
@@ -105,6 +110,32 @@ class _FlagsManagementPageState extends State<FlagsManagementPage>
                   ],
                 ),
               ),
+              Tab(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Escalated'),
+                    if (escalatedFlags.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryDark,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${escalatedFlags.length}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
               Tab(text: 'Reviewed (${reviewedFlags.length})'),
               Tab(text: 'All (${allFlags.length})'),
             ],
@@ -119,6 +150,7 @@ class _FlagsManagementPageState extends State<FlagsManagementPage>
                   controller: _tabController,
                   children: [
                     _FlagsList(flags: pendingFlags, showActions: true),
+                    _EscalatedFlagsList(flags: escalatedFlags),
                     _FlagsList(flags: reviewedFlags, showActions: false),
                     _FlagsList(flags: allFlags, showActions: false),
                   ],
@@ -727,6 +759,374 @@ class _FlagCardState extends State<_FlagCard> {
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.textSecondary),
             child: const Text('Dismiss'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Escalated flags list ──────────────────────────────────────────────────────
+
+class _EscalatedFlagsList extends StatelessWidget {
+  final List<FlagModel> flags;
+
+  const _EscalatedFlagsList({required this.flags});
+
+  @override
+  Widget build(BuildContext context) {
+    if (flags.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.admin_panel_settings_outlined,
+                size: 64,
+                color: AppTheme.textSecondary.withValues(alpha: 0.5)),
+            const SizedBox(height: 16),
+            Text('No escalated reports',
+                style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary)),
+            const SizedBox(height: 4),
+            Text('Community managers have not escalated any user reports.',
+                style: AppTheme.caption.copyWith(color: AppTheme.textSecondary)),
+          ],
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.all(24),
+      itemCount: flags.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (context, index) =>
+          _EscalatedFlagCard(flag: flags[index]),
+    );
+  }
+}
+
+class _EscalatedFlagCard extends StatelessWidget {
+  final FlagModel flag;
+
+  const _EscalatedFlagCard({required this.flag});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: AppTheme.cardDecorationFor(context),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Header ──────────────────────────────────────────────────────────
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryDark.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.admin_panel_settings_outlined,
+                    color: AppTheme.primaryDark, size: 22),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text('User Report — Escalated',
+                            style: AppTheme.headingSmall
+                                .copyWith(color: AppTheme.primaryDark)),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryDark.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                                color:
+                                    AppTheme.primaryDark.withValues(alpha: 0.3)),
+                          ),
+                          child: const Text(
+                            'ESCALATED',
+                            style: TextStyle(
+                              fontFamily: AppTheme.fontFamily,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.primaryDark,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Escalated by community staff · ${flag.timeAgo}',
+                      style:
+                          AppTheme.caption.copyWith(color: AppTheme.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+              // Actions
+              TextButton(
+                onPressed: () => _showResolveDialog(context),
+                style: TextButton.styleFrom(foregroundColor: AppTheme.successGreen),
+                child: const Text('Resolve',
+                    style: TextStyle(
+                        fontFamily: AppTheme.fontFamily,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12)),
+              ),
+              TextButton(
+                onPressed: () => _showDismissDialog(context),
+                style: TextButton.styleFrom(foregroundColor: AppTheme.textSecondary),
+                child: const Text('Dismiss',
+                    style: TextStyle(
+                        fontFamily: AppTheme.fontFamily,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // ── Original report reason ────────────────────────────────────────
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.backgroundGrey,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Report Reason',
+                    style: AppTheme.caption.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textSecondary)),
+                const SizedBox(height: 4),
+                Text(flag.reason,
+                    style: AppTheme.bodyMedium
+                        .copyWith(color: AppTheme.primaryDark)),
+                if (flag.details != null && flag.details!.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(flag.details!,
+                      style: AppTheme.bodyMedium
+                          .copyWith(color: AppTheme.textSecondary)),
+                ],
+              ],
+            ),
+          ),
+
+          // ── Escalation note ──────────────────────────────────────────────
+          if (flag.resolutionNote != null &&
+              flag.resolutionNote!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryDark.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                    color: AppTheme.primaryDark.withValues(alpha: 0.2)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Staff Escalation Note',
+                      style: AppTheme.caption.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.primaryDark)),
+                  const SizedBox(height: 4),
+                  Text(flag.resolutionNote!,
+                      style: AppTheme.bodyMedium
+                          .copyWith(color: AppTheme.primaryDark)),
+                ],
+              ),
+            ),
+          ],
+
+          // ── Context IDs ──────────────────────────────────────────────────
+          const SizedBox(height: 8),
+          _ContextRow(label: 'User ID', value: flag.targetId),
+          if (flag.communityId != null)
+            _ContextRow(label: 'Community ID', value: flag.communityId!),
+          if (flag.escalatedBy != null)
+            _ContextRow(label: 'Escalated by', value: flag.escalatedBy!),
+        ],
+      ),
+    );
+  }
+
+  void _showResolveDialog(BuildContext context) {
+    final noteController = TextEditingController();
+    final currentUser = context.read<UserProvider>().currentUser;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text('Resolve Escalated Report', style: AppTheme.headingMedium),
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Mark as resolved. Record the action taken on the user\'s account.',
+                style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: noteController,
+                style: AppTheme.bodyMedium,
+                decoration: InputDecoration(
+                  labelText: 'Resolution Note',
+                  hintText: 'e.g. Account suspended for 7 days.',
+                  labelStyle: AppTheme.caption,
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: AppTheme.cardBorder)),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: AppTheme.cardBorder)),
+                ),
+                maxLines: 3,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel',
+                style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final ok = await context.read<FlagProvider>().resolveFlag(
+                    flag.id,
+                    resolvedBy: currentUser?.id,
+                    note: noteController.text.trim().isEmpty
+                        ? null
+                        : noteController.text.trim(),
+                  );
+              if (ok && context.mounted) {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  content: Text('Report resolved'),
+                  backgroundColor: AppTheme.successGreen,
+                ));
+              }
+            },
+            style:
+                ElevatedButton.styleFrom(backgroundColor: AppTheme.successGreen),
+            child: const Text('Resolve'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDismissDialog(BuildContext context) {
+    final noteController = TextEditingController();
+    final currentUser = context.read<UserProvider>().currentUser;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text('Dismiss Escalated Report', style: AppTheme.headingMedium),
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Dismiss without action. Use this if the escalation was unwarranted.',
+                style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: noteController,
+                style: AppTheme.bodyMedium,
+                decoration: InputDecoration(
+                  labelText: 'Reason for Dismissal',
+                  hintText: 'Why is this escalation being dismissed...',
+                  labelStyle: AppTheme.caption,
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: AppTheme.cardBorder)),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: AppTheme.cardBorder)),
+                ),
+                maxLines: 3,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel',
+                style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final ok = await context.read<FlagProvider>().dismissFlag(
+                    flag.id,
+                    resolvedBy: currentUser?.id,
+                    note: noteController.text.trim().isEmpty
+                        ? null
+                        : noteController.text.trim(),
+                  );
+              if (ok && context.mounted) {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  content: Text('Report dismissed'),
+                  backgroundColor: AppTheme.textSecondary,
+                ));
+              }
+            },
+            style:
+                ElevatedButton.styleFrom(backgroundColor: AppTheme.textSecondary),
+            child: const Text('Dismiss'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ContextRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _ContextRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 2),
+      child: Row(
+        children: [
+          Text('$label: ',
+              style: AppTheme.caption.copyWith(color: AppTheme.textSecondary)),
+          Expanded(
+            child: Text(
+              value,
+              style: AppTheme.caption.copyWith(
+                  fontFamily: 'monospace', color: AppTheme.textSecondary),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),
