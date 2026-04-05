@@ -338,6 +338,19 @@ class CommunityRepository {
         .toList();
   }
 
+  /// Real-time stream of approved members — used by the manager Members tab
+  /// so role changes made by any manager propagate instantly.
+  Stream<List<CommunityMemberModel>> watchCommunityMembers(
+      String communityId) {
+    return _membersCollection
+        .where('communityId', isEqualTo: communityId)
+        .where('status', isEqualTo: MemberStatus.approved.index)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => CommunityMemberModel.fromMap(doc.data(), doc.id))
+            .toList());
+  }
+
   /// Check if a user is an approved member of a community.
   Future<bool> isMember(String communityId, String userId) async {
     final snapshot = await _membersCollection

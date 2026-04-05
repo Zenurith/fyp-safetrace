@@ -23,6 +23,7 @@ class _MembersTabState extends State<_MembersTab>
   final Map<String, UserModel?> _users = {};
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  StreamSubscription<List<CommunityMemberModel>>? _membersSubscription;
 
   @override
   void initState() {
@@ -30,29 +31,39 @@ class _MembersTabState extends State<_MembersTab>
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text.toLowerCase());
     });
-    _loadMembers();
+    _subscribeToMembers();
+  }
+
+  void _subscribeToMembers() {
+    _membersSubscription?.cancel();
+    _membersSubscription = CommunityRepository()
+        .watchCommunityMembers(widget.communityId)
+        .listen((members) {
+      if (!mounted) return;
+      // Fetch profiles for any members not yet in the cache
+      final newIds = members
+          .map((m) => m.userId)
+          .where((id) => !_users.containsKey(id))
+          .toList();
+      setState(() {
+        _members = members;
+        _isLoading = false;
+      });
+      if (newIds.isNotEmpty) {
+        context.read<UserProvider>().getUsersByIds(newIds).then((fetched) {
+          if (mounted) setState(() => _users.addAll(fetched));
+        });
+      }
+    }, onError: (_) {
+      if (mounted) setState(() => _isLoading = false);
+    });
   }
 
   @override
   void dispose() {
+    _membersSubscription?.cancel();
     _searchController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadMembers() async {
-    final provider = context.read<CommunityProvider>();
-    final members = await provider.getCommunityMembers(widget.communityId);
-    if (!mounted) return;
-    setState(() {
-      _members = members;
-      _isLoading = false;
-    });
-    if (members.isNotEmpty) {
-      final ids = members.map((m) => m.userId).toList();
-      context.read<UserProvider>().getUsersByIds(ids).then((fetched) {
-        if (mounted) setState(() => _users.addAll(fetched));
-      });
-    }
   }
 
   void _reload() {
@@ -60,7 +71,7 @@ class _MembersTabState extends State<_MembersTab>
       _isLoading = true;
       _users.clear();
     });
-    _loadMembers();
+    _subscribeToMembers();
   }
 
   @override
@@ -121,13 +132,7 @@ class _MembersTabState extends State<_MembersTab>
         ),
         Expanded(
           child: RefreshIndicator(
-            onRefresh: () async {
-              setState(() {
-                _isLoading = true;
-                _users.clear();
-              });
-              await _loadMembers();
-            },
+            onRefresh: () async => _reload(),
             child: filtered.isEmpty
                 ? const Center(child: Text('No members match your search'))
                 : ListView.separated(

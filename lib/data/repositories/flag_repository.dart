@@ -103,6 +103,17 @@ class FlagRepository {
         });
   }
 
+  Future<List<FlagModel>> getFlagsByCommunity(String communityId) async {
+    final snapshot = await _collection
+        .where('communityId', isEqualTo: communityId)
+        .get(const GetOptions(source: Source.server));
+    final flags = snapshot.docs
+        .map((doc) => FlagModel.fromMap(doc.data(), doc.id))
+        .toList();
+    flags.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return flags;
+  }
+
   Future<int> getPendingFlagCountByCommunity(String communityId) async {
     final snapshot = await _collection
         .where('communityId', isEqualTo: communityId)

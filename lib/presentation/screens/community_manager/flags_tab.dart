@@ -28,11 +28,16 @@ class _CommunityFlagsTab extends StatelessWidget {
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: flags.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (_, i) => _FlagCard(flag: flags[i], communityId: communityId),
+    return RefreshIndicator(
+      color: AppTheme.primaryRed,
+      onRefresh: () => context.read<FlagProvider>().refreshCommunityFlags(),
+      child: ListView.separated(
+        padding: const EdgeInsets.all(16),
+        itemCount: flags.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        itemBuilder: (_, i) =>
+            _FlagCard(flag: flags[i], communityId: communityId),
+      ),
     );
   }
 }

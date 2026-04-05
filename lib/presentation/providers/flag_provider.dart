@@ -17,6 +17,7 @@ class FlagProvider extends ChangeNotifier {
   List<FlagModel> _communityFlags = [];
   int _communityPendingCount = 0;
   StreamSubscription? _communityFlagsSubscription;
+  String? _activeCommunityId;
 
   List<FlagModel> get flags => _flags;
   List<FlagModel> get pendingFlags => _pendingFlags;
@@ -72,7 +73,10 @@ class FlagProvider extends ChangeNotifier {
   }
 
   void startListeningFlagsByCommunity(String communityId) {
+    // Always restart the subscription — this ensures a fresh server connection
+    // even if the same communityId was already active (e.g. after a reconnect).
     _communityFlagsSubscription?.cancel();
+    _activeCommunityId = communityId;
     _communityFlagsSubscription =
         _repository.watchFlagsByCommunity(communityId).listen(
       (flags) {
@@ -84,6 +88,12 @@ class FlagProvider extends ChangeNotifier {
       onError: (e) {
         _error = e.toString();
         notifyListeners();
+        // Auto-reconnect after stream error so manager B stays in sync
+        Future.delayed(const Duration(seconds: 3), () {
+          if (_activeCommunityId == communityId) {
+            startListeningFlagsByCommunity(communityId);
+          }
+        });
       },
     );
   }
@@ -91,8 +101,26 @@ class FlagProvider extends ChangeNotifier {
   void stopListeningCommunityFlags() {
     _communityFlagsSubscription?.cancel();
     _communityFlagsSubscription = null;
+    _activeCommunityId = null;
     _communityFlags = [];
     _communityPendingCount = 0;
+  }
+
+  /// Force-fetch the latest flags directly from Firestore, bypassing the
+  /// stream cache. Useful for pull-to-refresh.
+  Future<void> refreshCommunityFlags() async {
+    if (_activeCommunityId == null) return;
+    try {
+      final flags =
+          await _repository.getFlagsByCommunity(_activeCommunityId!);
+      _communityFlags = flags;
+      _communityPendingCount =
+          flags.where((f) => f.status == FlagStatus.pending).length;
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+    }
   }
 
   Future<void> refreshCommunityPendingCount(String communityId) async {

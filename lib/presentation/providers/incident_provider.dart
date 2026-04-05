@@ -152,7 +152,8 @@ class IncidentProvider extends ChangeNotifier {
   }
 
   void watchCommunityIncidents(String communityId) {
-    if (_activeCommunityId == communityId) return;
+    // No guard — always restart so both pending and community streams stay in
+    // sync (watchPendingCommunityIncidents also has no guard).
     _activeCommunityId = communityId;
     _communitySubscription?.cancel();
     _communityIncidents = [];
@@ -168,6 +169,23 @@ class IncidentProvider extends ChangeNotifier {
         notifyListeners();
       },
     );
+  }
+
+  /// Force a server-side fetch of all community incidents, bypassing the
+  /// stream cache. Call this when the Incidents tab becomes visible so
+  /// incidents submitted by other users are never missed.
+  Future<void> refreshCommunityIncidents() async {
+    if (_activeCommunityId == null) return;
+    try {
+      final incidents =
+          await _repository.getCommunityIncidentsFromServer(_activeCommunityId!);
+      _communityIncidents = incidents;
+      _filteredCache = null;
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+    }
   }
 
   void watchPendingCommunityIncidents(String communityId) {

@@ -67,6 +67,20 @@ class IncidentRepository {
             .toList());
   }
 
+  /// Fetch all incidents for a community directly from the server, bypassing
+  /// the local cache. Used by the Incidents tab on focus so a device that
+  /// missed a real-time push always sees the latest state.
+  Future<List<IncidentModel>> getCommunityIncidentsFromServer(
+      String communityId) async {
+    final snapshot = await _incidentsCollection
+        .where('communityIds', arrayContains: communityId)
+        .orderBy('reportedAt', descending: true)
+        .get(const GetOptions(source: Source.server));
+    return snapshot.docs
+        .map((doc) => IncidentModel.fromMap(doc.data(), doc.id))
+        .toList();
+  }
+
   /// Get recent incidents only (last 7 days)
   Future<List<IncidentModel>> getAll() async {
     final cutoff = DateTime.now().subtract(const Duration(days: maxIncidentAgeDays));

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../data/models/community_member_model.dart';
@@ -46,6 +47,8 @@ class _CommunityManagerScreenState extends State<CommunityManagerScreen>
     _flagProvider = context.read<FlagProvider>();
     _incidentProvider = context.read<IncidentProvider>();
     _communityProvider = context.read<CommunityProvider>();
+    // Refresh Reports from server whenever the user switches to that tab
+    _tabController.addListener(_onTabChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _communityProvider.watchPendingRequests(widget.communityId);
       _flagProvider.startListeningFlagsByCommunity(widget.communityId);
@@ -55,8 +58,24 @@ class _CommunityManagerScreenState extends State<CommunityManagerScreen>
     });
   }
 
+  void _onTabChanged() {
+    if (_tabController.indexIsChanging) return;
+    // Force a server-side refresh when switching to Incidents (1) or
+    // Reports (3) so stale cache / missed push-updates from another device
+    // are immediately corrected.
+    switch (_tabController.index) {
+      case 1:
+        _incidentProvider.refreshCommunityIncidents();
+        break;
+      case 3:
+        _flagProvider.refreshCommunityFlags();
+        break;
+    }
+  }
+
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     _flagProvider.stopListeningCommunityFlags();
     _communityProvider.stopWatchingPendingRequests();
