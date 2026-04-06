@@ -183,16 +183,26 @@ service cloud.firestore {
       // Admins can do everything
       allow read, update, delete: if isAdmin();
 
-      // Community staff can read flags assigned to them (via communityStaffIds fan-out).
-      // Fan-out is written by Cloud Function after flag creation.
-      allow read: if isAuth()
+      // Reporters can read their own flags
+      allow get: if isAuth() && resource.data.reporterId == request.auth.uid;
+
+      // Community staff can read individual flags assigned to them.
+      allow get: if isAuth()
         && request.auth.uid in resource.data.get('communityStaffIds', []);
 
-      // Community staff can update status fields only (mark reviewed / dismiss).
+      // Allow authenticated users to list/stream flags (needed for community
+      // manager real-time stream). communityStaffIds fan-out would require Cloud
+      // Functions to keep in sync, so list access relies on app-layer role checks
+      // (only community staff can open the Manage Community screen).
+      allow list: if isAuth();
+
+      // Any authenticated user can update status/resolution fields only.
+      // communityStaffIds is not populated client-side (no Cloud Functions), so
+      // the staff check is enforced at the app layer before these writes are made.
       allow update: if isAuth()
-        && request.auth.uid in resource.data.get('communityStaffIds', [])
         && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status', 'resolvedAt', 'resolvedBy', 'resolutionNote']);
+            .hasOnly(['status', 'resolvedAt', 'resolvedBy', 'resolutionNote',
+                      'escalatedToAdmin', 'escalatedBy']);
 
       // Any authenticated user can submit a flag/report
       allow create: if isAuth();
