@@ -53,11 +53,12 @@ class _FlagsManagementPageState extends State<FlagsManagementPage>
         communityFlags.where((f) => f.status == FlagStatus.pending).toList();
     final reviewedFlags =
         communityFlags.where((f) => f.status != FlagStatus.pending).toList();
-    // All community flags + all escalated flags (any status).
+    // All community flags + all escalated flags (any status), sorted newest first.
     final allEscalated = flagProvider.flags
         .where((f) => f.escalatedToAdmin)
         .toList();
-    final allFlags = [...communityFlags, ...allEscalated];
+    final allFlags = [...communityFlags, ...allEscalated]
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
     return Column(
       children: [

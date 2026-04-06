@@ -6,6 +6,7 @@ import '../../data/models/incident_model.dart';
 import '../../data/models/user_model.dart';
 import '../../utils/app_theme.dart';
 import '../providers/community_provider.dart';
+import '../providers/flag_provider.dart';
 import '../providers/incident_provider.dart';
 import '../providers/user_provider.dart';
 import '../widgets/flag_dialog.dart';
@@ -34,6 +35,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
   late TabController _tabController;
   late final IncidentProvider _incidentProvider;
   late final CommunityProvider _communityProvider;
+  late final FlagProvider _flagProvider;
   bool _isLoading = true;
 
   @override
@@ -42,6 +44,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
     _tabController = TabController(length: 3, vsync: this);
     _incidentProvider = context.read<IncidentProvider>();
     _communityProvider = context.read<CommunityProvider>();
+    _flagProvider = context.read<FlagProvider>();
     _loadCommunity();
   }
 
@@ -50,6 +53,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
     _tabController.dispose();
     _incidentProvider.stopWatchingPendingCommunityIncidents();
     _communityProvider.stopWatchingPendingRequests();
+    _flagProvider.stopListeningCommunityFlags();
     super.dispose();
   }
 
@@ -65,6 +69,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
     if (m?.isStaff == true && m?.isApproved == true) {
       _communityProvider.watchPendingRequests(widget.communityId);
       _incidentProvider.watchPendingCommunityIncidents(widget.communityId);
+      _flagProvider.startListeningFlagsByCommunity(widget.communityId);
     }
 
     if (mounted) {
@@ -319,7 +324,8 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
                 Builder(builder: (context) {
                   final pendingCount =
                       provider.pendingRequests.length +
-                      context.watch<IncidentProvider>().pendingCommunityIncidents.length;
+                      context.watch<IncidentProvider>().pendingCommunityIncidents.length +
+                      context.watch<FlagProvider>().communityPendingCount;
                   if (pendingCount == 0) return const SizedBox.shrink();
                   return Positioned(
                     right: 6,
