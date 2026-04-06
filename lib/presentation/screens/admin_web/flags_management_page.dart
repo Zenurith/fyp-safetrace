@@ -5,6 +5,7 @@ import '../../../data/models/community_model.dart';
 import '../../../data/models/flag_model.dart';
 import '../../../data/repositories/audit_log_repository.dart';
 import '../../../data/repositories/community_repository.dart';
+import '../../../data/repositories/user_repository.dart';
 import '../../../utils/app_theme.dart';
 import '../../providers/flag_provider.dart';
 import '../../providers/user_provider.dart';
@@ -52,8 +53,11 @@ class _FlagsManagementPageState extends State<FlagsManagementPage>
         communityFlags.where((f) => f.status == FlagStatus.pending).toList();
     final reviewedFlags =
         communityFlags.where((f) => f.status != FlagStatus.pending).toList();
-    final allFlags = [...communityFlags, ...escalatedFlags
-        .where((f) => f.status == FlagStatus.resolved || f.status == FlagStatus.dismissed)];
+    // All community flags + all escalated flags (any status).
+    final allEscalated = flagProvider.flags
+        .where((f) => f.escalatedToAdmin)
+        .toList();
+    final allFlags = [...communityFlags, ...allEscalated];
 
     return Column(
       children: [
@@ -650,12 +654,12 @@ class _FlagCardState extends State<_FlagCard> {
           ),
           ElevatedButton(
             onPressed: () async {
+              final note = noteController.text.trim();
+              Navigator.pop(ctx);
               final success = await context.read<FlagProvider>().resolveFlag(
                     widget.flag.id,
                     resolvedBy: currentUser?.id,
-                    note: noteController.text.trim().isEmpty
-                        ? null
-                        : noteController.text.trim(),
+                    note: note.isEmpty ? null : note,
                   );
               if (success && context.mounted) {
                 if (currentUser != null) {
@@ -666,13 +670,12 @@ class _FlagCardState extends State<_FlagCard> {
                     action: 'Resolved flag',
                     targetType: 'flag',
                     targetId: widget.flag.id,
-                    detail: noteController.text.trim().isEmpty
+                    detail: note.isEmpty
                         ? 'Reason: ${widget.flag.reason}'
-                        : noteController.text.trim(),
+                        : note,
                     timestamp: DateTime.now(),
                   ));
                 }
-                Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Flag resolved'),
@@ -740,15 +743,28 @@ class _FlagCardState extends State<_FlagCard> {
           ),
           ElevatedButton(
             onPressed: () async {
+              final note = noteController.text.trim();
+              Navigator.pop(ctx);
               final success = await context.read<FlagProvider>().dismissFlag(
                     widget.flag.id,
                     resolvedBy: currentUser?.id,
-                    note: noteController.text.trim().isEmpty
-                        ? null
-                        : noteController.text.trim(),
+                    note: note.isEmpty ? null : note,
                   );
               if (success && context.mounted) {
-                Navigator.pop(ctx);
+                if (currentUser != null) {
+                  AuditLogRepository().create(AuditLogModel(
+                    id: '',
+                    adminId: currentUser.id,
+                    adminName: currentUser.name,
+                    action: 'Dismissed flag',
+                    targetType: 'flag',
+                    targetId: widget.flag.id,
+                    detail: note.isEmpty
+                        ? 'Reason: ${widget.flag.reason}'
+                        : note,
+                    timestamp: DateTime.now(),
+                  ));
+                }
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Flag dismissed'),
@@ -874,6 +890,24 @@ class _EscalatedFlagCard extends StatelessWidget {
               ),
               // Actions
               TextButton(
+                onPressed: () => _showTempBanDialog(context),
+                style: TextButton.styleFrom(foregroundColor: AppTheme.warningOrange),
+                child: const Text('Temp Ban',
+                    style: TextStyle(
+                        fontFamily: AppTheme.fontFamily,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12)),
+              ),
+              TextButton(
+                onPressed: () => _showPermaBanDialog(context),
+                style: TextButton.styleFrom(foregroundColor: AppTheme.primaryRed),
+                child: const Text('Perma Ban',
+                    style: TextStyle(
+                        fontFamily: AppTheme.fontFamily,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12)),
+              ),
+              TextButton(
                 onPressed: () => _showResolveDialog(context),
                 style: TextButton.styleFrom(foregroundColor: AppTheme.successGreen),
                 child: const Text('Resolve',
@@ -965,6 +999,256 @@ class _EscalatedFlagCard extends StatelessWidget {
     );
   }
 
+  void _showTempBanDialog(BuildContext context) {
+    final reasonController = TextEditingController();
+    final currentUser = context.read<UserProvider>().currentUser;
+    int selectedDays = 7;
+    const durations = [1, 3, 7, 14, 30];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: Text('Temporarily Suspend User',
+              style: AppTheme.headingMedium.copyWith(color: AppTheme.warningOrange)),
+          content: SizedBox(
+            width: 440,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'The user will be blocked from accessing SafeTrace for the selected period.',
+                  style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
+                ),
+                const SizedBox(height: 16),
+                Text('Suspension Duration',
+                    style: AppTheme.caption.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textSecondary)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: durations.map((days) {
+                    final selected = selectedDays == days;
+                    return ChoiceChip(
+                      label: Text('$days ${days == 1 ? 'day' : 'days'}',
+                          style: TextStyle(
+                            fontFamily: AppTheme.fontFamily,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                            color: selected ? Colors.white : AppTheme.primaryDark,
+                          )),
+                      selected: selected,
+                      selectedColor: AppTheme.warningOrange,
+                      backgroundColor: AppTheme.backgroundGrey,
+                      side: BorderSide(
+                          color: selected
+                              ? AppTheme.warningOrange
+                              : AppTheme.cardBorder),
+                      onSelected: (_) => setModalState(() => selectedDays = days),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: reasonController,
+                  style: AppTheme.bodyMedium,
+                  decoration: InputDecoration(
+                    labelText: 'Reason',
+                    hintText: 'Describe the behaviour that warrants suspension...',
+                    labelStyle: AppTheme.caption,
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: AppTheme.cardBorder)),
+                    enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: AppTheme.cardBorder)),
+                  ),
+                  maxLines: 3,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Cancel',
+                  style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final reason = reasonController.text.trim().isEmpty
+                    ? 'Suspended by administrator.'
+                    : reasonController.text.trim();
+                final until = DateTime.now().add(Duration(days: selectedDays));
+                final days = selectedDays;
+                Navigator.pop(ctx);
+                try {
+                  await UserRepository().suspendUser(flag.targetId, until);
+                  if (!context.mounted) return;
+                  final note =
+                      'User suspended for $days ${days == 1 ? 'day' : 'days'}. $reason';
+                  await context.read<FlagProvider>().resolveFlag(
+                        flag.id,
+                        resolvedBy: currentUser?.id,
+                        note: note,
+                      );
+                  if (currentUser != null && context.mounted) {
+                    AuditLogRepository().create(AuditLogModel(
+                      id: '',
+                      adminId: currentUser.id,
+                      adminName: currentUser.name,
+                      action: 'Suspended user ($days days)',
+                      targetType: 'user',
+                      targetId: flag.targetId,
+                      detail: note,
+                      timestamp: DateTime.now(),
+                    ));
+                  }
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(
+                          'User suspended for $days ${days == 1 ? 'day' : 'days'}'),
+                      backgroundColor: AppTheme.warningOrange,
+                    ));
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text('Failed to suspend user: $e'),
+                      backgroundColor: AppTheme.primaryRed,
+                    ));
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.warningOrange),
+              child: const Text('Suspend User'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showPermaBanDialog(BuildContext context) {
+    final reasonController = TextEditingController();
+    final currentUser = context.read<UserProvider>().currentUser;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: Text('Permanently Ban User',
+              style: AppTheme.headingMedium.copyWith(color: AppTheme.primaryRed)),
+          content: SizedBox(
+            width: 440,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryRed.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: AppTheme.primaryRed.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded,
+                          color: AppTheme.primaryRed, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'This permanently blocks the user from SafeTrace. This action cannot be undone from this screen.',
+                          style: AppTheme.caption.copyWith(color: AppTheme.primaryRed),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: reasonController,
+                  style: AppTheme.bodyMedium,
+                  onChanged: (_) => setModalState(() {}),
+                  decoration: InputDecoration(
+                    labelText: 'Ban Reason (required)',
+                    hintText: 'Describe the behaviour that warrants a permanent ban...',
+                    labelStyle: AppTheme.caption,
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: AppTheme.cardBorder)),
+                    enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: AppTheme.cardBorder)),
+                  ),
+                  maxLines: 3,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Cancel',
+                  style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary)),
+            ),
+            ElevatedButton(
+              onPressed: reasonController.text.trim().isEmpty
+                  ? null
+                  : () async {
+                      final reason = reasonController.text.trim();
+                      Navigator.pop(ctx);
+                      try {
+                        await UserRepository().banUser(flag.targetId, reason);
+                        if (!context.mounted) return;
+                        final note = 'User permanently banned. $reason';
+                        await context.read<FlagProvider>().resolveFlag(
+                              flag.id,
+                              resolvedBy: currentUser?.id,
+                              note: note,
+                            );
+                        if (currentUser != null && context.mounted) {
+                          AuditLogRepository().create(AuditLogModel(
+                            id: '',
+                            adminId: currentUser.id,
+                            adminName: currentUser.name,
+                            action: 'Permanently banned user',
+                            targetType: 'user',
+                            targetId: flag.targetId,
+                            detail: note,
+                            timestamp: DateTime.now(),
+                          ));
+                        }
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                            content: Text('User permanently banned'),
+                            backgroundColor: AppTheme.primaryRed,
+                          ));
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text('Failed to ban user: $e'),
+                            backgroundColor: AppTheme.primaryRed,
+                          ));
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryRed),
+              child: const Text('Permanently Ban'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showResolveDialog(BuildContext context) {
     final noteController = TextEditingController();
     final currentUser = context.read<UserProvider>().currentUser;
@@ -1011,23 +1295,33 @@ class _EscalatedFlagCard extends StatelessWidget {
           ),
           ElevatedButton(
             onPressed: () async {
+              final note = noteController.text.trim();
+              Navigator.pop(ctx);
               final ok = await context.read<FlagProvider>().resolveFlag(
                     flag.id,
                     resolvedBy: currentUser?.id,
-                    note: noteController.text.trim().isEmpty
-                        ? null
-                        : noteController.text.trim(),
+                    note: note.isEmpty ? null : note,
                   );
               if (ok && context.mounted) {
-                Navigator.pop(ctx);
+                if (currentUser != null) {
+                  AuditLogRepository().create(AuditLogModel(
+                    id: '',
+                    adminId: currentUser.id,
+                    adminName: currentUser.name,
+                    action: 'Resolved escalated report',
+                    targetType: 'flag',
+                    targetId: flag.id,
+                    detail: note.isEmpty ? 'Reason: ${flag.reason}' : note,
+                    timestamp: DateTime.now(),
+                  ));
+                }
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                   content: Text('Report resolved'),
                   backgroundColor: AppTheme.successGreen,
                 ));
               }
             },
-            style:
-                ElevatedButton.styleFrom(backgroundColor: AppTheme.successGreen),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.successGreen),
             child: const Text('Resolve'),
           ),
         ],
@@ -1081,23 +1375,33 @@ class _EscalatedFlagCard extends StatelessWidget {
           ),
           ElevatedButton(
             onPressed: () async {
+              final note = noteController.text.trim();
+              Navigator.pop(ctx);
               final ok = await context.read<FlagProvider>().dismissFlag(
                     flag.id,
                     resolvedBy: currentUser?.id,
-                    note: noteController.text.trim().isEmpty
-                        ? null
-                        : noteController.text.trim(),
+                    note: note.isEmpty ? null : note,
                   );
               if (ok && context.mounted) {
-                Navigator.pop(ctx);
+                if (currentUser != null) {
+                  AuditLogRepository().create(AuditLogModel(
+                    id: '',
+                    adminId: currentUser.id,
+                    adminName: currentUser.name,
+                    action: 'Dismissed escalated report',
+                    targetType: 'flag',
+                    targetId: flag.id,
+                    detail: note.isEmpty ? 'Reason: ${flag.reason}' : note,
+                    timestamp: DateTime.now(),
+                  ));
+                }
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                   content: Text('Report dismissed'),
                   backgroundColor: AppTheme.textSecondary,
                 ));
               }
             },
-            style:
-                ElevatedButton.styleFrom(backgroundColor: AppTheme.textSecondary),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.textSecondary),
             child: const Text('Dismiss'),
           ),
         ],

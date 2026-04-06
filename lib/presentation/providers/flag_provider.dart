@@ -36,7 +36,15 @@ class FlagProvider extends ChangeNotifier {
     ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
   /// Combined count for the admin sidebar badge.
-  int get totalAdminPendingCount => _pendingCount + escalatedFlags.length;
+  /// Derived from _flags so it stays in sync with what the page shows.
+  int get totalAdminPendingCount {
+    final communityPending = _flags
+        .where((f) =>
+            f.targetType == FlagTargetType.community &&
+            f.status == FlagStatus.pending)
+        .length;
+    return communityPending + escalatedFlags.length;
+  }
 
   void startListening() {
     _flagsSubscription?.cancel();

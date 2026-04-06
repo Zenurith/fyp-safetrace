@@ -7,6 +7,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
+import 'data/models/user_model.dart';
 import 'data/services/push_notification_service.dart';
 import 'presentation/providers/incident_provider.dart';
 import 'presentation/providers/user_provider.dart';
@@ -224,16 +225,95 @@ class _UserLoaderState extends State<_UserLoader> {
       );
     }
 
+    final user = userProvider.currentUser!;
+
     // Web platform routing - show admin panel for admins, access denied for others
     if (kIsWeb) {
-      if (userProvider.currentUser!.isAdmin) {
+      if (user.isAdmin) {
         return const AdminWebShell();
       } else {
         return const AccessDeniedScreen();
       }
     }
 
+    // Block banned / suspended users before they reach HomeScreen
+    if (!user.canAccessApp) {
+      return _BannedScreen(user: user);
+    }
+
     // Mobile platform - show normal home screen
     return const HomeScreen();
+  }
+}
+
+class _BannedScreen extends StatelessWidget {
+  final UserModel user;
+
+  const _BannedScreen({required this.user});
+
+  @override
+  Widget build(BuildContext context) {
+    final isBanned = user.isActivelyBanned;
+    final until = user.suspendedUntil;
+
+    String title;
+    String message;
+    if (isBanned) {
+      title = 'Account Banned';
+      message = user.banReason?.isNotEmpty == true
+          ? 'Your account has been permanently banned.\n\nReason: ${user.banReason}'
+          : 'Your account has been permanently banned from SafeTrace.';
+    } else {
+      title = 'Account Suspended';
+      final untilStr = until != null
+          ? '${until.day}/${until.month}/${until.year}'
+          : 'a future date';
+      message = 'Your account has been temporarily suspended until $untilStr.\n\n'
+          'You may log back in after your suspension ends.';
+    }
+
+    return Scaffold(
+      backgroundColor: AppTheme.backgroundGrey,
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryRed.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.block, color: AppTheme.primaryRed, size: 36),
+              ),
+              const SizedBox(height: 24),
+              Text(title,
+                  style: AppTheme.headingLarge.copyWith(color: AppTheme.primaryDark),
+                  textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              Text(message,
+                  style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
+                  textAlign: TextAlign.center),
+              const SizedBox(height: 32),
+              ElevatedButton(
+                onPressed: () => FirebaseAuth.instance.signOut(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryDark,
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+                child: Text('Sign Out',
+                    style: AppTheme.bodyMedium.copyWith(
+                        color: Colors.white, fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

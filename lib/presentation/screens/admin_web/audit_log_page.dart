@@ -30,7 +30,6 @@ class _AuditLogPageState extends State<AuditLogPage> {
     ('Flag', 'flag'),
     ('Config', 'config'),
     ('Community', 'community'),
-    ('Incident', 'incident'),
   ];
 
   static const _dateOptions = [
@@ -295,8 +294,6 @@ class _AuditEntryCard extends StatelessWidget {
         return Icons.tune_outlined;
       case 'community':
         return Icons.groups_outlined;
-      case 'incident':
-        return Icons.warning_amber_outlined;
       default:
         return Icons.info_outline;
     }
