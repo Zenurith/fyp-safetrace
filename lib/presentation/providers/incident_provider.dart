@@ -381,9 +381,6 @@ class IncidentProvider extends ChangeNotifier {
     required String reporterId,
     bool isAnonymous = false,
     List<String> mediaUrls = const [],
-    bool? imageVerified,
-    double? verificationScore,
-    String? verificationNote,
     List<String> communityIds = const [],
     DateTime? incidentTime,
     String? customCategoryName,
@@ -392,15 +389,6 @@ class IncidentProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Determine initial status based on AI verification result.
-      // Image verification alone cannot set verified — that requires 2+ community upvotes.
-      IncidentStatus initialStatus;
-      if (imageVerified == true) {
-        initialStatus = IncidentStatus.underReview; // Image passed → awaiting community votes
-      } else {
-        initialStatus = IncidentStatus.pending;     // Failed or unavailable
-      }
-
       final incident = IncidentModel(
         id: '',
         title: title,
@@ -414,10 +402,7 @@ class IncidentProvider extends ChangeNotifier {
         reporterId: reporterId,
         isAnonymous: isAnonymous,
         mediaUrls: mediaUrls,
-        status: initialStatus,
-        imageVerified: imageVerified,
-        verificationScore: verificationScore,
-        verificationNote: verificationNote,
+        status: IncidentStatus.pending,
         communityIds: communityIds,
         incidentTime: incidentTime,
         customCategoryName: customCategoryName,

@@ -8,12 +8,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../config/app_constants.dart';
 import '../../data/models/incident_model.dart';
-import '../../data/models/image_verification_result.dart';
 import '../../data/services/location_service.dart';
 import '../../data/services/media_upload_service.dart';
-import '../../data/services/image_verification_service.dart';
 import '../../data/services/report_draft_service.dart';
-import '../../data/services/video_frame_extractor.dart';
 import '../../data/services/category_suggestion_service.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/incident_enum_helpers.dart';
@@ -46,9 +43,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final _locationService = LocationService();
   final _mediaService = MediaUploadService();
   final _draftService = ReportDraftService();
-  final _verificationService = ImageVerificationService(
-    apiKey: AppConstants.geminiApiKey,
-  );
   final _suggestionService = CategorySuggestionService(
     apiKey: AppConstants.geminiApiKey,
   );
@@ -68,8 +62,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   String _address = 'Jalan Genting Klang, Setapak';
   bool _loadingLocation = false;
   bool _isSubmitting = false;
-  bool _isVerifying = false;
-  ImageVerificationResult? _verificationResult;
 
   DateTime? _incidentTime;
 
@@ -678,72 +670,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
     setState(() => _isSubmitting = true);
 
-    if (_selectedMedia.isNotEmpty && _verificationService.isConfigured) {
-      if (kDebugMode) debugPrint('Report: Starting image verification...');
-      setState(() => _isVerifying = true);
-      try {
-        ImageVerificationResult? worstResult;
-        const videoExtensions = ['mp4', 'mov', 'avi', 'mkv', 'webm', '3gp'];
-        for (final media in _selectedMedia) {
-          final ext = media.path.split('.').last.toLowerCase();
-          final isVideo = videoExtensions.contains(ext);
-
-          late final ImageVerificationResult result;
-          if (isVideo) {
-            if (kDebugMode) debugPrint('Report: Extracting frame from video: ${media.path}');
-            final frame = await extractVideoFrame(media.path);
-            if (frame == null) {
-              // Web or extraction failed — flag for manual review
-              result = ImageVerificationResult.failed(
-                'Video verification is not supported on this platform. Submitted for manual review.',
-              );
-            } else {
-              if (kDebugMode) debugPrint('Report: Verifying video frame (${frame.length} bytes)');
-              result = await _verificationService.verifyImage(
-                imageBytes: frame,
-                categoryName: _selectedCategoryName ?? categoryLabel(_selectedCategory),
-                description: _descriptionController.text.trim(),
-                mimeType: 'image/jpeg',
-              );
-            }
-          } else {
-            final imageBytes = await media.readAsBytes();
-            result = await _verificationService.verifyImage(
-              imageBytes: imageBytes,
-              categoryName: _selectedCategoryName ?? categoryLabel(_selectedCategory),
-              description: _descriptionController.text.trim(),
-            );
-          }
-
-          if (worstResult == null ||
-              result.confidenceScore < worstResult.confidenceScore) {
-            worstResult = result;
-          }
-        }
-        if (worstResult != null) {
-          setState(() {
-            _verificationResult = worstResult;
-            _isVerifying = false;
-          });
-          if (!worstResult.isValid || worstResult.isLowConfidence) {
-            if (mounted) {
-              final shouldContinue =
-                  await _showVerificationWarningDialog(worstResult);
-              if (!shouldContinue) {
-                setState(() => _isSubmitting = false);
-                return;
-              }
-            }
-          }
-        } else {
-          setState(() => _isVerifying = false);
-        }
-      } catch (e) {
-        if (kDebugMode) debugPrint('Image verification error: $e');
-        setState(() => _isVerifying = false);
-      }
-    }
-
     String? incidentId;
     try {
       incidentId = await provider.reportIncident(
@@ -758,9 +684,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         address: addressToSubmit,
         reporterId: userId,
         isAnonymous: _isAnonymous,
-        imageVerified: _verificationResult?.isValid,
-        verificationScore: _verificationResult?.confidenceScore,
-        verificationNote: _verificationResult?.explanation,
         communityIds:
             _selectedCommunityId != null ? [_selectedCommunityId!] : [],
         incidentTime: _incidentTime,
@@ -801,35 +724,21 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       await _draftService.clear();
       if (!mounted) return;
 
-      final wasAutoApproved = _verificationResult != null &&
-          _verificationResult!.isValid &&
-          _verificationResult!.isHighConfidence;
-
       setState(() => _isSubmitting = false);
       await Future.delayed(const Duration(milliseconds: 100));
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Row(
             children: [
-              Icon(
-                wasAutoApproved ? Icons.verified : Icons.schedule,
-                color: Colors.white,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(wasAutoApproved
-                    ? 'Report verified and published!'
-                    : 'Report submitted for review'),
-              ),
+              Icon(Icons.schedule, color: Colors.white, size: 20),
+              SizedBox(width: 8),
+              Expanded(child: Text('Report submitted for community review')),
             ],
           ),
-          backgroundColor: wasAutoApproved
-              ? AppTheme.successGreen
-              : AppTheme.warningOrange,
-          duration: const Duration(seconds: 3),
+          backgroundColor: AppTheme.warningOrange,
+          duration: Duration(seconds: 3),
         ),
       );
 
@@ -846,108 +755,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         );
       }
     }
-  }
-
-  Future<bool> _showVerificationWarningDialog(
-      ImageVerificationResult result) async {
-    return await showDialog<bool>(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            title: Row(
-              children: [
-                Icon(
-                  result.isValid
-                      ? Icons.warning_amber
-                      : Icons.error_outline,
-                  color: result.isValid
-                      ? AppTheme.warningOrange
-                      : AppTheme.primaryRed,
-                ),
-                const SizedBox(width: 8),
-                const Text('Image Verification'),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(result.explanation,
-                    style: const TextStyle(fontSize: 14)),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.backgroundGrey,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      const Text('Confidence: '),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: _getConfidenceColor(result.confidenceScore),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          '${(result.confidenceScore * 100).toInt()}% '
-                          '(${result.confidenceLabel})',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (result.concerns.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  const Text('Concerns:',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  ...result.concerns.map((c) => Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: Text('• $c',
-                            style: const TextStyle(fontSize: 13)),
-                      )),
-                ],
-                const SizedBox(height: 16),
-                Text(
-                  result.isValid
-                      ? 'The image may not clearly match your report. Do you want to submit anyway?'
-                      : 'The image does not appear to match your selected category. Please review your submission.',
-                  style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Go Back'),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: result.isValid
-                      ? AppTheme.warningOrange
-                      : AppTheme.primaryRed,
-                ),
-                child: const Text('Submit Anyway'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-  }
-
-  Color _getConfidenceColor(double score) {
-    if (score >= 0.7) return AppTheme.successGreen;
-    if (score >= 0.4) return AppTheme.warningOrange;
-    return AppTheme.primaryRed;
   }
 
   // ─── Build ────────────────────────────────────────────────────────────────
@@ -1224,9 +1031,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                       children: [
                         const CircularProgressIndicator(),
                         const SizedBox(height: 16),
-                        Text(_isVerifying
-                            ? 'Verifying image...'
-                            : 'Submitting report...'),
+                        const Text('Submitting report...'),
                       ],
                     ),
                   ),
