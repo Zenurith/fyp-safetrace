@@ -506,7 +506,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 onTap: () async {
                   final messenger = ScaffoldMessenger.of(context);
                   Navigator.pop(context);
-                  final images = await _mediaService.pickMultipleImages();
+                  final images = await _mediaService.pickMultipleMedia();
                   if (!mounted) return;
                   if (images.isNotEmpty) {
                     final remaining = _maxMediaFiles - _selectedMedia.length;

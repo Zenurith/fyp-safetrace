@@ -32,6 +32,14 @@ class MediaUploadService {
     );
   }
 
+  Future<List<XFile>> pickMultipleMedia() async {
+    return await _picker.pickMultipleMedia(
+      maxWidth: 1920,
+      maxHeight: 1080,
+      imageQuality: 85,
+    );
+  }
+
   Future<String?> uploadFile(XFile file, String incidentId) async {
     try {
       if (kDebugMode) debugPrint('MediaUpload: Starting upload for incident $incidentId');

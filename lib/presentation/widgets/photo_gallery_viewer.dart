@@ -1,5 +1,7 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
 import '../../utils/app_theme.dart';
 
 class PhotoGalleryViewer extends StatefulWidget {
@@ -56,9 +58,13 @@ class _PhotoGalleryViewerState extends State<PhotoGalleryViewer> {
   }
 
   bool _isVideo(String url) {
-    return url.contains('/videos/') ||
-        url.toLowerCase().endsWith('.mp4') ||
-        url.toLowerCase().endsWith('.mov');
+    final lower = url.toLowerCase();
+    return lower.contains('/videos/') ||
+        lower.contains('%2fvideos%2f') ||
+        lower.contains('.mp4') ||
+        lower.contains('.mov') ||
+        lower.contains('.avi') ||
+        lower.contains('.mkv');
   }
 
   @override
@@ -73,7 +79,7 @@ class _PhotoGalleryViewerState extends State<PhotoGalleryViewer> {
             child: Container(color: Colors.transparent),
           ),
 
-          // Image PageView
+          // PageView
           PageView.builder(
             controller: _pageController,
             itemCount: widget.imageUrls.length,
@@ -85,40 +91,42 @@ class _PhotoGalleryViewerState extends State<PhotoGalleryViewer> {
               final isVideo = _isVideo(url);
               final isLocal = _isLocalFile(url);
 
+              if (isVideo) {
+                return _VideoPlayerWidget(url: url, isLocal: isLocal);
+              }
+
               return Center(
-                child: isVideo
-                    ? _buildVideoPlaceholder()
-                    : InteractiveViewer(
-                        minScale: 0.5,
-                        maxScale: 4.0,
-                        child: isLocal
-                            ? Image.file(
-                                File(url.replaceFirst('file://', '')),
-                                fit: BoxFit.contain,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return _buildErrorWidget('Failed to load image');
-                                },
-                              )
-                            : Image.network(
-                                url,
-                                fit: BoxFit.contain,
-                                loadingBuilder: (context, child, loadingProgress) {
-                                  if (loadingProgress == null) return child;
-                                  return Center(
-                                    child: CircularProgressIndicator(
-                                      value: loadingProgress.expectedTotalBytes != null
-                                          ? loadingProgress.cumulativeBytesLoaded /
-                                              loadingProgress.expectedTotalBytes!
-                                          : null,
-                                      color: Colors.white,
-                                    ),
-                                  );
-                                },
-                                errorBuilder: (context, error, stackTrace) {
-                                  return _buildErrorWidget('Failed to load image');
-                                },
+                child: InteractiveViewer(
+                  minScale: 0.5,
+                  maxScale: 4.0,
+                  child: isLocal
+                      ? Image.file(
+                          File(url.replaceFirst('file://', '')),
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) {
+                            return _buildErrorWidget('Failed to load image');
+                          },
+                        )
+                      : Image.network(
+                          url,
+                          fit: BoxFit.contain,
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Center(
+                              child: CircularProgressIndicator(
+                                value: loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
+                                color: Colors.white,
                               ),
-                      ),
+                            );
+                          },
+                          errorBuilder: (context, error, stackTrace) {
+                            return _buildErrorWidget('Failed to load image');
+                          },
+                        ),
+                ),
               );
             },
           ),
@@ -235,27 +243,6 @@ class _PhotoGalleryViewerState extends State<PhotoGalleryViewer> {
     );
   }
 
-  Widget _buildVideoPlaceholder() {
-    return Container(
-      padding: const EdgeInsets.all(40),
-      decoration: BoxDecoration(
-        color: Colors.grey[900],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: const Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.videocam, color: Colors.white, size: 48),
-          SizedBox(height: 8),
-          Text(
-            'Video playback not available',
-            style: TextStyle(color: Colors.white),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildErrorWidget(String message) {
     return Container(
       padding: const EdgeInsets.all(40),
@@ -271,6 +258,114 @@ class _PhotoGalleryViewerState extends State<PhotoGalleryViewer> {
           Text(
             message,
             style: const TextStyle(color: Colors.white54),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VideoPlayerWidget extends StatefulWidget {
+  final String url;
+  final bool isLocal;
+
+  const _VideoPlayerWidget({required this.url, required this.isLocal});
+
+  @override
+  State<_VideoPlayerWidget> createState() => _VideoPlayerWidgetState();
+}
+
+class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
+  late VideoPlayerController _controller;
+  bool _initialized = false;
+  bool _hasError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initPlayer();
+  }
+
+  Future<void> _initPlayer() async {
+    try {
+      if (widget.isLocal) {
+        final path = widget.url.replaceFirst('file://', '');
+        _controller = VideoPlayerController.file(File(path));
+      } else {
+        _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+      }
+      await _controller.initialize();
+      if (mounted) {
+        setState(() => _initialized = true);
+      }
+    } catch (e, st) {
+      if (kDebugMode) debugPrint('VideoPlayer init error: $e\n$st');
+      if (mounted) {
+        setState(() => _hasError = true);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_hasError) {
+      return Center(
+        child: Container(
+          padding: const EdgeInsets.all(40),
+          decoration: BoxDecoration(
+            color: Colors.grey[900],
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.videocam_off, color: Colors.white54, size: 48),
+              SizedBox(height: 8),
+              Text('Failed to load video', style: TextStyle(color: Colors.white54)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (!_initialized) {
+      return const Center(child: CircularProgressIndicator(color: Colors.white));
+    }
+
+    return Center(
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          AspectRatio(
+            aspectRatio: _controller.value.aspectRatio,
+            child: VideoPlayer(_controller),
+          ),
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _controller.value.isPlaying
+                    ? _controller.pause()
+                    : _controller.play();
+              });
+            },
+            child: AnimatedOpacity(
+              opacity: _controller.value.isPlaying ? 0.0 : 1.0,
+              duration: const Duration(milliseconds: 200),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  color: Colors.black54,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.play_arrow, color: Colors.white, size: 48),
+              ),
+            ),
           ),
         ],
       ),

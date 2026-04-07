@@ -216,7 +216,7 @@ class _IncidentBottomSheetState extends State<IncidentBottomSheet> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  '${incident.mediaUrls.length} ${incident.mediaUrls.length == 1 ? 'photo' : 'photos'}',
+                  '${incident.mediaUrls.length} ${incident.mediaUrls.length == 1 ? 'file' : 'files'}',
                   style: const TextStyle(
                     fontSize: 13,
                     color: AppTheme.textSecondary,
@@ -232,9 +232,13 @@ class _IncidentBottomSheetState extends State<IncidentBottomSheet> {
                 itemCount: incident.mediaUrls.length,
                 itemBuilder: (context, index) {
                   final url = incident.mediaUrls[index];
-                  final isVideo = url.contains('/videos/') ||
-                      url.toLowerCase().endsWith('.mp4') ||
-                      url.toLowerCase().endsWith('.mov');
+                  final urlLower = url.toLowerCase();
+                  final isVideo = urlLower.contains('/videos/') ||
+                      urlLower.contains('%2fvideos%2f') ||
+                      urlLower.contains('.mp4') ||
+                      urlLower.contains('.mov') ||
+                      urlLower.contains('.avi') ||
+                      urlLower.contains('.mkv');
                   final isLocalFile = url.startsWith('/') || url.startsWith('file://');
 
                   return GestureDetector(

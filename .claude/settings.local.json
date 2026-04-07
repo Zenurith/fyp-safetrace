@@ -57,7 +57,10 @@
       "Bash(py -m pip install opencv-python)",
       "Bash(\"C:/Users/User/AppData/Local/Programs/Python/Python314/python.exe\" \"c:/Users/User/Downloads/morphological_operations.py\" 2>&1)",
       "Bash(npm install:*)",
-      "Bash(echo \"EXIT:$?\")"
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(~/flutter/bin/flutter pub:*)",
+      "Bash(/c/flutter/bin/flutter pub:*)",
+      "Bash(flutter.bat pub:*)"
     ]
   }
 }
