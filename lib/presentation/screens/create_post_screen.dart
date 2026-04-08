@@ -14,6 +14,7 @@ import '../../data/services/report_draft_service.dart';
 import '../../data/services/category_suggestion_service.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/incident_enum_helpers.dart';
+import '../providers/category_provider.dart';
 import '../providers/incident_provider.dart';
 import '../providers/user_provider.dart';
 import '../providers/community_provider.dart';
@@ -102,6 +103,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         context.read<CommunityProvider>().loadMyCommunities(userId);
       }
       _checkForDraft();
+      // Force a server-side category refresh so any admin changes
+      // (disabled/deleted categories) are reflected immediately.
+      context.read<CategoryProvider>().refresh();
     });
   }
 

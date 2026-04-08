@@ -19,6 +19,7 @@ import 'presentation/providers/comment_provider.dart';
 import 'presentation/providers/flag_provider.dart';
 import 'presentation/providers/post_provider.dart';
 import 'presentation/providers/system_config_provider.dart';
+import 'presentation/providers/flag_thread_provider.dart';
 import 'presentation/screens/home_screen.dart';
 import 'presentation/screens/auth_screen.dart';
 import 'presentation/screens/community_detail_screen.dart';
@@ -69,6 +70,7 @@ class SafeTraceApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => FlagProvider()),
         ChangeNotifierProvider(create: (_) => PostProvider()),
         ChangeNotifierProvider(create: (_) => SystemConfigProvider()),
+        ChangeNotifierProvider(create: (_) => FlagThreadProvider()),
       ],
       child: MaterialApp(
         title: 'SafeTrace',
@@ -119,14 +121,30 @@ class _UserLoader extends StatefulWidget {
   State<_UserLoader> createState() => _UserLoaderState();
 }
 
-class _UserLoaderState extends State<_UserLoader> {
+class _UserLoaderState extends State<_UserLoader> with WidgetsBindingObserver {
   final _appLinks = AppLinks();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadUser();
     _initDeepLinks();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Refresh categories from server when app returns to foreground so any
+      // admin changes (e.g. deleted categories) are reflected immediately.
+      context.read<CategoryProvider>().refresh();
+    }
   }
 
   void _initDeepLinks() {

@@ -10,11 +10,13 @@ import '../../data/repositories/community_repository.dart';
 import '../providers/comment_provider.dart';
 import '../providers/community_provider.dart';
 import '../providers/flag_provider.dart';
+import '../providers/flag_thread_provider.dart';
 import '../providers/incident_provider.dart';
 import '../providers/user_provider.dart';
 import '../widgets/incident_bottom_sheet.dart';
 import '../widgets/user_avatar.dart';
 import 'create_community_screen.dart';
+import 'flag_thread_screen.dart';
 
 part 'community_manager/pending_incidents_tab.dart';
 part 'community_manager/pending_requests_tab.dart';

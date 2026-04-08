@@ -5,8 +5,10 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../data/models/user_model.dart';
 import '../../utils/app_theme.dart';
+import '../providers/flag_thread_provider.dart';
 import '../providers/user_provider.dart';
 import '../widgets/user_avatar.dart';
+import 'flag_inbox_screen.dart';
 import 'my_reports_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -297,30 +299,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                 ),
-                // My Reports button
+                // My Reports + Message Inbox buttons
                 const SizedBox(height: 12),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => MyReportsScreen(
-                              onSwitchTab: widget.onSwitchTab,
-                            ),
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => MyReportsScreen(
+                                  onSwitchTab: widget.onSwitchTab,
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.history, size: 18),
+                          label: const Text('My Reports'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryRed,
+                            foregroundColor: Colors.white,
                           ),
-                        );
-                      },
-                      icon: const Icon(Icons.history),
-                      label: const Text('My Reports'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryRed,
-                        foregroundColor: Colors.white,
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 10),
+                      _FlagUpdatesButton(),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -486,6 +494,56 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
           ),
           child: const Text('Save'),
         ),
+      ],
+    );
+  }
+}
+
+class _FlagUpdatesButton extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final unread = context.watch<FlagThreadProvider>().totalUnread;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const FlagInboxScreen()),
+            ),
+            icon: const Icon(Icons.inbox_outlined, size: 18),
+            label: const Text('Message Inbox'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryDark,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ),
+        if (unread > 0)
+          Positioned(
+            top: -4,
+            right: -4,
+            child: Container(
+              width: 18,
+              height: 18,
+              decoration: const BoxDecoration(
+                color: AppTheme.primaryRed,
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(
+                  '$unread',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }

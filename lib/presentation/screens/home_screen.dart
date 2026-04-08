@@ -12,6 +12,7 @@ import '../providers/incident_provider.dart';
 import '../providers/vote_provider.dart';
 import '../providers/alert_settings_provider.dart';
 import '../providers/community_provider.dart';
+import '../providers/flag_thread_provider.dart';
 import '../providers/system_config_provider.dart';
 import '../widgets/incident_bottom_sheet.dart';
 import '../widgets/incident_notification_overlay.dart';
@@ -20,6 +21,7 @@ import 'alert_settings_screen.dart';
 import 'profile_screen.dart';
 import 'community_list_screen.dart';
 import 'create_post_screen.dart';
+import 'flag_inbox_screen.dart';
 import 'notification_history_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -33,6 +35,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   bool _votesLoaded = false;
   bool _communitiesLoaded = false;
+  bool _flagThreadsLoaded = false;
 
   final _notificationService = IncidentNotificationService();
   final _locationService = LocationService();
@@ -55,6 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context.read<CommunityProvider>().startListening();
       _loadUserVotesIfNeeded();
       _loadMyCommunityIfNeeded();
+      _loadFlagThreadsIfNeeded();
       _initNotifications();
       _wireUpAlertSettings();
       _incidentProvider.addListener(_onIncidentProviderChanged);
@@ -162,6 +166,15 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _loadFlagThreadsIfNeeded() {
+    if (_flagThreadsLoaded) return;
+    final user = context.read<UserProvider>().currentUser;
+    if (user != null) {
+      context.read<FlagThreadProvider>().loadUserThreads(user.id);
+      _flagThreadsLoaded = true;
+    }
+  }
+
   /// Saves a notification to SharedPreferences history.
   Future<void> _saveToHistory(IncidentNotification n) async {
     try {
@@ -254,10 +267,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final userIsLoaded = context.select<UserProvider, bool>((p) => p.currentUser != null);
 
     // Load user-specific data once user is available (first time only)
-    if (userIsLoaded && (!_votesLoaded || !_communitiesLoaded)) {
+    if (userIsLoaded && (!_votesLoaded || !_communitiesLoaded || !_flagThreadsLoaded)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _loadUserVotesIfNeeded();
         _loadMyCommunityIfNeeded();
+        _loadFlagThreadsIfNeeded();
       });
     }
 
@@ -299,6 +313,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               actions: [
+                _FlagInboxButton(),
                 IconButton(
                   icon: const Icon(Icons.notifications_none_outlined,
                       color: Colors.white),
@@ -405,6 +420,49 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _FlagInboxButton extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final unread = context.watch<FlagThreadProvider>().totalUnread;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.inbox_outlined, color: Colors.white),
+          tooltip: 'Message Inbox',
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const FlagInboxScreen()),
+          ),
+        ),
+        if (unread > 0)
+          Positioned(
+            top: 6,
+            right: 6,
+            child: Container(
+              width: 16,
+              height: 16,
+              decoration: const BoxDecoration(
+                color: AppTheme.primaryRed,
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(
+                  '$unread',
+                  style: const TextStyle(
+                    fontSize: 9,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

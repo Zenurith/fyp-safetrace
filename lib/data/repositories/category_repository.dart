@@ -7,11 +7,23 @@ class CategoryRepository {
   CollectionReference<Map<String, dynamic>> get _categoriesCollection =>
       _firestore.collection('categories');
 
-  /// Initialize default categories if they don't exist
+  /// Initialize default categories if they don't exist.
+  /// Always tries the server first so the local offline cache is refreshed
+  /// before the stream starts — prevents deleted categories from reappearing.
   Future<void> initializeDefaultCategories() async {
-    final snapshot = await _categoriesCollection.get();
+    QuerySnapshot<Map<String, dynamic>> snapshot;
+    try {
+      // Force server read to bust any stale offline cache.
+      snapshot = await _categoriesCollection.get(
+        const GetOptions(source: Source.server),
+      );
+    } catch (_) {
+      // Device is offline — fall back to local cache.
+      snapshot = await _categoriesCollection.get(
+        const GetOptions(source: Source.cache),
+      );
+    }
     if (snapshot.docs.isEmpty) {
-      // No categories exist, create defaults
       for (final category in CategoryModel.defaultCategories) {
         await _categoriesCollection.doc(category.id).set(category.toMap());
       }
@@ -39,9 +51,11 @@ class CategoryRepository {
             .toList());
   }
 
-  /// Get all categories
+  /// Get all categories from server (bypasses offline cache).
   Future<List<CategoryModel>> getAll() async {
-    final snapshot = await _categoriesCollection.orderBy('sortOrder').get();
+    final snapshot = await _categoriesCollection
+        .orderBy('sortOrder')
+        .get(const GetOptions(source: Source.server));
     return snapshot.docs
         .map((doc) => CategoryModel.fromMap(doc.data(), doc.id))
         .toList();

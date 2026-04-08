@@ -711,8 +711,9 @@ class _FilterSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<IncidentProvider>(
-      builder: (context, provider, _) {
+    return Consumer2<IncidentProvider, CategoryProvider>(
+      builder: (context, provider, categoryProvider, _) {
+        final enabledCategories = categoryProvider.enabledCategories;
         return ListView(
           controller: scrollController,
           padding: const EdgeInsets.all(16),
@@ -824,13 +825,11 @@ class _FilterSheet extends StatelessWidget {
               child: Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: IncidentCategory.values.map((cat) {
-                  final label =
-                      cat.name[0].toUpperCase() + cat.name.substring(1);
+                children: enabledCategories.map((cat) {
                   return _buildFilterChip(
-                    label,
-                    provider.activeFilters.contains(label),
-                    () => provider.toggleFilter(label),
+                    cat.name,
+                    provider.activeFilters.contains(cat.name),
+                    () => provider.toggleFilter(cat.name),
                   );
                 }).toList(),
               ),

@@ -30,6 +30,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
     ('Flag', 'flag'),
     ('Config', 'config'),
     ('Community', 'community'),
+    ('Category', 'category'),
   ];
 
   static const _dateOptions = [
@@ -199,6 +200,8 @@ class _AuditEntryCard extends StatelessWidget {
         return AppTheme.accentBlue;
       case 'community':
         return AppTheme.successGreen;
+      case 'category':
+        return AppTheme.warningOrange;
       default:
         return AppTheme.textSecondary;
     }
@@ -294,6 +297,8 @@ class _AuditEntryCard extends StatelessWidget {
         return Icons.tune_outlined;
       case 'community':
         return Icons.groups_outlined;
+      case 'category':
+        return Icons.label_outline;
       default:
         return Icons.info_outline;
     }

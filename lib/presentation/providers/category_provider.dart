@@ -21,15 +21,17 @@ class CategoryProvider extends ChangeNotifier {
 
   StreamSubscription? _subscription;
 
-  /// Initialize and start listening to categories
+  /// Initialize and start listening to categories.
+  /// Hits the server on startup to bust any stale offline cache, ensuring
+  /// deleted categories are not served from a stale local snapshot.
   Future<void> initialize() async {
     _isLoading = true;
 
     try {
-      // Initialize default categories if needed
+      // Force server read first — updates offline cache before stream starts.
       await _repository.initializeDefaultCategories();
 
-      // Start listening to changes
+      // Start real-time stream.
       _subscription = _repository.watchAll().listen(
         (categories) {
           _categories = categories;
@@ -49,6 +51,17 @@ class CategoryProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  /// Force a fresh fetch from the server — call this when the app resumes
+  /// from the background to ensure categories stay in sync.
+  Future<void> refresh() async {
+    try {
+      final fresh = await _repository.getAll();
+      _categories = fresh;
+      _enabledCategories = null;
+      notifyListeners();
+    } catch (_) {}
   }
 
   /// Add a new category

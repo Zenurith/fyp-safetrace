@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../data/models/audit_log_model.dart';
 import '../../../data/models/category_model.dart';
+import '../../../data/repositories/audit_log_repository.dart';
 import '../../../utils/app_theme.dart';
 import '../../providers/category_provider.dart';
+import '../../providers/user_provider.dart';
 import '../../widgets/admin_web/responsive_layout.dart';
 
 class CategoriesManagementPage extends StatelessWidget {
@@ -145,6 +148,7 @@ class CategoriesManagementPage extends StatelessWidget {
   }
 
   void _showAddCategoryDialog(BuildContext context) {
+    final admin = context.read<UserProvider>().currentUser;
     showDialog(
       context: context,
       builder: (ctx) => _CategoryDialog(
@@ -155,6 +159,18 @@ class CategoriesManagementPage extends StatelessWidget {
                 colorHex: colorHex,
               );
           if (result != null && context.mounted) {
+            if (admin != null) {
+              AuditLogRepository().create(AuditLogModel(
+                id: '',
+                adminId: admin.id,
+                adminName: admin.name,
+                action: 'Added category "$name"',
+                targetType: 'category',
+                targetId: result,
+                detail: 'New category created.',
+                timestamp: DateTime.now(),
+              ));
+            }
             Navigator.pop(ctx);
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -296,8 +312,21 @@ class _CategoryCard extends StatelessWidget {
           Switch.adaptive(
             value: category.isEnabled,
             activeTrackColor: AppTheme.successGreen,
-            onChanged: (value) {
-              context.read<CategoryProvider>().toggleCategoryEnabled(category.id);
+            onChanged: (value) async {
+              await context.read<CategoryProvider>().toggleCategoryEnabled(category.id);
+              final admin = context.read<UserProvider>().currentUser;
+              if (admin != null) {
+                AuditLogRepository().create(AuditLogModel(
+                  id: '',
+                  adminId: admin.id,
+                  adminName: admin.name,
+                  action: '${value ? 'Enabled' : 'Disabled'} category "${category.name}"',
+                  targetType: 'category',
+                  targetId: category.id,
+                  detail: 'Category visibility toggled.',
+                  timestamp: DateTime.now(),
+                ));
+              }
             },
           ),
 
@@ -329,6 +358,7 @@ class _CategoryCard extends StatelessWidget {
   }
 
   void _showEditDialog(BuildContext context) {
+    final admin = context.read<UserProvider>().currentUser;
     showDialog(
       context: context,
       builder: (ctx) => _CategoryDialog(
@@ -342,6 +372,20 @@ class _CategoryCard extends StatelessWidget {
           final provider = context.read<CategoryProvider>();
           final result = await provider.updateCategory(updated);
           if (result && ctx.mounted) {
+            if (admin != null) {
+              AuditLogRepository().create(AuditLogModel(
+                id: '',
+                adminId: admin.id,
+                adminName: admin.name,
+                action: 'Updated category "${category.name}"',
+                targetType: 'category',
+                targetId: category.id,
+                detail: name != category.name
+                    ? 'Renamed from "${category.name}" to "$name".'
+                    : 'Icon or color updated.',
+                timestamp: DateTime.now(),
+              ));
+            }
             Navigator.pop(ctx);
             ScaffoldMessenger.of(ctx).showSnackBar(
               SnackBar(
@@ -356,6 +400,7 @@ class _CategoryCard extends StatelessWidget {
   }
 
   void _showDeleteDialog(BuildContext context) {
+    final admin = context.read<UserProvider>().currentUser;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -374,8 +419,21 @@ class _CategoryCard extends StatelessWidget {
             onPressed: () async {
               final provider = context.read<CategoryProvider>();
               final name = category.name;
-              final result = await provider.deleteCategory(category.id);
+              final id = category.id;
+              final result = await provider.deleteCategory(id);
               if (result && ctx.mounted) {
+                if (admin != null) {
+                  AuditLogRepository().create(AuditLogModel(
+                    id: '',
+                    adminId: admin.id,
+                    adminName: admin.name,
+                    action: 'Deleted category "$name"',
+                    targetType: 'category',
+                    targetId: id,
+                    detail: 'Custom category permanently removed.',
+                    timestamp: DateTime.now(),
+                  ));
+                }
                 Navigator.pop(ctx);
                 ScaffoldMessenger.of(ctx).showSnackBar(
                   SnackBar(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../data/models/user_model.dart';
+import '../../../data/repositories/user_repository.dart';
 import '../../../utils/app_theme.dart';
 import '../../providers/user_provider.dart';
 import '../../widgets/user_avatar.dart';
@@ -14,22 +15,10 @@ class UsersManagementPage extends StatefulWidget {
 }
 
 class _UsersManagementPageState extends State<UsersManagementPage> {
-  late Future<List<UserModel>> _usersFuture;
+  final Stream<List<UserModel>> _usersStream = UserRepository().watchAllUsers();
   String _searchQuery = '';
   String _roleFilter = 'all'; // 'all', 'admin', 'user'
   String _statusFilter = 'all'; // 'all', 'active', 'banned', 'suspended'
-
-  @override
-  void initState() {
-    super.initState();
-    _usersFuture = context.read<UserProvider>().fetchAllUsers();
-  }
-
-  void _refresh() {
-    setState(() {
-      _usersFuture = context.read<UserProvider>().fetchAllUsers();
-    });
-  }
 
   List<UserModel> _filterUsers(List<UserModel> users) {
     return users.where((user) {
@@ -144,20 +133,14 @@ class _UsersManagementPageState extends State<UsersManagementPage> {
               ),
               const SizedBox(width: 16),
 
-              // Refresh button
-              _ActionIconButton(
-                icon: Icons.refresh_rounded,
-                tooltip: 'Refresh users',
-                onPressed: _refresh,
-              ),
             ],
           ),
         ),
 
         // Users list
         Expanded(
-          child: FutureBuilder<List<UserModel>>(
-            future: _usersFuture,
+          child: StreamBuilder<List<UserModel>>(
+            stream: _usersStream,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(
@@ -186,16 +169,6 @@ class _UsersManagementPageState extends State<UsersManagementPage> {
                         'Please check your connection and try again',
                         style: AppTheme.bodyMedium.copyWith(
                           color: AppTheme.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton.icon(
-                        onPressed: _refresh,
-                        icon: const Icon(Icons.refresh_rounded, size: 18),
-                        label: const Text('Retry'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryRed,
-                          foregroundColor: Colors.white,
                         ),
                       ),
                     ],
@@ -245,7 +218,7 @@ class _UsersManagementPageState extends State<UsersManagementPage> {
                   final user = users[index];
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12),
-                    child: _UserCard(user: user, onRefresh: _refresh),
+                    child: _UserCard(user: user),
                   );
                 },
               );
@@ -355,9 +328,8 @@ class _ActionIconButton extends StatelessWidget {
 
 class _UserCard extends StatefulWidget {
   final UserModel user;
-  final VoidCallback onRefresh;
 
-  const _UserCard({required this.user, required this.onRefresh});
+  const _UserCard({required this.user});
 
   @override
   State<_UserCard> createState() => _UserCardState();
@@ -402,7 +374,6 @@ class _UserCardState extends State<_UserCard> {
             // Actions section
             _ActionsSection(
               user: user,
-              onRefresh: widget.onRefresh,
               isHovered: _isHovered,
             ),
           ],
@@ -696,12 +667,10 @@ class _StatItem extends StatelessWidget {
 
 class _ActionsSection extends StatelessWidget {
   final UserModel user;
-  final VoidCallback onRefresh;
   final bool isHovered;
 
   const _ActionsSection({
     required this.user,
-    required this.onRefresh,
     required this.isHovered,
   });
 
@@ -754,7 +723,6 @@ class _ActionsSection extends StatelessWidget {
               onPressed: () async {
                 final newRole = user.isAdmin ? 'user' : 'admin';
                 await context.read<UserProvider>().setUserRole(user.id, newRole);
-                onRefresh();
               },
             ),
             const SizedBox(width: 8),
@@ -764,12 +732,7 @@ class _ActionsSection extends StatelessWidget {
               icon: Icons.gavel_rounded,
               label: 'Moderate',
               color: AppTheme.primaryRed,
-              onPressed: () async {
-                final result = await UserModerationDialog.show(context, user);
-                if (result == true) {
-                  onRefresh();
-                }
-              },
+              onPressed: () => UserModerationDialog.show(context, user),
             ),
           ],
         ],

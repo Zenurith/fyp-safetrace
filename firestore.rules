@@ -217,6 +217,35 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ─── Flag Threads ───────────────────────────────────────────────────────
+    // Real-time thread workspace for flag resolution communication.
+    // Participant enforcement is at the app layer — only admins and community
+    // staff who manage the flag can open the thread screen.
+
+    match /flag_threads/{flagId} {
+      // Any authenticated user can read and write thread documents.
+      // The thread is only accessible via the flag management UI which enforces roles.
+      allow read, create: if isAuth();
+
+      // Updates cover: markRead (unreadCounts), lastMessage/lastMessageAt from sendMessage transaction.
+      allow update: if isAuth();
+
+      // Admins can fully manage (delete stale threads).
+      allow delete: if isAdmin();
+
+      match /messages/{messageId} {
+        // Any participant (authenticated user) can read messages in a thread
+        allow read: if isAuth();
+
+        // Only the sender can create a message — senderId must match auth uid
+        allow create: if isAuth()
+          && request.resource.data.senderId == request.auth.uid;
+
+        // Messages are immutable
+        allow update, delete: if false;
+      }
+    }
+
     // ─── Admin Audit Log ────────────────────────────────────────────────────
 
     match /admin_audit_log/{entryId} {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -279,6 +280,8 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
   late VideoPlayerController _controller;
   bool _initialized = false;
   bool _hasError = false;
+  bool _showControls = true;
+  Timer? _hideTimer;
 
   @override
   void initState() {
@@ -295,8 +298,10 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
         _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
       }
       await _controller.initialize();
+      _controller.addListener(_onControllerUpdate);
       if (mounted) {
         setState(() => _initialized = true);
+        _startHideTimer();
       }
     } catch (e, st) {
       if (kDebugMode) debugPrint('VideoPlayer init error: $e\n$st');
@@ -306,8 +311,47 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
     }
   }
 
+  void _onControllerUpdate() {
+    if (mounted) setState(() {});
+  }
+
+  void _togglePlayPause() {
+    if (_controller.value.isPlaying) {
+      _controller.pause();
+    } else {
+      _controller.play();
+    }
+    _showControlsTemporarily();
+  }
+
+  void _showControlsTemporarily() {
+    _hideTimer?.cancel();
+    setState(() => _showControls = true);
+    if (_controller.value.isPlaying) {
+      _startHideTimer();
+    }
+  }
+
+  void _startHideTimer() {
+    _hideTimer?.cancel();
+    _hideTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted && _controller.value.isPlaying) {
+        setState(() => _showControls = false);
+      }
+    });
+  }
+
+  String _formatDuration(Duration d) {
+    final h = d.inHours;
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return h > 0 ? '$h:$m:$s' : '$m:$s';
+  }
+
   @override
   void dispose() {
+    _hideTimer?.cancel();
+    _controller.removeListener(_onControllerUpdate);
     _controller.dispose();
     super.dispose();
   }
@@ -338,36 +382,124 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
       return const Center(child: CircularProgressIndicator(color: Colors.white));
     }
 
-    return Center(
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          AspectRatio(
-            aspectRatio: _controller.value.aspectRatio,
-            child: VideoPlayer(_controller),
-          ),
-          GestureDetector(
-            onTap: () {
-              setState(() {
-                _controller.value.isPlaying
-                    ? _controller.pause()
-                    : _controller.play();
-              });
-            },
-            child: AnimatedOpacity(
-              opacity: _controller.value.isPlaying ? 0.0 : 1.0,
-              duration: const Duration(milliseconds: 200),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: const BoxDecoration(
-                  color: Colors.black54,
-                  shape: BoxShape.circle,
+    final position = _controller.value.position;
+    final duration = _controller.value.duration;
+    final isPlaying = _controller.value.isPlaying;
+
+    return GestureDetector(
+      onTap: _showControlsTemporarily,
+      child: Center(
+        child: AspectRatio(
+          aspectRatio: _controller.value.aspectRatio,
+          child: Stack(
+            children: [
+              VideoPlayer(_controller),
+              // Controls overlay
+              AnimatedOpacity(
+                opacity: _showControls ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 200),
+                child: Stack(
+                  children: [
+                    // Center play/pause button
+                    Center(
+                      child: GestureDetector(
+                        onTap: _togglePlayPause,
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: const BoxDecoration(
+                            color: Colors.black54,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            isPlaying ? Icons.pause : Icons.play_arrow,
+                            color: Colors.white,
+                            size: 48,
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Bottom control bar
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        padding: const EdgeInsets.fromLTRB(4, 24, 8, 8),
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Colors.transparent, Colors.black87],
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            IconButton(
+                              icon: Icon(
+                                isPlaying ? Icons.pause : Icons.play_arrow,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                              onPressed: _togglePlayPause,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                            ),
+                            Text(
+                              _formatDuration(position),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontFamily: AppTheme.fontFamily,
+                              ),
+                            ),
+                            Expanded(
+                              child: SliderTheme(
+                                data: SliderTheme.of(context).copyWith(
+                                  trackHeight: 2,
+                                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                                  activeTrackColor: AppTheme.primaryRed,
+                                  inactiveTrackColor: Colors.white38,
+                                  thumbColor: Colors.white,
+                                  overlayColor: Colors.white24,
+                                ),
+                                child: Slider(
+                                  value: duration.inMilliseconds > 0
+                                      ? position.inMilliseconds
+                                          .clamp(0, duration.inMilliseconds)
+                                          .toDouble()
+                                      : 0.0,
+                                  min: 0,
+                                  max: duration.inMilliseconds > 0
+                                      ? duration.inMilliseconds.toDouble()
+                                      : 1.0,
+                                  onChangeStart: (_) => _hideTimer?.cancel(),
+                                  onChanged: (value) {
+                                    _controller.seekTo(Duration(milliseconds: value.toInt()));
+                                  },
+                                  onChangeEnd: (_) => _showControlsTemporarily(),
+                                ),
+                              ),
+                            ),
+                            Text(
+                              _formatDuration(duration),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontFamily: AppTheme.fontFamily,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                child: const Icon(Icons.play_arrow, color: Colors.white, size: 48),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
