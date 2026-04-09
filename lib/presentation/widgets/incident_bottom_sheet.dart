@@ -5,6 +5,7 @@ import '../../utils/share_utils.dart';
 import '../../data/models/flag_model.dart';
 import '../../data/models/incident_model.dart';
 import '../../data/repositories/incident_repository.dart';
+import '../../data/repositories/user_repository.dart';
 import '../../utils/app_theme.dart';
 import '../providers/incident_provider.dart';
 import '../providers/user_provider.dart';
@@ -26,13 +27,36 @@ class IncidentBottomSheet extends StatefulWidget {
 
 class _IncidentBottomSheetState extends State<IncidentBottomSheet> {
   final _repository = IncidentRepository();
+  final _userRepository = UserRepository();
   IncidentModel? _fetched;
   bool _loading = false;
+  String? _reporterName;
+  bool _reporterFetched = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchIfNeeded());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _fetchIfNeeded();
+      if (!mounted) return;
+      final provider = context.read<IncidentProvider>();
+      final incident =
+          provider.incidents.where((i) => i.id == widget.incidentId).firstOrNull ??
+          provider.myReports.where((i) => i.id == widget.incidentId).firstOrNull ??
+          _fetched;
+      if (incident != null) _loadReporterName(incident);
+    });
+  }
+
+  Future<void> _loadReporterName(IncidentModel incident) async {
+    if (_reporterFetched || incident.isAnonymous) {
+      if (!_reporterFetched) setState(() => _reporterFetched = true);
+      return;
+    }
+    setState(() => _reporterFetched = true);
+    final user = await _userRepository.getCurrentUser(incident.reporterId);
+    if (!mounted) return;
+    setState(() => _reporterName = user?.name);
   }
 
   Future<void> _fetchIfNeeded() async {
@@ -164,6 +188,13 @@ class _IncidentBottomSheetState extends State<IncidentBottomSheet> {
                 style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
               ),
             ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            incident.isAnonymous
+                ? 'Posted anonymously'
+                : 'Posted by ${_reporterName ?? '...'}',
+            style: AppTheme.caption,
           ),
 
           // Image verification badge (for admins)
