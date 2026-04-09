@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../data/models/incident_model.dart';
 import '../../utils/app_theme.dart';
+import '../providers/category_provider.dart';
 import '../providers/incident_provider.dart';
 
 class IncidentSearchDelegate extends SearchDelegate<IncidentModel?> {
@@ -134,6 +135,10 @@ class _IncidentSearchTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final categoryProvider = context.watch<CategoryProvider>();
+    final resolvedIcon = _resolvedIcon(categoryProvider);
+    final resolvedColor = _resolvedColor(categoryProvider);
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
@@ -147,12 +152,12 @@ class _IncidentSearchTile extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: _categoryColor(incident.category).withValues(alpha: 0.1),
+                  color: resolvedColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
-                  _categoryIcon(incident.category),
-                  color: _categoryColor(incident.category),
+                  resolvedIcon,
+                  color: resolvedColor,
                   size: 20,
                 ),
               ),
@@ -285,6 +290,26 @@ class _IncidentSearchTile extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  IconData _resolvedIcon(CategoryProvider categoryProvider) {
+    if (incident.category == IncidentCategory.other &&
+        incident.customCategoryName != null) {
+      final model =
+          categoryProvider.getCategoryByName(incident.customCategoryName!);
+      if (model != null) return model.icon;
+    }
+    return _categoryIcon(incident.category);
+  }
+
+  Color _resolvedColor(CategoryProvider categoryProvider) {
+    if (incident.category == IncidentCategory.other &&
+        incident.customCategoryName != null) {
+      final model =
+          categoryProvider.getCategoryByName(incident.customCategoryName!);
+      if (model != null) return model.color;
+    }
+    return _categoryColor(incident.category);
   }
 
   Color _categoryColor(IncidentCategory category) {
