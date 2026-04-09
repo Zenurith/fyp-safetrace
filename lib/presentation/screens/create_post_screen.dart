@@ -703,6 +703,17 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       }
     }
 
+    // If verification flagged the image, ask user before proceeding
+    if (imageVerified == false && mounted) {
+      final shouldPost = await _showLowConfidenceDialog(
+        verificationNote ?? 'Image may not match the selected category.',
+      );
+      if (!shouldPost) {
+        setState(() => _isSubmitting = false);
+        return;
+      }
+    }
+
     String? incidentId;
     try {
       incidentId = await provider.reportIncident(
@@ -803,6 +814,60 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         );
       }
     }
+  }
+
+  Future<bool> _showLowConfidenceDialog(String explanation) async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: AppTheme.warningOrange),
+            SizedBox(width: 8),
+            Text(
+              'Image Mismatch',
+              style: TextStyle(
+                fontFamily: AppTheme.fontFamily,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.primaryDark,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(explanation, style: AppTheme.bodyMedium),
+            const SizedBox(height: 12),
+            const Text(
+              'Your image may not match the selected category. Do you still want to post?',
+              style: TextStyle(
+                fontFamily: AppTheme.fontFamily,
+                fontSize: 12,
+                color: AppTheme.textSecondary,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.warningOrange,
+            ),
+            child: const Text('Post Anyway'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 
   // ─── Build ────────────────────────────────────────────────────────────────
