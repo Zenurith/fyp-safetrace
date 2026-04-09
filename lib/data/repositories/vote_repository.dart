@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/vote_model.dart';
 import '../models/incident_model.dart';
+import '../models/status_history_model.dart';
 import 'user_repository.dart';
 import 'system_config_repository.dart';
 
@@ -147,9 +148,21 @@ class VoteRepository {
       };
 
       if (newStatus != null) {
+        final now = Timestamp.now();
+        final existingHistory = List<Map<String, dynamic>>.from(
+          incidentData['statusHistory'] as List? ?? [],
+        );
         incidentUpdate['status'] = newStatus.index;
-        incidentUpdate['statusUpdatedAt'] = Timestamp.now();
+        incidentUpdate['statusUpdatedAt'] = now;
         incidentUpdate['statusNote'] = 'Auto-updated based on community votes';
+        incidentUpdate['statusHistory'] = [
+          ...existingHistory,
+          StatusHistoryEntry(
+            status: newStatus,
+            timestamp: now.toDate(),
+            note: 'Auto-updated based on community votes',
+          ).toMap(),
+        ];
       }
 
       transaction.set(incidentRef, incidentUpdate, SetOptions(merge: true));
@@ -271,9 +284,21 @@ class VoteRepository {
         };
 
         if (newStatus != null) {
+          final now = Timestamp.now();
+          final existingHistory = List<Map<String, dynamic>>.from(
+            incidentData['statusHistory'] as List? ?? [],
+          );
           incidentUpdate['status'] = newStatus.index;
-          incidentUpdate['statusUpdatedAt'] = Timestamp.now();
+          incidentUpdate['statusUpdatedAt'] = now;
           incidentUpdate['statusNote'] = 'Auto-updated based on community votes';
+          incidentUpdate['statusHistory'] = [
+            ...existingHistory,
+            StatusHistoryEntry(
+              status: newStatus,
+              timestamp: now.toDate(),
+              note: 'Auto-updated based on community votes',
+            ).toMap(),
+          ];
         }
 
         transaction.set(incidentRef, incidentUpdate, SetOptions(merge: true));
@@ -368,9 +393,21 @@ class VoteRepository {
         };
 
         if (newStatus != null) {
+          final now = Timestamp.now();
+          final existingHistory = List<Map<String, dynamic>>.from(
+            incidentData['statusHistory'] as List? ?? [],
+          );
           incidentUpdate['status'] = newStatus.index;
-          incidentUpdate['statusUpdatedAt'] = Timestamp.now();
+          incidentUpdate['statusUpdatedAt'] = now;
           incidentUpdate['statusNote'] = 'Auto-updated based on community votes';
+          incidentUpdate['statusHistory'] = [
+            ...existingHistory,
+            StatusHistoryEntry(
+              status: newStatus,
+              timestamp: now.toDate(),
+              note: 'Auto-updated based on community votes',
+            ).toMap(),
+          ];
         }
 
         transaction.set(incidentRef, incidentUpdate, SetOptions(merge: true));

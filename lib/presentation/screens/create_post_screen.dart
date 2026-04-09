@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../config/app_constants.dart';
 import '../../data/models/incident_model.dart';
+import '../../data/services/image_verification_service.dart';
 import '../../data/services/location_service.dart';
 import '../../data/services/media_upload_service.dart';
 import '../../data/services/report_draft_service.dart';
@@ -44,6 +45,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final _locationService = LocationService();
   final _mediaService = MediaUploadService();
   final _draftService = ReportDraftService();
+  final _verificationService = ImageVerificationService(apiKey: AppConstants.geminiApiKey);
   final _suggestionService = CategorySuggestionService(
     apiKey: AppConstants.geminiApiKey,
   );
@@ -674,6 +676,33 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
     setState(() => _isSubmitting = true);
 
+    // Run image verification on any image files before submitting
+    bool? imageVerified;
+    double? verificationScore;
+    String? verificationNote;
+    if (_selectedMedia.isNotEmpty && _verificationService.isConfigured) {
+      final imageFiles = _selectedMedia.where((f) {
+        final lower = f.path.toLowerCase();
+        return !lower.endsWith('.mp4') && !lower.endsWith('.mov') &&
+            !lower.endsWith('.avi') && !lower.endsWith('.mkv');
+      }).toList();
+      if (imageFiles.isNotEmpty) {
+        try {
+          final bytesList = await Future.wait(imageFiles.map((f) => f.readAsBytes()));
+          final result = await _verificationService.verifyMultipleImages(
+            imageBytesList: bytesList,
+            categoryName: _selectedCategoryName ?? categoryLabel(_selectedCategory),
+            description: _descriptionController.text.trim(),
+          );
+          imageVerified = result.isValid;
+          verificationScore = result.confidenceScore;
+          verificationNote = result.explanation;
+        } catch (e) {
+          if (kDebugMode) debugPrint('Image verification error: $e');
+        }
+      }
+    }
+
     String? incidentId;
     try {
       incidentId = await provider.reportIncident(
@@ -692,6 +721,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             _selectedCommunityId != null ? [_selectedCommunityId!] : [],
         incidentTime: _incidentTime,
         customCategoryName: _selectedCategoryName,
+        imageVerified: imageVerified,
+        verificationScore: verificationScore,
+        verificationNote: verificationNote,
       ).timeout(
         const Duration(seconds: 30),
         onTimeout: () {
@@ -732,17 +764,29 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       await Future.delayed(const Duration(milliseconds: 100));
       if (!mounted) return;
 
+      final autoVerified = imageVerified == true;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Row(
             children: [
-              Icon(Icons.schedule, color: Colors.white, size: 20),
-              SizedBox(width: 8),
-              Expanded(child: Text('Report submitted for community review')),
+              Icon(
+                autoVerified ? Icons.verified : Icons.schedule,
+                color: Colors.white,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  autoVerified
+                      ? 'Report image verified, under review'
+                      : 'Report submitted for community review',
+                ),
+              ),
             ],
           ),
-          backgroundColor: AppTheme.warningOrange,
-          duration: Duration(seconds: 3),
+          backgroundColor:
+              autoVerified ? AppTheme.successGreen : AppTheme.warningOrange,
+          duration: const Duration(seconds: 3),
         ),
       );
 

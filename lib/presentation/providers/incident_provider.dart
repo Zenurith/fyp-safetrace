@@ -384,6 +384,9 @@ class IncidentProvider extends ChangeNotifier {
     List<String> communityIds = const [],
     DateTime? incidentTime,
     String? customCategoryName,
+    bool? imageVerified,
+    double? verificationScore,
+    String? verificationNote,
   }) async {
     _isLoading = true;
     notifyListeners();
@@ -402,10 +405,13 @@ class IncidentProvider extends ChangeNotifier {
         reporterId: reporterId,
         isAnonymous: isAnonymous,
         mediaUrls: mediaUrls,
-        status: IncidentStatus.pending,
+        status: imageVerified == true ? IncidentStatus.underReview : IncidentStatus.pending,
         communityIds: communityIds,
         incidentTime: incidentTime,
         customCategoryName: customCategoryName,
+        imageVerified: imageVerified,
+        verificationScore: verificationScore,
+        verificationNote: verificationNote,
       );
       final id = await _repository.add(incident);
 
